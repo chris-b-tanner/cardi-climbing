@@ -259,6 +259,25 @@ $og_image   = $site_url . "/images/Cardigan-Climbing-Wall.jpg";
     }
     .hero__signup .ml-embedded * { color: var(--black) !important; }
 
+    /* ── CGI watermark wrapper ──────────────────────────── */
+    .img-cgi { position: relative; display: block; overflow: hidden; }
+    .img-cgi--full { width: 100%; }
+    .img-cgi--stretch { height: 100%; }
+    .img-cgi::after {
+      content: 'CGI \2014  our vision for the space';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 0.5rem 1.25rem;
+      background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.85);
+      font-family: var(--f-body);
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
     /* ── Hero photo ─────────────────────────────────────── */
     .hero-photo {
       width: 100%;
@@ -538,11 +557,13 @@ $og_image   = $site_url . "/images/Cardigan-Climbing-Wall.jpg";
   </div>
 </section>
 
-<img
-  src="images/Cardigan-Climbing-Wall.jpg"
-  alt="Cardigan Climbing — exterior view of the community climbing centre"
-  class="hero-photo"
->
+<div class="img-cgi img-cgi--full">
+  <img
+    src="images/Cardigan-Climbing-Wall.jpg"
+    alt="Cardigan Climbing — exterior view of the community climbing centre"
+    class="hero-photo"
+  >
+</div>
 
 <!-- Stats ────────────────────────────────────────────── -->
 <div class="stats">
@@ -614,11 +635,13 @@ $og_image   = $site_url . "/images/Cardigan-Climbing-Wall.jpg";
         </div>
       </div>
 
-      <img
-        src="images/Cardigan-Boundering-Wall.jpg"
-        alt="The bouldering area inside Cardigan Climbing"
-        class="mission__photo"
-      >
+      <div class="img-cgi">
+        <img
+          src="images/Cardigan-Boundering-Wall.jpg"
+          alt="The bouldering area inside Cardigan Climbing"
+          class="mission__photo"
+        >
+      </div>
 
     </div>
   </div>
@@ -674,11 +697,13 @@ $og_image   = $site_url . "/images/Cardigan-Climbing-Wall.jpg";
     </div>
 
     <div class="plan__features-wrap">
-      <img
-        src="images/Cardigan-Climbing-Centre.jpg"
-        alt="A group learning to climb at Cardigan Climbing Centre"
-        class="plan__features-photo"
-      >
+      <div class="img-cgi img-cgi--stretch">
+        <img
+          src="images/Cardigan-Climbing-Centre.jpg"
+          alt="A group learning to climb at Cardigan Climbing Centre"
+          class="plan__features-photo"
+        >
+      </div>
       <div class="plan__features">
         <h3>What the wall will include</h3>
         <ul class="feature-list">
