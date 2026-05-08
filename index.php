@@ -176,6 +176,34 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
     }
     .hero__actions { display: flex; gap: 1rem; flex-wrap: wrap; }
 
+    .hero__signup { margin-top: 3rem; max-width: 100%; }
+    .hero__signup-label {
+      font-family: var(--f-head);
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--black);
+      margin-bottom: 1rem;
+      max-width: none;
+    }
+    .hero__signup .ml-embedded { width: 100%; }
+    .hero__signup .ml-embedded > div,
+    .hero__signup .ml-embedded .ml-form-embedWrapper,
+    .hero__signup .ml-embedded .ml-form-embedBody,
+    .hero__signup .ml-embedded .ml-form-embedContent,
+    .hero__signup .ml-embedded .ml-form-formContent,
+    .hero__signup .ml-embedded .ml-block-form,
+    .hero__signup .ml-embedded .ml-form-horizontalRow {
+      margin-left: 0 !important;
+      margin-right: auto !important;
+      text-align: left !important;
+      float: none !important;
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .hero__signup .ml-embedded * { color: var(--black) !important; }
+
     /* ── Hero photo ─────────────────────────────────────── */
     .hero-photo {
       width: 100%;
@@ -434,6 +462,11 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
     <div class="hero__actions">
       <a href="#involved" class="btn btn--teal">Get Involved</a>
       <a href="#mission" class="btn btn--outline">Our Mission</a>
+    </div>
+
+    <div class="hero__signup">
+      <p class="hero__signup-label">Follow the project</p>
+      <div class="ml-embedded" data-form="4M8VyN"></div>
     </div>
   </div>
 </section>
