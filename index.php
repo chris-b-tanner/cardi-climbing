@@ -1,4 +1,10 @@
 <?php
+// Redirect to HTTPS on Heroku
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] !== 'https') {
+    header('Location: https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], true, 301);
+    exit;
+}
+
 $site_name  = "Cardigan Climbing";
 $site_title = "Cardigan Climbing — Climb. Connect. Community.";
 $site_desc  = "A community-led indoor climbing and bouldering wall coming to Cardigan, Wales. Open to all ages and abilities. Follow the project and help us make it happen.";
