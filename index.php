@@ -1,14 +1,63 @@
 <?php
-$site_name = "Cardigan Climbing";
-$site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales.";
+$site_name  = "Cardigan Climbing";
+$site_title = "Cardigan Climbing — Climb. Connect. Community.";
+$site_desc  = "A community-led indoor climbing and bouldering wall coming to Cardigan, Wales. Open to all ages and abilities. Follow the project and help us make it happen.";
+$site_url   = "https://www.cardiganclimbing.org";
+$og_image   = $site_url . "/images/Cardigan-Climbing-Wall.jpg";
 ?>
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= htmlspecialchars($site_name) ?></title>
+
+  <title><?= htmlspecialchars($site_title) ?></title>
   <meta name="description" content="<?= htmlspecialchars($site_desc) ?>">
+  <meta name="keywords" content="climbing wall, bouldering, Cardigan, Aberteifi, Ceredigion, West Wales, community climbing, indoor climbing, youth climbing">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="<?= htmlspecialchars($site_url) ?>">
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="<?= htmlspecialchars($site_url) ?>">
+  <meta property="og:title"       content="<?= htmlspecialchars($site_title) ?>">
+  <meta property="og:description" content="<?= htmlspecialchars($site_desc) ?>">
+  <meta property="og:image"       content="<?= htmlspecialchars($og_image) ?>">
+  <meta property="og:locale"      content="en_GB">
+  <meta property="og:site_name"   content="<?= htmlspecialchars($site_name) ?>">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="<?= htmlspecialchars($site_title) ?>">
+  <meta name="twitter:description" content="<?= htmlspecialchars($site_desc) ?>">
+  <meta name="twitter:image"       content="<?= htmlspecialchars($og_image) ?>">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SportsActivityLocation",
+    "name": "Cardigan Climbing",
+    "description": "<?= addslashes($site_desc) ?>",
+    "url": "<?= $site_url ?>",
+    "email": "cardiganclimbing@gmail.com",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Cardigan",
+      "addressRegion": "Ceredigion",
+      "addressCountry": "GB"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "52.0833",
+      "longitude": "-4.6570"
+    },
+    "sport": "Rock Climbing",
+    "currenciesAccepted": "GBP",
+    "openingHoursSpecification": [],
+    "sameAs": []
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
