@@ -303,8 +303,12 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
 
     .plan__features {
       border: 1px solid var(--border);
+      border-left: none;
       padding: 2.5rem;
       background: var(--white);
+    }
+    @media (max-width: 767px) {
+      .plan__features { border-left: 1px solid var(--border); border-top: none; }
     }
     .plan__features h3 {
       font-size: 0.75rem;
@@ -334,14 +338,22 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       background: var(--teal);
     }
 
-    /* ── Plan photo strip ───────────────────────────────── */
-    .plan-photo {
+    /* ── Plan features + photo ──────────────────────────── */
+    .plan__features-wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    @media (min-width: 768px) {
+      .plan__features-wrap { grid-template-columns: 340px 1fr; }
+    }
+    .plan__features-photo {
       width: 100%;
-      height: clamp(240px, 35vw, 480px);
+      height: 100%;
+      min-height: 320px;
       object-fit: cover;
-      object-position: center 30%;
+      object-position: center top;
       display: block;
-      margin-top: 2.5rem;
     }
 
     /* ── Get Involved ───────────────────────────────────── */
@@ -606,25 +618,26 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       </div>
     </div>
 
-    <div class="plan__features">
-      <h3>What the wall will include</h3>
-      <ul class="feature-list">
-        <li>Bouldering area for all skill levels</li>
-<li>Equipment hire (harnesses, shoes, chalk)</li>
-        <li>Dedicated junior training space</li>
-        <li>Changing rooms and accessible facilities</li>
-        <li>Cafe and social area</li>
-        <li>Flexible school and group booking</li>
-        <li>Coaching and instructed sessions</li>
-        <li>Day passes, memberships, and block booking</li>
-      </ul>
+    <div class="plan__features-wrap">
+      <img
+        src="images/Cardigan-Climbing-Centre.jpg"
+        alt="A group learning to climb at Cardigan Climbing Centre"
+        class="plan__features-photo"
+      >
+      <div class="plan__features">
+        <h3>What the wall will include</h3>
+        <ul class="feature-list">
+          <li>Bouldering area for all skill levels</li>
+          <li>Equipment hire (harnesses, shoes, chalk)</li>
+          <li>Dedicated junior training space</li>
+          <li>Changing rooms and accessible facilities</li>
+          <li>Cafe and social area</li>
+          <li>Flexible school and group booking</li>
+          <li>Coaching and instructed sessions</li>
+          <li>Day passes, memberships, and block booking</li>
+        </ul>
+      </div>
     </div>
-
-    <img
-      src="images/Cardigan-Climbing-Centre.jpg"
-      alt="The tall climbing wall inside Cardigan Climbing Centre"
-      class="plan-photo"
-    >
   </div>
 </section>
 
@@ -646,8 +659,7 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       <div class="way">
         <h3>Support Us</h3>
         <p>
-          When our community share offer launches you will be able to invest directly
-          in the wall and become a co-owner. Sign up below to hear first.
+          When our fundraiser launches we'd love you to contribute, and share the news! Sign up below to hear first.
         </p>
       </div>
       <div class="way">
@@ -669,7 +681,7 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       <h2>Get Updates</h2>
       <p>
         Sign up for project news, community events, and be the first to hear
-        when our share offer goes live.
+        when our fundraiser goes live.
       </p>
     </div>
     <div class="signup__form">
