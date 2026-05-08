@@ -14,14 +14,15 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- TODO: Replace YOUR_MAILERLITE_ACCOUNT_ID with your MailerLite account ID -->
+  <!-- MailerLite Universal -->
   <script>
-    (function(w,d,e,u,f,l,n){w[f]=w[f]||function(){(w[f].q=w[f].q||[]).push(arguments);},
-    l=d.createElement(e),l.async=1,l.src=u,n=d.getElementsByTagName(e)[0],
-    n.parentNode.insertBefore(l,n);})(window,document,'script',
-    'https://assets.mailerlite.com/js/universal.js','ml');
-    ml('account', 'YOUR_MAILERLITE_ACCOUNT_ID');
+    (function(w,d,e,u,f,l,n){w[f]=w[f]||function(){(w[f].q=w[f].q||[])
+    .push(arguments);},l=d.createElement(e),l.async=1,l.src=u,
+    n=d.getElementsByTagName(e)[0],n.parentNode.insertBefore(l,n);})
+    (window,document,'script','https://assets.mailerlite.com/js/universal.js','ml');
+    ml('account', '2331086');
   </script>
+  <!-- End MailerLite Universal -->
 
   <style>
     /* ── Tokens ─────────────────────────────────────────── */
@@ -347,8 +348,8 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
     .signup__copy .eyebrow { color: rgba(255,255,255,0.5); }
     .signup__copy p { color: rgba(255,255,255,0.7); max-width: none; }
     .signup__form { padding-top: 0.25rem; }
-    /* MailerLite light override inside teal block */
-    .signup__form .ml-embedded * { color: var(--white) !important; }
+    /* MailerLite form text — keep black against white form background */
+    .signup__form .ml-embedded * { color: var(--black) !important; }
 
     /* ── Footer ─────────────────────────────────────────── */
     .footer { background: var(--black); padding: 4rem 0 2rem; }
@@ -557,8 +558,9 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
         <p class="step__num">PHASE 03</p>
         <h3>Build &amp; Fit-Out</h3>
         <p>
-          Appointing a specialist wall builder, completing fit-out, and working towards
-          opening day. Community volunteers will be involved wherever safely possible.
+          The build and fit-out will be completed entirely by the community, with
+          specialist advice from qualified climbing guides and inspiration from
+          other community bouldering walls.
         </p>
       </div>
       <div class="step">
@@ -575,9 +577,7 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       <h3>What the wall will include</h3>
       <ul class="feature-list">
         <li>Bouldering area for all skill levels</li>
-        <li>Top-rope and lead climbing walls</li>
-        <li>Beginner-friendly auto-belay routes</li>
-        <li>Equipment hire (harnesses, shoes, chalk)</li>
+<li>Equipment hire (harnesses, shoes, chalk)</li>
         <li>Dedicated junior training space</li>
         <li>Changing rooms and accessible facilities</li>
         <li>Cafe and social area</li>
@@ -640,12 +640,7 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
       </p>
     </div>
     <div class="signup__form">
-      <!--
-        TODO: Replace the div below with your MailerLite embedded form.
-        In MailerLite go to: Forms > Embedded forms > copy the data-form value.
-        The universal JS in <head> loads it automatically.
-      -->
-      <div class="ml-embedded" data-form="YOUR_MAILERLITE_FORM_ID"></div>
+      <div class="ml-embedded" data-form="hfBS2G"></div>
     </div>
   </div>
 </div>
@@ -670,20 +665,21 @@ $site_desc = "A community-led climbing and bouldering wall for Cardigan, Wales."
         <h4>Contact</h4>
         <ul>
           <!-- TODO: Replace with your contact details -->
-          <li><a href="mailto:hello@cardiganclimbing.wales">hello@cardiganclimbing.wales</a></li>
+          <li><a href="mailto:cardiganclimbing@gmail.com">cardiganclimbing@gmail.com</a></li>
           <li>Cardigan, Ceredigion</li>
           <li>Wales, SA43</li>
         </ul>
       </div>
+      <!-- Social links: unhide once profiles are live
       <div class="footer__col">
         <h4>Follow Us</h4>
         <ul>
-          <!-- TODO: Replace # with your social links -->
           <li><a href="#">Facebook</a></li>
           <li><a href="#">Instagram</a></li>
           <li><a href="#">Twitter / X</a></li>
         </ul>
       </div>
+      -->
     </div>
     <div class="footer__bottom">
       <span>&copy; <?= date('Y') ?> Cardigan Climbing. All rights reserved.</span>
