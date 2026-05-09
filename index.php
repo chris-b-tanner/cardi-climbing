@@ -93,6 +93,21 @@ $t = [
     'img_alt_bouldering' => 'The bouldering area inside Cardigan Climbing',
     'img_alt_centre'   => 'A group learning to climb at Cardigan Climbing Centre',
     'cgi_watermark'    => 'CGI \2014  our vision for the space',
+    'nav_adventures'   => 'Adventures',
+    'adv_eyebrow'      => 'Adventure Hub',
+    'adv_h2'           => 'Your Gateway to West Wales Adventure',
+    'adv_intro'        => 'Cardigan Climbing is more than a wall. We are building a hub for outdoor adventure &#8212; connecting visitors and locals with world-class activities on one of Britain&#8217;s most spectacular coastlines. Book directly with us or we&#8217;ll put you in touch with our trusted local partners.',
+    'adv_guided_title' => 'Private Guiding',
+    'adv_1_title'      => 'Coasteering',
+    'adv_1_body'       => 'Navigate sea caves, jump from rocks, and swim through gullies on the Pembrokeshire and Ceredigion coast with qualified guides.',
+    'adv_2_title'      => 'Guided Climbing',
+    'adv_2_body'       => 'Take your skills outdoors onto the dramatic sea cliffs and crags of West Wales with our experienced mountain guides.',
+    'adv_3_title'      => 'Mountain Biking',
+    'adv_3_body'       => 'Explore the trails, lanes, and moorland of the Cambrian Mountains and Preseli Hills on two wheels &#8212; guided or self-guided.',
+    'adv_partners_title' => 'Adventure Partners',
+    'adv_partners_intro' => 'We work closely with a hand-picked group of local specialists so we can point you towards &#8212; or book directly with &#8212; the very best adventure experiences West Wales has to offer.',
+    'adv_cta'          => 'Planning a group visit, school trip, or adventure holiday? Get in touch and we&#8217;ll build your itinerary.',
+    'adv_cta_btn'      => 'Get in Touch',
   ],
   'cy' => [
     'meta_title'       => 'Dringo Aberteifi — Dringo. Cysylltu. Cymuned.',
@@ -174,6 +189,21 @@ $t = [
     'img_alt_bouldering' => 'Yr ardal bouldering yn Nringo Aberteifi',
     'img_alt_centre'   => 'Grŵp yn dysgu dringo yng Nghanolfan Ddringo Aberteifi',
     'cgi_watermark'    => 'CGI \2014  ein gweledigaeth ar gyfer y gofod',
+    'nav_adventures'   => 'Anturiaethau',
+    'adv_eyebrow'      => 'Hwb Antur',
+    'adv_h2'           => 'Eich Porth i Antur Gorllewin Cymru',
+    'adv_intro'        => 'Mae Dringo Aberteifi yn fwy na wal. Rydym yn adeiladu hwb ar gyfer antur awyr agored &#8212; yn cysylltu ymwelwyr a phobl leol â gweithgareddau o&#8217;r radd flaenaf ar hyd un o arfordiroedd mwyaf trawiadol Prydain. Archebwch yn uniongyrchol gyda ni neu byddwn yn cysylltu chi â&#8217;n partneriaid lleol dibynadwy.',
+    'adv_guided_title' => 'Tywys Preifat',
+    'adv_1_title'      => 'Arfordira',
+    'adv_1_body'       => 'Archwilio ogofâu môr, neidio oddi ar greigiau, a nofio trwy fylchau ar arfordir Penfro a Cheredigion gyda thywysyddion cymwysedig.',
+    'adv_2_title'      => 'Dringo dan Arweiniad',
+    'adv_2_body'       => 'Ewch â&#8217;ch sgiliau i&#8217;r awyr agored ar glogwyni môr a chreigiau dramatig Gorllewin Cymru gyda&#8217;n tywysyddion mynydd profiadol.',
+    'adv_3_title'      => 'Beicio Mynydd',
+    'adv_3_body'       => 'Archwilio llwybrau, lonydd, a rhostir Mynyddoedd Cambria a Bryniau&#8217;r Preseli ar ddwy olwyn &#8212; gyda thywysydd neu&#8217;n annibynnol.',
+    'adv_partners_title' => 'Partneriaid Antur',
+    'adv_partners_intro' => 'Rydym yn gweithio&#8217;n agos gyda grŵp dethol o arbenigwyr lleol fel y gallwn eich cyfeirio at &#8212; neu archebu&#8217;n uniongyrchol gyda &#8212; y profiadau antur gorau sydd gan Orllewin Cymru i&#8217;w cynnig.',
+    'adv_cta'          => 'Yn cynllunio ymweliad grŵp, taith ysgol, neu wyliau antur? Cysylltwch â ni a byddwn yn adeiladu eich rhaglen.',
+    'adv_cta_btn'      => 'Cysylltwch â Ni',
   ],
 ];
 
@@ -597,6 +627,60 @@ function t($key) {
       object-fit: cover; object-position: center top; display: block;
     }
 
+    /* ── Adventure Hub ──────────────────────────────────── */
+    .adv__intro { font-size: 1.05rem; margin-bottom: 3.5rem; }
+    .adv__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+    .adv__card { border-top: 3px solid var(--teal); padding-top: 1.5rem; }
+    .adv__card h3 { color: var(--black); margin-bottom: 0.5rem; }
+    .adv__card p  { font-size: 0.9rem; }
+    .adv__partners {
+      border: 1px solid var(--border);
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .adv__partners h3 {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      margin-bottom: 0.75rem;
+    }
+    .adv__partners-intro { font-size: 0.9rem; margin-bottom: 2rem; max-width: none; }
+    .adv__partner-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+    }
+    .adv__partner-list li {
+      padding: 0.85rem 1.5rem;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--f-head);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--black);
+    }
+    .adv__cta-block {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 2rem 2.5rem;
+      background: var(--offwhite);
+      border: 1px solid var(--border);
+    }
+    .adv__cta-block p { font-size: 0.95rem; max-width: 56ch; }
+
     /* ── Get Involved ───────────────────────────────────── */
     .involved__ways {
       display: grid;
@@ -677,6 +761,7 @@ function t($key) {
       <ul class="nav__links">
         <li><a href="#mission"><?= t('nav_mission') ?></a></li>
         <li><a href="#plan"><?= t('nav_plan') ?></a></li>
+        <li><a href="#adventures"><?= t('nav_adventures') ?></a></li>
         <li><a href="#involved"><?= t('nav_involved') ?></a></li>
       </ul>
       <div class="lang-switch">
@@ -818,6 +903,48 @@ function t($key) {
           <li><?= t('feature_8') ?></li>
         </ul>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Adventure Hub ────────────────────────────────────── -->
+<section class="section section--off" id="adventures">
+  <div class="wrap">
+    <span class="eyebrow"><?= t('adv_eyebrow') ?></span>
+    <h2><?= t('adv_h2') ?></h2>
+    <p class="adv__intro"><?= t('adv_intro') ?></p>
+
+    <span class="eyebrow"><?= t('adv_guided_title') ?></span>
+    <div class="adv__grid">
+      <div class="adv__card">
+        <h3><?= t('adv_1_title') ?></h3>
+        <p><?= t('adv_1_body') ?></p>
+      </div>
+      <div class="adv__card">
+        <h3><?= t('adv_2_title') ?></h3>
+        <p><?= t('adv_2_body') ?></p>
+      </div>
+      <div class="adv__card">
+        <h3><?= t('adv_3_title') ?></h3>
+        <p><?= t('adv_3_body') ?></p>
+      </div>
+    </div>
+
+    <div class="adv__partners">
+      <h3><?= t('adv_partners_title') ?></h3>
+      <p class="adv__partners-intro"><?= t('adv_partners_intro') ?></p>
+      <ul class="adv__partner-list">
+        <li>Adventure Beyond</li>
+        <li>Walking on Water</li>
+        <li>Forest Canoeing</li>
+        <li>Anturio</li>
+        <li>Planturio</li>
+      </ul>
+    </div>
+
+    <div class="adv__cta-block">
+      <p><?= t('adv_cta') ?></p>
+      <a href="mailto:cardiganclimbing@gmail.com" class="btn btn--teal"><?= t('adv_cta_btn') ?></a>
     </div>
   </div>
 </section>
