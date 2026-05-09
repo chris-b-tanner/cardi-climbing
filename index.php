@@ -405,6 +405,68 @@ function t($key) {
     }
     .nav__links a:hover { color: var(--black); }
 
+    /* ── Hamburger ──────────────────────────────────────── */
+    .nav__hamburger {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 22px;
+      height: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .nav__hamburger span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: var(--black);
+      transition: transform 0.2s, opacity 0.2s;
+      transform-origin: center;
+    }
+    .nav--open .nav__hamburger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav--open .nav__hamburger span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .nav--open .nav__hamburger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    @media (min-width: 640px) { .nav__hamburger { display: none; } }
+
+    /* ── Mobile menu ────────────────────────────────────── */
+    .nav__cta        { display: none; }
+    .nav__lang-desktop { display: none; }
+    @media (min-width: 640px) {
+      .nav__cta          { display: inline-block; }
+      .nav__lang-desktop { display: flex; }
+    }
+    .nav__mobile {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+    }
+    .nav--open .nav__mobile { display: block; }
+    @media (min-width: 640px) { .nav__mobile { display: none !important; } }
+    .nav__mobile ul { list-style: none; }
+    .nav__mobile ul li { border-bottom: 1px solid var(--border); }
+    .nav__mobile ul a {
+      display: block;
+      padding: 1rem 0;
+      font-family: var(--f-head);
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--black);
+      transition: color 0.15s;
+    }
+    .nav__mobile ul a:hover { color: var(--teal); }
+    .nav__mobile-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 1.25rem;
+      margin-top: 0.5rem;
+    }
+
     /* ── Language switcher ──────────────────────────────── */
     .lang-switch {
       display: flex;
@@ -764,12 +826,33 @@ function t($key) {
         <li><a href="#adventures"><?= t('nav_adventures') ?></a></li>
         <li><a href="#involved"><?= t('nav_involved') ?></a></li>
       </ul>
-      <div class="lang-switch">
+      <div class="lang-switch nav__lang-desktop">
         <a href="/" class="<?= $lang === 'en' ? 'lang-switch__current' : '' ?>">EN</a>
         <span class="lang-switch__sep">/</span>
         <a href="/?lang=cy" class="<?= $lang === 'cy' ? 'lang-switch__current' : '' ?>">CY</a>
       </div>
-      <a href="#involved" class="btn btn--teal"><?= t('nav_cta') ?></a>
+      <a href="#involved" class="btn btn--teal nav__cta"><?= t('nav_cta') ?></a>
+      <button class="nav__hamburger" id="nav-toggle" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <!-- Mobile menu -->
+    <div class="nav__mobile" id="nav-mobile">
+      <ul>
+        <li><a href="#mission"   class="nav__mobile-link"><?= t('nav_mission') ?></a></li>
+        <li><a href="#plan"      class="nav__mobile-link"><?= t('nav_plan') ?></a></li>
+        <li><a href="#adventures" class="nav__mobile-link"><?= t('nav_adventures') ?></a></li>
+        <li><a href="#involved"  class="nav__mobile-link"><?= t('nav_involved') ?></a></li>
+      </ul>
+      <div class="nav__mobile-footer">
+        <div class="lang-switch">
+          <a href="/" class="<?= $lang === 'en' ? 'lang-switch__current' : '' ?>">EN</a>
+          <span class="lang-switch__sep">/</span>
+          <a href="/?lang=cy" class="<?= $lang === 'cy' ? 'lang-switch__current' : '' ?>">CY</a>
+        </div>
+        <a href="#involved" class="btn btn--teal nav__mobile-link"><?= t('nav_cta') ?></a>
+      </div>
     </div>
   </div>
 </nav>
@@ -1028,9 +1111,26 @@ function t($key) {
 </footer>
 
 <script>
-  const nav = document.getElementById('nav');
+  const nav    = document.getElementById('nav');
+  const toggle = document.getElementById('nav-toggle');
+
+  // Sticky border on scroll
   window.addEventListener('scroll', () => {
     nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+
+  // Hamburger toggle
+  toggle.addEventListener('click', () => {
+    const open = nav.classList.toggle('nav--open');
+    toggle.setAttribute('aria-expanded', open);
+  });
+
+  // Close menu when any mobile link is clicked
+  document.querySelectorAll('.nav__mobile-link').forEach(link => {
+    link.addEventListener('click', () => {
+      nav.classList.remove('nav--open');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
   });
 </script>
 
