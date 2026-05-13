@@ -876,7 +876,7 @@ function t($key) {
 
 <div class="img-cgi img-cgi--full">
   <img
-    src="images/Cardigan-Climbing-Wall.jpg"
+    src="images/Bouldering-wall-cardigan.jpg"
     alt="<?= t('img_alt_exterior') ?>"
     class="hero-photo"
   >
