@@ -9,7 +9,7 @@ if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROT
 $lang     = (isset($_GET['lang']) && $_GET['lang'] === 'cy') ? 'cy' : 'en';
 $html_lang = ($lang === 'cy') ? 'cy' : 'en-GB';
 $site_url  = 'https://www.cardiganclimbing.org';
-$og_image  = $site_url . '/images/Cardigan-Climbing-Wall.jpg';
+$og_image  = $site_url . '/images/Bouldering-wall-cardigan.jpg';
 
 // All translations — t() returns raw HTML-safe strings (hardcoded, not user input)
 $t = [
