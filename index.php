@@ -54,7 +54,7 @@ $t = [
     'phase_1_title'    => 'Community &amp; Feasibility',
     'phase_1_body'     => 'Building the founding team, conducting a community needs survey, and identifying suitable premises in or near Cardigan town centre. Establishing a CIC to hold the asset for the long term. <br><br><strong style="color:#40a840">In progress.</strong>',
     'phase_2_title'    => 'Funding &amp; Volunteers',
-    'phase_2_body'     => 'Securing a mix of grants, community shares, and private investment.',
+    'phase_2_body'     => 'Securing a mix of grants, community shares, and private investment. Building a team of volunteers to take the project to the next level.',
     'phase_3_title'    => 'Build &amp; Fit-Out',
     'phase_3_body'     => 'The build and fit-out will be completed entirely by the community, with specialist advice from qualified climbing guides and inspiration from other community bouldering walls.',
     'phase_4_title'    => 'Open the Doors',
