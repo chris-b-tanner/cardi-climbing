@@ -1,0 +1,216 @@
+{% extends 'base.html.twig' %}
+
+{% block content %}
+
+{# ── Hero ──────────────────────────────────────────────── #}
+<section class="hero" id="home">
+  <div class="wrap">
+    <p class="hero__label">{{ 'hero_label'|trans }}</p>
+    <h1>{{ 'hero_h1'|trans|raw }}</h1>
+    <p class="hero__sub">{{ 'hero_sub'|trans }}</p>
+    <div class="hero__actions">
+      <a href="#involved" class="btn btn--teal">{{ 'hero_cta_primary'|trans }}</a>
+      <a href="#mission"  class="btn btn--outline">{{ 'hero_cta_secondary'|trans }}</a>
+    </div>
+    <div class="hero__signup">
+      <p class="hero__signup-label">{{ 'hero_signup_label'|trans }}</p>
+      <div class="ml-embedded" data-form="4M8VyN"></div>
+    </div>
+  </div>
+</section>
+
+<div class="img-cgi img-cgi--full">
+  <img
+    src="/images/Bouldering-wall-cardigan.jpg"
+    alt="{{ 'img_alt_exterior'|trans }}"
+    class="hero-photo"
+  >
+</div>
+
+{# ── Stats ─────────────────────────────────────────────── #}
+<div class="stats">
+  <div class="wrap">
+    <div class="stats__grid">
+      <div class="stats__item"><strong>1st</strong><span>{{ 'stat_1_label'|trans }}</span></div>
+      <div class="stats__item"><strong>50+</strong><span>{{ 'stat_2_label'|trans }}</span></div>
+      <div class="stats__item"><strong>10,000+</strong><span>{{ 'stat_3_label'|trans }}</span></div>
+      <div class="stats__item"><strong>3</strong><span>{{ 'stat_4_label'|trans }}</span></div>
+    </div>
+  </div>
+</div>
+
+{# ── Mission ───────────────────────────────────────────── #}
+<section class="section" id="mission">
+  <div class="wrap">
+    <div class="mission__grid">
+      <div class="mission__text">
+        <span class="eyebrow">{{ 'mission_eyebrow'|trans }}</span>
+        <h2>{{ 'mission_h2'|trans }}</h2>
+        <p>{{ 'mission_p1'|trans }}</p>
+        <p>{{ 'mission_p2'|trans }}</p>
+        <p>{{ 'mission_p3'|trans }}</p>
+        <div class="mission__pillars">
+          <div class="pillar">
+            <h3>{{ 'pillar_1_title'|trans }}</h3>
+            <p>{{ 'pillar_1_body'|trans }}</p>
+          </div>
+          <div class="pillar">
+            <h3>{{ 'pillar_2_title'|trans }}</h3>
+            <p>{{ 'pillar_2_body'|trans }}</p>
+          </div>
+          <div class="pillar">
+            <h3>{{ 'pillar_3_title'|trans }}</h3>
+            <p>{{ 'pillar_3_body'|trans }}</p>
+          </div>
+          <div class="pillar">
+            <h3>{{ 'pillar_4_title'|trans }}</h3>
+            <p>{{ 'pillar_4_body'|trans }}</p>
+          </div>
+        </div>
+        <a href="#plan" class="btn btn--teal" style="margin-top:1.5rem;">{{ 'mission_cta'|trans }}</a>
+      </div>
+      <div class="img-cgi">
+        <img
+          src="/images/Cardigan-Boundering-Wall.jpg"
+          alt="{{ 'img_alt_bouldering'|trans }}"
+          class="mission__photo"
+        >
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Plan ──────────────────────────────────────────────── #}
+<section class="section section--off" id="plan">
+  <div class="wrap">
+    <div class="plan__intro">
+      <span class="eyebrow">{{ 'plan_eyebrow'|trans }}</span>
+      <h2>{{ 'plan_h2'|trans|raw }}</h2>
+      <p>{{ 'plan_intro'|trans }}</p>
+    </div>
+    <div class="plan__steps">
+      <div class="step">
+        <p class="step__num">{{ 'phase_label'|trans }} 01</p>
+        <h3>{{ 'phase_1_title'|trans }}</h3>
+        <p>{{ 'phase_1_body'|trans|raw }}</p>
+      </div>
+      <div class="step">
+        <p class="step__num">{{ 'phase_label'|trans }} 02</p>
+        <h3>{{ 'phase_2_title'|trans }}</h3>
+        <p>{{ 'phase_2_body'|trans|raw }}</p>
+      </div>
+      <div class="step">
+        <p class="step__num">{{ 'phase_label'|trans }} 03</p>
+        <h3>{{ 'phase_3_title'|trans }}</h3>
+        <p>{{ 'phase_3_body'|trans }}</p>
+      </div>
+      <div class="step">
+        <p class="step__num">{{ 'phase_label'|trans }} 04</p>
+        <h3>{{ 'phase_4_title'|trans }}</h3>
+        <p>{{ 'phase_4_body'|trans }}</p>
+      </div>
+    </div>
+    <div class="plan__features-wrap">
+      <div class="img-cgi img-cgi--stretch">
+        <img
+          src="/images/Cardigan-Climbing-Bouldering.jpg"
+          alt="{{ 'img_alt_centre'|trans }}"
+          class="plan__features-photo"
+        >
+      </div>
+      <div class="plan__features">
+        <h3>{{ 'features_title'|trans }}</h3>
+        <ul class="feature-list">
+          <li>{{ 'feature_1'|trans }}</li>
+          <li>{{ 'feature_2'|trans }}</li>
+          <li>{{ 'feature_3'|trans }}</li>
+          <li>{{ 'feature_4'|trans }}</li>
+          <li>{{ 'feature_5'|trans }}</li>
+          <li>{{ 'feature_6'|trans }}</li>
+          <li>{{ 'feature_7'|trans }}</li>
+          <li>{{ 'feature_8'|trans }}</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Adventure Hub ─────────────────────────────────────── #}
+<section class="section section--off" id="adventures">
+  <div class="wrap">
+    <span class="eyebrow">{{ 'adv_eyebrow'|trans }}</span>
+    <h2>{{ 'adv_h2'|trans }}</h2>
+    <p class="adv__intro">{{ 'adv_intro'|trans }}</p>
+
+    <span class="eyebrow">{{ 'adv_guided_title'|trans }}</span>
+    <div class="adv__grid">
+      <div class="adv__card">
+        <h3>{{ 'adv_1_title'|trans }}</h3>
+        <p>{{ 'adv_1_body'|trans }}</p>
+      </div>
+      <div class="adv__card">
+        <h3>{{ 'adv_2_title'|trans }}</h3>
+        <p>{{ 'adv_2_body'|trans }}</p>
+      </div>
+      <div class="adv__card">
+        <h3>{{ 'adv_3_title'|trans }}</h3>
+        <p>{{ 'adv_3_body'|trans }}</p>
+      </div>
+    </div>
+
+    <div class="adv__partners">
+      <h3>{{ 'adv_partners_title'|trans }}</h3>
+      <p class="adv__partners-intro">{{ 'adv_partners_intro'|trans }}</p>
+      <ul class="adv__partner-list">
+        <li>Adventure Beyond</li>
+        <li>Walking on Water</li>
+        <li>Forest Canoeing</li>
+        <li>Anturio</li>
+        <li>Planturio</li>
+      </ul>
+    </div>
+
+    <div class="adv__cta-block">
+      <p>{{ 'adv_cta'|trans }}</p>
+      <a href="mailto:cardiganclimbing@gmail.com" class="btn btn--teal">{{ 'adv_cta_btn'|trans }}</a>
+    </div>
+  </div>
+</section>
+
+{# ── Get Involved ──────────────────────────────────────── #}
+<section class="section" id="involved">
+  <div class="wrap">
+    <span class="eyebrow">{{ 'involved_eyebrow'|trans }}</span>
+    <h2>{{ 'involved_h2'|trans }}</h2>
+    <div class="involved__ways">
+      <div class="way">
+        <h3>{{ 'way_1_title'|trans }}</h3>
+        <p>{{ 'way_1_body'|trans }}</p>
+      </div>
+      <div class="way">
+        <h3>{{ 'way_2_title'|trans }}</h3>
+        <p>{{ 'way_2_body'|trans }}</p>
+      </div>
+      <div class="way">
+        <h3>{{ 'way_3_title'|trans }}</h3>
+        <p>{{ 'way_3_body'|trans }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Signup ────────────────────────────────────────────── #}
+<div class="signup">
+  <div class="wrap">
+    <div class="signup__copy">
+      <span class="eyebrow">{{ 'signup_eyebrow'|trans }}</span>
+      <h2>{{ 'signup_h2'|trans }}</h2>
+      <p>{{ 'signup_body'|trans }}</p>
+    </div>
+    <div class="signup__form">
+      <div class="ml-embedded" data-form="hfBS2G"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

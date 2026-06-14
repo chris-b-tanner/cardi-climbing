@@ -1,0 +1,7 @@
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://www.cardiganclimbing.org/sitemap.xml

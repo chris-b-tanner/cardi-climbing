@@ -1,0 +1,16 @@
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/var/
+/public/bundles/
+###< symfony/framework-bundle ###
+
+###> symfony/dotenv ###
+.env.local.php
+###< symfony/dotenv ###
+
+/vendor/
+composer.phar
+.DS_Store
+/.idea/

@@ -1,0 +1,16 @@
+parameters:
+    app.site_url: 'https://www.cardiganclimbing.org'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            string $appEnv: '%kernel.environment%'
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
