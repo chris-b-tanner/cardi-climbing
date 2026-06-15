@@ -9,6 +9,12 @@
   <div class="btn-row">
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
     <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
+    <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
+          style="display:inline;"
+          onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
+      <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+    </form>
   </div>
 </div>
 

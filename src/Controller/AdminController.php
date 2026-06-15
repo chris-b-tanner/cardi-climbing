@@ -144,6 +144,25 @@ class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function deleteUser(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        if ($user === $this->getUser()) {
+            $this->addFlash('error', 'You cannot delete your own account.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $em->remove($user);
+        $em->flush();
+
+        $this->addFlash('success', 'Member deleted.');
+        return $this->redirectToRoute('app_admin_users');
+    }
+
     #[Route('/users/{id}/notes', name: 'app_admin_user_add_note', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function addNote(Request $request, User $user, EntityManagerInterface $em): Response
     {
