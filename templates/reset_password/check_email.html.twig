@@ -13,13 +13,6 @@
 {% block content %}
 <main class="login-page">
   <div class="login-card">
-    {% for url in app.flashes('dev_link') %}
-      <div class="alert alert--dev" style="margin-bottom:1.25rem;">
-        <strong>Dev — reset link:</strong><br>
-        <a href="{{ url }}" style="color:inherit;">{{ url }}</a>
-      </div>
-    {% endfor %}
-
     <h1>Check your email</h1>
     <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;max-width:none;">
       If an account exists for that email address, a password reset link has been sent.

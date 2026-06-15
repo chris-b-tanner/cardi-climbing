@@ -13,7 +13,6 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use SymfonyCasts\Bundle\ResetPassword\Controller\ResetPasswordControllerTrait;
 use SymfonyCasts\Bundle\ResetPassword\Exception\ResetPasswordExceptionInterface;
 use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
@@ -27,7 +26,6 @@ class ResetPasswordController extends AbstractController
         private readonly ResetPasswordHelperInterface $resetPasswordHelper,
         private readonly string $mailerFrom,
         private readonly string $mailerFromName,
-        private readonly string $appEnv,
     ) {}
 
     #[Route('', name: 'app_forgot_password_request')]
@@ -135,15 +133,7 @@ class ResetPasswordController extends AbstractController
             ->textTemplate('email/reset_password.txt.twig')
             ->context(['resetToken' => $resetToken, 'user' => $user]);
 
-        if ($this->appEnv === 'dev') {
-            $this->addFlash('dev_link', $this->generateUrl(
-                'app_reset_password',
-                ['token' => $resetToken->getToken()],
-                UrlGeneratorInterface::ABSOLUTE_URL,
-            ));
-        } else {
-            $mailer->send($message);
-        }
+        $mailer->send($message);
 
         $this->setTokenObjectInSession($resetToken);
 

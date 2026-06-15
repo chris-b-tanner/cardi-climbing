@@ -72,6 +72,9 @@
         <li><a href="#plan">{{ 'nav_plan'|trans }}</a></li>
         <li><a href="#adventures">{{ 'nav_adventures'|trans }}</a></li>
         <li><a href="#involved">{{ 'nav_involved'|trans }}</a></li>
+        {% if is_granted('ROLE_ADMIN') %}
+          <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
+        {% endif %}
       </ul>
       <div class="lang-switch nav__lang-desktop">
         <a href="/" class="{{ app.request.locale == 'en' ? 'lang-switch__current' : '' }}">EN</a>
@@ -90,6 +93,9 @@
         <li><a href="#plan"       class="nav__mobile-link">{{ 'nav_plan'|trans }}</a></li>
         <li><a href="#adventures" class="nav__mobile-link">{{ 'nav_adventures'|trans }}</a></li>
         <li><a href="#involved"   class="nav__mobile-link">{{ 'nav_involved'|trans }}</a></li>
+        {% if is_granted('ROLE_ADMIN') %}
+          <li><a href="{{ path('app_admin_users') }}" class="nav__mobile-link">Admin</a></li>
+        {% endif %}
       </ul>
       <div class="nav__mobile-footer">
         <div class="lang-switch">
