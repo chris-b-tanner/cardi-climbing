@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -69,6 +70,15 @@ class WebhookController extends AbstractController
         $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
 
         $em->persist($user);
+
+        $textBody = trim($payload['TextBody'] ?? '');
+        if ($textBody !== '') {
+            $note = new Note();
+            $note->setUser($user);
+            $note->setContent($textBody);
+            $em->persist($note);
+        }
+
         $em->flush();
 
         return new JsonResponse(['status' => 'created', 'id' => $user->getId()]);
