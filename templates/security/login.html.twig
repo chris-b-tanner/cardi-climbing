@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Sign In — Cardigan Climbing{% endblock %}
+
+{% block nav %}
+<header class="auth-header">
+  <div class="wrap">
+    <a href="/" class="nav__logo">{{ 'nav_logo'|trans|raw }}</a>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="login-page">
+  <div class="login-card">
+    <h1>Sign In</h1>
+    <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;">Members &amp; staff area</p>
+
+    {% if error %}
+      <div class="alert alert--error">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_login') }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+      <div class="form-group">
+        <label for="inputEmail">Email address</label>
+        <input type="email" id="inputEmail" name="_username" class="form-control"
+               value="{{ last_username }}" autocomplete="email" autofocus required>
+      </div>
+
+      <div class="form-group">
+        <label for="inputPassword">Password</label>
+        <input type="password" id="inputPassword" name="_password" class="form-control"
+               autocomplete="current-password" required>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn--teal">Sign In</button>
+      </div>
+    </form>
+
+    <div class="login-footer">
+      <a href="{{ path('app_forgot_password_request') }}">Forgot your password?</a>
+      &nbsp;&bull;&nbsp;
+      <a href="/">← Back to site</a>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

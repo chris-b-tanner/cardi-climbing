@@ -7,6 +7,9 @@ services:
         autoconfigure: true
         bind:
             string $appEnv: '%kernel.environment%'
+            string $mailerFrom: '%env(MAILER_FROM)%'
+            string $mailerFromName: '%env(MAILER_FROM_NAME)%'
+            string $webhookSecret: '%env(WEBHOOK_SECRET)%'
 
     App\:
         resource: '../src/'

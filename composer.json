@@ -14,17 +14,23 @@
         "symfony/dotenv": "7.2.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.2.*",
+        "symfony/http-client": "7.2.*",
+        "symfony/mailer": "7.2.*",
+        "symfony/postmark-mailer": "7.2.*",
         "symfony/runtime": "7.2.*",
         "symfony/security-bundle": "7.2.*",
         "symfony/translation": "7.2.*",
         "symfony/twig-bundle": "7.2.*",
         "symfony/validator": "7.2.*",
         "symfony/yaml": "7.2.*",
+        "symfonycasts/reset-password-bundle": "^1.0",
         "twig/extra-bundle": "^3.0",
         "twig/twig": "^3.0"
     },
     "require-dev": {
-        "symfony/maker-bundle": "^1.0"
+        "symfony/maker-bundle": "^1.0",
+        "symfony/stopwatch": "7.2.*",
+        "symfony/web-profiler-bundle": "7.2.*"
     },
     "config": {
         "allow-plugins": {

@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Forgot your password? — Cardigan Climbing{% endblock %}
+
+{% block nav %}
+<header class="auth-header">
+  <div class="wrap">
+    <a href="/" class="nav__logo">{{ 'nav_logo'|trans|raw }}</a>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="login-page">
+  <div class="login-card">
+    <h1>Forgot password?</h1>
+    <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;">
+      Enter your email address and we&rsquo;ll send you a reset link.
+    </p>
+
+    {% for message in app.flashes('reset_password_error') %}
+      <div class="alert alert--error">{{ message }}</div>
+    {% endfor %}
+
+    {% if error %}
+      <div class="alert alert--error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_forgot_password_request') }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('forgot-password') }}">
+
+      <div class="form-group">
+        <label for="inputEmail">Email address</label>
+        <input type="email" id="inputEmail" name="email" class="form-control"
+               autocomplete="email" autofocus required>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn--teal">Send reset link</button>
+      </div>
+    </form>
+
+    <div class="login-footer">
+      <a href="{{ path('app_login') }}">← Back to sign in</a>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

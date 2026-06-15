@@ -29,4 +29,27 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->persist($user);
         $this->getEntityManager()->flush();
     }
+
+    public function search(string $query = '', ?int $tagId = null): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->leftJoin('u.tags', 't')
+            ->addSelect('t');
+
+        if ($query !== '') {
+            $qb->andWhere('u.email LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q')
+               ->setParameter('q', '%' . $query . '%');
+        }
+
+        if ($tagId !== null) {
+            $qb->andWhere('t.id = :tagId')
+               ->setParameter('tagId', $tagId);
+        }
+
+        return $qb
+            ->orderBy('u.lastName', 'ASC')
+            ->addOrderBy('u.firstName', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

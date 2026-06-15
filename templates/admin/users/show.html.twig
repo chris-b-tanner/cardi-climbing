@@ -1,0 +1,60 @@
+{% extends 'admin/base.html.twig' %}
+
+{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% block title %}{{ displayName ?: user.email }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ displayName ?: user.email }}</h1>
+  <div class="btn-row">
+    <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
+    <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">First name</div>
+      <div class="card__value">{{ user.firstName ?: '—' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Last name</div>
+      <div class="card__value">{{ user.lastName ?: '—' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Email</div>
+      <div class="card__value">
+        <a href="mailto:{{ user.email }}" style="color:var(--teal);">{{ user.email }}</a>
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Role</div>
+      <div class="card__value">
+        {% if 'ROLE_ADMIN' in user.roles %}
+          <span class="role-pill role-pill--admin">Admin</span>
+        {% elseif 'ROLE_STAFF' in user.roles %}
+          <span class="role-pill role-pill--staff">Staff</span>
+        {% else %}
+          <span class="role-pill">Member</span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Joined</div>
+      <div class="card__value">{{ user.createdAt|date('j M Y') }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Tags</div>
+  {% if user.tags is empty %}
+    <span class="tag-badge--none">No tags assigned</span>
+  {% else %}
+    {% for tag in user.tags %}
+      <span class="tag-badge">{{ tag.name }}</span>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

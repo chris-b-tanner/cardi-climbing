@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Check your email — Cardigan Climbing{% endblock %}
+
+{% block nav %}
+<header class="auth-header">
+  <div class="wrap">
+    <a href="/" class="nav__logo">{{ 'nav_logo'|trans|raw }}</a>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="login-page">
+  <div class="login-card">
+    {% for url in app.flashes('dev_link') %}
+      <div class="alert alert--dev" style="margin-bottom:1.25rem;">
+        <strong>Dev — reset link:</strong><br>
+        <a href="{{ url }}" style="color:inherit;">{{ url }}</a>
+      </div>
+    {% endfor %}
+
+    <h1>Check your email</h1>
+    <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;max-width:none;">
+      If an account exists for that email address, a password reset link has been sent.
+      The link will expire in <strong style="color:var(--black);">{{ resetToken.expirationMessageKey|trans({'%count%': resetToken.expirationMessageData['%count%']}, 'ResetPasswordBundle') }}</strong>.
+    </p>
+
+    <p style="font-size:0.8rem;color:var(--muted);max-width:none;line-height:1.7;">
+      Didn&rsquo;t receive an email? Check your spam folder, or
+      <a href="{{ path('app_forgot_password_request') }}" style="color:var(--teal);">try again</a>.
+    </p>
+
+    <div class="login-footer">
+      <a href="{{ path('app_login') }}">← Back to sign in</a>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

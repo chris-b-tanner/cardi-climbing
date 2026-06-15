@@ -1,0 +1,26 @@
+<div class="result-count">{{ users|length }} {{ users|length == 1 ? 'member' : 'members' }}</div>
+
+{% if users is empty %}
+  <div class="empty">
+    <strong>No members found</strong>
+    Try adjusting your search or filter.
+  </div>
+{% else %}
+  <div class="user-list">
+    {% for user in users %}
+      {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+      <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="user-item">
+        <div class="user-item__main">
+          <div class="user-item__name">{{ displayName ?: user.email }}</div>
+          <div class="user-item__email">{{ user.email }}</div>
+        </div>
+        <div class="user-item__tags">
+          {% for tag in user.tags %}
+            <span class="tag-badge">{{ tag.name }}</span>
+          {% endfor %}
+        </div>
+        <span class="user-item__arrow">›</span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}

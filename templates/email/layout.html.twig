@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>{% block emailTitle %}Cardigan Climbing{% endblock %}</title>
+<!--[if mso]>
+<noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+<![endif]-->
+<style>
+  body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+  img{-ms-interpolation-mode:bicubic}
+  body{margin:0;padding:0;background-color:#f6f6f3;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif}
+  table{border-collapse:collapse}
+  a{color:#2d6b5a}
+  @media only screen and (max-width:600px){
+    .email-wrapper{width:100%!important}
+    .email-card{padding:32px 24px!important}
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f6f6f3;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f6f3;padding:40px 0;">
+  <tr>
+    <td align="center">
+
+      <!-- Email wrapper -->
+      <table class="email-wrapper" role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#141414;padding:24px 40px;border-radius:0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#ffffff;">
+                    CARDIGAN <span style="color:#2d6b5a;">CLIMBING</span>
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body card -->
+        <tr>
+          <td class="email-card" style="background-color:#ffffff;padding:48px 40px;border-left:1px solid #e4e2dc;border-right:1px solid #e4e2dc;">
+            {% block emailBody %}{% endblock %}
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#f6f6f3;padding:24px 40px;border:1px solid #e4e2dc;border-top:none;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;">
+                  <p style="margin:0 0 4px;">
+                    <strong style="color:#5a5857;">Cardigan Climbing</strong> &mdash; Cardigan (Aberteifi), Ceredigion, Wales
+                  </p>
+                  <p style="margin:0;">
+                    <a href="mailto:cardiganclimbing@gmail.com" style="color:#2d6b5a;text-decoration:none;">cardiganclimbing@gmail.com</a>
+                    &nbsp;&bull;&nbsp;
+                    <a href="https://www.cardiganclimbing.org" style="color:#2d6b5a;text-decoration:none;">www.cardiganclimbing.org</a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+      <!-- /Email wrapper -->
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

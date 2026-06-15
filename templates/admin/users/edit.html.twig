@@ -1,0 +1,56 @@
+{% extends 'admin/base.html.twig' %}
+
+{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% block title %}Edit — {{ displayName ?: user.email }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit member</h1>
+  <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+<form method="post" action="{{ path('app_admin_user_edit', {id: user.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_edit_' ~ user.id) }}">
+
+  <div class="card">
+    <div class="detail-grid">
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="firstName">First name</label>
+        <input type="text" id="firstName" name="firstName" class="form-control"
+               value="{{ user.firstName }}" autocomplete="given-name">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="lastName">Last name</label>
+        <input type="text" id="lastName" name="lastName" class="form-control"
+               value="{{ user.lastName }}" autocomplete="family-name">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" class="form-control"
+             value="{{ user.email }}" autocomplete="email" required>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.75rem;">Tags</div>
+    {% if allTags is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No tags exist yet — add rows directly to the <code>tag</code> table.</p>
+    {% else %}
+      <div class="tag-grid">
+        {% for tag in allTags %}
+          <input type="checkbox" id="tag_{{ tag.id }}" name="tags[]"
+                 value="{{ tag.id }}" class="tag-check"
+                 {% if user.hasTag(tag) %}checked{% endif %}>
+          <label for="tag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

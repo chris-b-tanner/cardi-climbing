@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin{% endblock %} — Cardigan Climbing</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal:    #2a9d8f;
+      --teal-dk: #21867a;
+      --black:   #1a1a1a;
+      --muted:   #6b7280;
+      --border:  #e5e7eb;
+      --bg:      #f9fafb;
+      --white:   #ffffff;
+      --red:     #dc2626;
+      --green:   #16a34a;
+      --radius:  8px;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 0.9375rem;
+      background: var(--bg);
+      color: var(--black);
+      min-height: 100vh;
+    }
+
+    .admin-bar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--black); color: #fff;
+      padding: 0 1rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 52px;
+    }
+    .admin-bar__brand {
+      font-weight: 600; font-size: 0.9rem; color: #fff; text-decoration: none;
+    }
+    .admin-bar__brand span { color: var(--teal); }
+    .admin-bar__right {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 0.8rem; color: #aaa;
+    }
+    .admin-bar__user { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+    .admin-bar__logout {
+      color: #aaa; text-decoration: none;
+      border: 1px solid #444; padding: 0.25rem 0.6rem;
+      border-radius: 4px; font-size: 0.78rem; flex-shrink: 0;
+    }
+    .admin-bar__logout:hover { border-color: #888; color: #fff; }
+
+    .admin-wrap { max-width: 960px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+
+    .flash { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.875rem; }
+    .flash--success { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
+    .flash--error   { background: #fee2e2; color: var(--red);   border: 1px solid #fecaca; }
+
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
+    }
+    .page-header h1 { font-size: 1.25rem; font-weight: 600; }
+
+    .btn {
+      display: inline-block; padding: 0.5rem 1rem; border-radius: 6px;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none;
+      text-decoration: none; line-height: 1.4;
+    }
+    .btn--teal  { background: var(--teal); color: #fff; }
+    .btn--teal:hover  { background: var(--teal-dk); }
+    .btn--ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn--ghost:hover { border-color: #9ca3af; color: var(--black); }
+    .btn--sm    { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+    .btn-row    { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    .card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
+    }
+    .card__label {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.3rem;
+    }
+    .card__value { font-size: 0.9375rem; color: var(--black); word-break: break-all; }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+    @media (max-width: 480px) { .detail-grid { grid-template-columns: 1fr; } }
+
+    .tag-badge {
+      display: inline-block; background: #e0f2fe; color: #0369a1;
+      font-size: 0.73rem; font-weight: 500; padding: 0.18rem 0.55rem;
+      border-radius: 99px; margin: 0.1rem;
+    }
+    .tag-badge--none { color: var(--muted); font-style: italic; font-size: 0.875rem; }
+
+    .role-pill {
+      display: inline-block; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0.15rem 0.5rem; border-radius: 4px;
+      background: #f3f4f6; color: var(--muted);
+    }
+    .role-pill--admin { background: #fef3c7; color: #92400e; }
+    .role-pill--staff { background: #ede9fe; color: #5b21b6; }
+
+    .filter-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .filter-form input[type="search"],
+    .filter-form select {
+      flex: 1 1 160px; padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.875rem; background: var(--white); color: var(--black);
+    }
+    .filter-form input:focus,
+    .filter-form select:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: transparent; }
+
+    .result-count { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+    .user-list { display: flex; flex-direction: column; gap: 0.4rem; }
+    .user-item {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.85rem 1rem;
+      display: flex; align-items: center; gap: 0.75rem;
+      text-decoration: none; color: inherit;
+      transition: border-color 0.1s, box-shadow 0.1s;
+    }
+    .user-item:hover { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(42,157,143,0.12); }
+    .user-item__main { flex: 1; min-width: 0; }
+    .user-item__name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-item__email { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-item__tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.2rem; flex-shrink: 0; max-width: 45%; }
+    .user-item__arrow { color: #d1d5db; flex-shrink: 0; }
+
+    .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+    .empty strong { display: block; margin-bottom: 0.4rem; color: var(--black); }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block; font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--muted); margin-bottom: 0.35rem;
+    }
+    .form-control {
+      width: 100%; padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.9375rem; color: var(--black); background: var(--white);
+      font-family: inherit;
+    }
+    .form-control:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: transparent; }
+
+    .tag-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag-check { display: none; }
+    .tag-check-label {
+      display: inline-flex; align-items: center;
+      padding: 0.35rem 0.8rem; border-radius: 99px;
+      border: 1px solid var(--border); background: var(--white);
+      font-size: 0.82rem; cursor: pointer; user-select: none;
+      transition: border-color 0.1s, background 0.1s;
+    }
+    .tag-check:checked + .tag-check-label {
+      background: #e0f2fe; border-color: #7dd3fc; color: #0369a1; font-weight: 500;
+    }
+    .tag-check-label:hover { border-color: var(--teal); }
+
+    .form-actions { display: flex; gap: 0.5rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<div class="admin-bar">
+  <a href="{{ path('app_admin_users') }}" class="admin-bar__brand">
+    <span>Cardigan</span> Admin
+  </a>
+  <div class="admin-bar__right">
+    {% if app.user %}
+      <span class="admin-bar__user">{{ app.user.firstName ?? app.user.email }}</span>
+    {% endif %}
+    <a href="{{ path('app_logout') }}" class="admin-bar__logout">Sign out</a>
+  </div>
+</div>
+
+<div class="admin-wrap">
+  {% for msg in app.flashes('success') %}
+    <div class="flash flash--success">{{ msg }}</div>
+  {% endfor %}
+  {% for msg in app.flashes('error') %}
+    <div class="flash flash--error">{{ msg }}</div>
+  {% endfor %}
+
+  {% block content %}{% endblock %}
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

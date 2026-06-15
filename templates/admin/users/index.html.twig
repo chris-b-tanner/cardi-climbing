@@ -1,0 +1,56 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Members{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Members</h1>
+  <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+</div>
+
+<div class="filter-form">
+  <input type="search" id="search-q" placeholder="Search name or email…"
+         value="{{ currentQuery }}" aria-label="Search members" autocomplete="off">
+  <select id="search-tag" aria-label="Filter by tag">
+    <option value="">All tags</option>
+    {% for tag in tags %}
+      <option value="{{ tag.id }}"{% if currentTagId == tag.id %} selected{% endif %}>{{ tag.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<div id="results">
+  {% include 'admin/users/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput = document.getElementById('search-q');
+  const tagSelect   = document.getElementById('search-tag');
+  const results     = document.getElementById('results');
+  const endpoint    = '{{ path('app_admin_users') }}';
+  let debounce;
+
+  function fetchResults() {
+    const params = new URLSearchParams();
+    if (searchInput.value) params.set('q', searchInput.value);
+    if (tagSelect.value)   params.set('tag', tagSelect.value);
+
+    const qs = params.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+    fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+
+  tagSelect.addEventListener('change', fetchResults);
+</script>
+{% endblock %}
