@@ -25,10 +25,48 @@
                value="{{ user.lastName }}" autocomplete="family-name">
       </div>
     </div>
-    <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
+    <div class="form-group" style="margin-top:1rem;">
       <label for="email">Email</label>
       <input type="email" id="email" name="email" class="form-control"
              value="{{ user.email }}" autocomplete="email" required>
+    </div>
+    <div class="form-group">
+      <label for="phone">Phone</label>
+      <input type="tel" id="phone" name="phone" class="form-control"
+             value="{{ user.phone }}" autocomplete="tel">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
+        <input type="checkbox" name="optIn" value="1"{% if user.optIn %} checked{% endif %}
+               style="width:1rem;height:1rem;accent-color:var(--teal);">
+        Opted in to mailing list
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.75rem;">Address</div>
+    <div class="form-group">
+      <label for="addressLine1">Line 1</label>
+      <input type="text" id="addressLine1" name="addressLine1" class="form-control"
+             value="{{ user.addressLine1 }}" autocomplete="address-line1">
+    </div>
+    <div class="form-group">
+      <label for="addressLine2">Line 2</label>
+      <input type="text" id="addressLine2" name="addressLine2" class="form-control"
+             value="{{ user.addressLine2 }}" autocomplete="address-line2">
+    </div>
+    <div class="detail-grid">
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="town">Town / City</label>
+        <input type="text" id="town" name="town" class="form-control"
+               value="{{ user.town }}" autocomplete="address-level2">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="postcode">Postcode</label>
+        <input type="text" id="postcode" name="postcode" class="form-control"
+               value="{{ user.postcode }}" autocomplete="postal-code">
+      </div>
     </div>
   </div>
 

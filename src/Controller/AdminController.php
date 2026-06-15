@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
@@ -111,6 +112,12 @@ class AdminController extends AbstractController
             $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
             $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
             $user->setEmail(trim($request->request->get('email', '')));
+            $user->setOptIn($request->request->has('optIn'));
+            $user->setPhone(trim($request->request->get('phone', '')) ?: null);
+            $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
+            $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
+            $user->setTown(trim($request->request->get('town', '')) ?: null);
+            $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
 
             $submittedTagIds = array_map('intval', $request->request->all()['tags'] ?? []);
 
@@ -135,5 +142,30 @@ class AdminController extends AbstractController
             'user'    => $user,
             'allTags' => $allTags,
         ]);
+    }
+
+    #[Route('/users/{id}/notes', name: 'app_admin_user_add_note', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addNote(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('note_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $content = trim($request->request->get('content', ''));
+
+        if ($content !== '') {
+            /** @var User $admin */
+            $admin = $this->getUser();
+
+            $note = new Note();
+            $note->setUser($user);
+            $note->setContent($content);
+            $note->setAddedBy($admin);
+
+            $em->persist($note);
+            $em->flush();
+        }
+
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 }

@@ -29,6 +29,14 @@
       </div>
     </div>
     <div>
+      <div class="card__label">Phone</div>
+      <div class="card__value">
+        {% if user.phone %}
+          <a href="tel:{{ user.phone }}" style="color:var(--teal);">{{ user.phone }}</a>
+        {% else %}—{% endif %}
+      </div>
+    </div>
+    <div>
       <div class="card__label">Role</div>
       <div class="card__value">
         {% if 'ROLE_ADMIN' in user.roles %}
@@ -41,11 +49,27 @@
       </div>
     </div>
     <div>
+      <div class="card__label">Mailing list</div>
+      <div class="card__value">{{ user.optIn ? 'Opted in' : 'Opted out' }}</div>
+    </div>
+    <div>
       <div class="card__label">Joined</div>
       <div class="card__value">{{ user.createdAt|date('j M Y') }}</div>
     </div>
   </div>
 </div>
+
+{% if user.addressLine1 or user.town or user.postcode %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Address</div>
+  <div class="card__value" style="line-height:1.8;">
+    {% if user.addressLine1 %}<span>{{ user.addressLine1 }}</span><br>{% endif %}
+    {% if user.addressLine2 %}<span>{{ user.addressLine2 }}</span><br>{% endif %}
+    {% if user.town %}<span>{{ user.town }}</span><br>{% endif %}
+    {% if user.postcode %}<span>{{ user.postcode }}</span>{% endif %}
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Tags</div>
@@ -56,5 +80,38 @@
       <span class="tag-badge">{{ tag.name }}</span>
     {% endfor %}
   {% endif %}
+</div>
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.75rem;">Notes</div>
+
+  {% if user.notes is empty %}
+    <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
+  {% else %}
+    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
+      {% for note in user.notes %}
+        <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
+          <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
+          <p style="font-size:0.75rem;color:var(--muted);">
+            {{ note.createdAt|date('j M Y, H:i') }}
+            {% if note.addedBy %}
+              · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
+            {% else %}
+              · System
+            {% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ path('app_admin_user_add_note', {id: user.id}) }}" novalidate>
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_' ~ user.id) }}">
+    <div class="form-group" style="margin-bottom:0.5rem;">
+      <textarea name="content" class="form-control" rows="3"
+                placeholder="Add a note…" style="resize:vertical;"></textarea>
+    </div>
+    <button type="submit" class="btn btn--teal btn--sm">Add note</button>
+  </form>
 </div>
 {% endblock %}

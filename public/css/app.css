@@ -248,22 +248,29 @@ p + p { margin-top: 1rem; }
   margin-bottom: 1rem;
   max-width: none;
 }
-.hero__signup .ml-embedded { width: 100%; }
-.hero__signup .ml-embedded > div,
-.hero__signup .ml-embedded .ml-form-embedWrapper,
-.hero__signup .ml-embedded .ml-form-embedBody,
-.hero__signup .ml-embedded .ml-form-embedContent,
-.hero__signup .ml-embedded .ml-form-formContent,
-.hero__signup .ml-embedded .ml-block-form,
-.hero__signup .ml-embedded .ml-form-horizontalRow {
-  margin-left: 0 !important;
-  margin-right: auto !important;
-  text-align: left !important;
-  float: none !important;
-  max-width: 100% !important;
-  width: 100% !important;
+.subscribe-form { width: 100%; }
+.subscribe-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
 }
-.hero__signup .ml-embedded * { color: var(--black) !important; }
+.subscribe-form__input {
+  width: 100%;
+  padding: 0.875rem 1.125rem;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: var(--white);
+  color: var(--black);
+}
+.subscribe-form__input:focus { outline: none; border-color: var(--teal); }
+.subscribe-form .btn--teal { background: var(--black); color: var(--white); width: 100%; justify-content: center; }
+.subscribe-form .btn--teal:hover { background: #333; }
+.subscribe-form__msg { font-size: 0.95rem; padding: 0.5rem 0; }
+.subscribe-form__msg--success { color: var(--teal); font-weight: 500; }
+.subscribe-form__msg--error   { color: var(--red); }
 
 /* ── CGI watermark ──────────────────────────────────── */
 .img-cgi { position: relative; display: block; overflow: hidden; }
@@ -491,7 +498,17 @@ p + p { margin-top: 1rem; }
 .signup__copy .eyebrow { color: rgba(255,255,255,0.5); }
 .signup__copy p { color: rgba(255,255,255,0.7); max-width: none; }
 .signup__form { padding-top: 0.25rem; }
-.signup__form .ml-embedded * { color: var(--black) !important; }
+.signup__form .subscribe-form__input {
+  border-color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.15);
+  color: var(--white);
+}
+.signup__form .subscribe-form__input::placeholder { color: rgba(255,255,255,0.65); }
+.signup__form .subscribe-form__input:focus { border-color: var(--white); }
+.signup__form .subscribe-form__msg--success { color: var(--white); }
+.signup__form .subscribe-form__msg--error   { color: #fef08a; }
+.signup__form .btn--teal { background: var(--black); color: var(--white); }
+.signup__form .btn--teal:hover { background: #333; }
 
 /* ── Footer ─────────────────────────────────────────── */
 .footer { background: var(--black); padding: 4rem 0 2rem; }

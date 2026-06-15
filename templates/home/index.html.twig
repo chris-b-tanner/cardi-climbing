@@ -1,6 +1,8 @@
 {% extends 'base.html.twig' %}
 
 {% block content %}
+{% set subSuccess = app.flashes('subscribe_success') %}
+{% set subError   = app.flashes('subscribe_error') %}
 
 {# ── Hero ──────────────────────────────────────────────── #}
 <section class="hero" id="home">
@@ -13,8 +15,22 @@
       <a href="#mission"  class="btn btn--outline">{{ 'hero_cta_secondary'|trans }}</a>
     </div>
     <div class="hero__signup">
-      <p class="hero__signup-label">{{ 'hero_signup_label'|trans }}</p>
-      <div class="ml-embedded" data-form="4M8VyN"></div>
+      <p class="hero__signup-label">Sign up for emails</p>
+      {% if subSuccess %}
+        <p class="subscribe-form__msg subscribe-form__msg--success">{{ subSuccess|first }}</p>
+      {% elseif subError %}
+        <p class="subscribe-form__msg subscribe-form__msg--error">{{ subError|first }}</p>
+      {% else %}
+        <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          <div class="subscribe-form__fields">
+            <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
+            <input type="text"  name="lastName"  class="subscribe-form__input" placeholder="Last name">
+            <input type="email" name="email"     class="subscribe-form__input" placeholder="Email address" required>
+          </div>
+          <button type="submit" class="btn btn--teal">Stay in the loop</button>
+        </form>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -208,7 +224,22 @@
       <p>{{ 'signup_body'|trans }}</p>
     </div>
     <div class="signup__form">
-      <div class="ml-embedded" data-form="hfBS2G"></div>
+      {% if subSuccess %}
+        <p class="subscribe-form__msg subscribe-form__msg--success">{{ subSuccess|first }}</p>
+      {% elseif subError %}
+        <p class="subscribe-form__msg subscribe-form__msg--error">{{ subError|first }}</p>
+      {% else %}
+        <p style="font-family:var(--f-head);font-size:1.4rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--white);margin-bottom:1.25rem;">Sign up for emails</p>
+        <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          <div class="subscribe-form__fields">
+            <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
+            <input type="text"  name="lastName"  class="subscribe-form__input" placeholder="Last name">
+            <input type="email" name="email"     class="subscribe-form__input" placeholder="Email address" required>
+          </div>
+          <button type="submit" class="btn btn--teal">Stay in the loop</button>
+        </form>
+      {% endif %}
     </div>
   </div>
 </div>
