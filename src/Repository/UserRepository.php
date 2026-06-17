@@ -37,7 +37,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->addSelect('t');
 
         if ($query !== '') {
-            $qb->andWhere('u.email LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q')
+            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q')
                ->setParameter('q', '%' . $query . '%');
         }
 
@@ -49,6 +49,19 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return $qb
             ->orderBy('u.lastName', 'ASC')
             ->addOrderBy('u.firstName', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByFullName(string $firstName, string $lastName, int $excludeId): array
+    {
+        return $this->createQueryBuilder('u')
+            ->where('LOWER(u.firstName) = LOWER(:fn)')
+            ->andWhere('LOWER(u.lastName) = LOWER(:ln)')
+            ->andWhere('u.id != :id')
+            ->setParameter('fn', $firstName)
+            ->setParameter('ln', $lastName)
+            ->setParameter('id', $excludeId)
             ->getQuery()
             ->getResult();
     }

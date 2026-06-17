@@ -9,18 +9,23 @@
   <div class="user-list">
     {% for user in users %}
       {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
-      <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="user-item">
-        <div class="user-item__main">
-          <div class="user-item__name">{{ displayName ?: user.email }}</div>
-          <div class="user-item__email">{{ user.email }}</div>
-        </div>
-        <div class="user-item__tags">
-          {% for tag in user.tags %}
-            <span class="tag-badge">{{ tag.name }}</span>
-          {% endfor %}
-        </div>
-        <span class="user-item__arrow">›</span>
-      </a>
+      <div class="user-item">
+        <label class="user-item__check-wrap" title="Select for merge">
+          <input type="checkbox" class="merge-check" value="{{ user.id }}">
+        </label>
+        <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="user-item__link">
+          <div class="user-item__main">
+            <div class="user-item__name">{{ displayName ?: user.email }}</div>
+            <div class="user-item__email">{{ user.email }}</div>
+          </div>
+          <div class="user-item__tags">
+            {% for tag in user.tags %}
+              <span class="tag-badge">{{ tag.name }}</span>
+            {% endfor %}
+          </div>
+          <span class="user-item__arrow">›</span>
+        </a>
+      </div>
     {% endfor %}
   </div>
 {% endif %}

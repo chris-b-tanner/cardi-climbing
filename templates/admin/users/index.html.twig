@@ -18,18 +18,93 @@
   </select>
 </div>
 
+<div id="merge-toolbar" style="display:none;" class="merge-toolbar">
+  <span id="merge-count" class="merge-count"></span>
+  <a id="merge-btn" href="#" class="btn btn--teal btn--sm">Merge selected</a>
+  <button type="button" id="merge-clear" class="btn btn--ghost btn--sm">Clear selection</button>
+</div>
+
 <div id="results">
   {% include 'admin/users/_list.html.twig' %}
 </div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .user-item { cursor: default; }
+  .user-item__check-wrap {
+    display: flex; align-items: center; padding: 0.5rem 0.25rem 0.5rem 0;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .merge-check {
+    width: 1.1rem; height: 1.1rem; accent-color: var(--teal); cursor: pointer;
+  }
+  .user-item__link {
+    flex: 1; display: flex; align-items: center; gap: 0.75rem;
+    text-decoration: none; color: inherit; min-width: 0;
+  }
+  .user-item.is-selected {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px rgba(42,157,143,0.18);
+  }
+  .merge-toolbar {
+    display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    background: #e0f2fe; border: 1px solid #7dd3fc;
+    border-radius: var(--radius); padding: 0.6rem 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  .merge-count { font-size: 0.875rem; font-weight: 500; color: #0369a1; }
+</style>
 <script>
   const searchInput = document.getElementById('search-q');
   const tagSelect   = document.getElementById('search-tag');
   const results     = document.getElementById('results');
+  const toolbar     = document.getElementById('merge-toolbar');
+  const mergeBtn    = document.getElementById('merge-btn');
+  const mergeCount  = document.getElementById('merge-count');
+  const mergeClear  = document.getElementById('merge-clear');
   const endpoint    = '{{ path('app_admin_users') }}';
+  const mergeUrl    = '{{ path('app_admin_user_merge') }}';
   let debounce;
+
+  const selected = new Set();
+
+  function syncCheckboxes() {
+    results.querySelectorAll('.merge-check').forEach(cb => {
+      const id = cb.value;
+      cb.checked = selected.has(id);
+      cb.closest('.user-item').classList.toggle('is-selected', selected.has(id));
+    });
+  }
+
+  function updateToolbar() {
+    const count = selected.size;
+    toolbar.style.display = count > 0 ? 'flex' : 'none';
+    if (count === 2) {
+      const ids = [...selected];
+      mergeBtn.href = `${mergeUrl}?ids[]=${ids[0]}&ids[]=${ids[1]}`;
+      mergeBtn.style.pointerEvents = '';
+      mergeBtn.style.opacity = '';
+      mergeCount.textContent = '2 members selected';
+    } else {
+      mergeBtn.href = '#';
+      mergeBtn.style.pointerEvents = 'none';
+      mergeBtn.style.opacity = '0.45';
+      mergeCount.textContent = count === 1
+        ? '1 member selected — select one more to merge'
+        : `${count} selected — select exactly 2 to merge`;
+    }
+  }
+
+  function attachCheckboxListeners() {
+    results.querySelectorAll('.merge-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) selected.add(cb.value); else selected.delete(cb.value);
+        cb.closest('.user-item').classList.toggle('is-selected', cb.checked);
+        updateToolbar();
+      });
+    });
+  }
 
   function fetchResults() {
     const params = new URLSearchParams();
@@ -43,8 +118,18 @@
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     })
       .then(r => r.text())
-      .then(html => { results.innerHTML = html; });
+      .then(html => {
+        results.innerHTML = html;
+        syncCheckboxes();
+        attachCheckboxListeners();
+      });
   }
+
+  mergeClear.addEventListener('click', () => {
+    selected.clear();
+    syncCheckboxes();
+    updateToolbar();
+  });
 
   searchInput.addEventListener('input', () => {
     clearTimeout(debounce);
@@ -52,5 +137,8 @@
   });
 
   tagSelect.addEventListener('change', fetchResults);
+
+  // Wire up checkboxes on initial load
+  attachCheckboxListeners();
 </script>
 {% endblock %}

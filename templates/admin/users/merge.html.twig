@@ -1,0 +1,118 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Merge members{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Merge members</h1>
+  <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+<p style="color:var(--muted);font-size:0.875rem;margin-bottom:1.25rem;">
+  Choose which member record to keep as primary. The other record's email, tags, and notes will be merged into the primary, then it will be deleted.
+</p>
+
+<form method="post" action="{{ path('app_admin_user_merge') }}" id="merge-form">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('merge_users') }}">
+  <input type="hidden" name="primaryId" id="primaryId" value="">
+  <input type="hidden" name="secondaryId" id="secondaryId" value="">
+
+  <div class="merge-cards">
+    {% for user in users %}
+      {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+      <label class="merge-card" for="pick_{{ user.id }}">
+        <input type="radio" name="primary" id="pick_{{ user.id }}" value="{{ user.id }}"
+               class="merge-radio" {% if loop.first %}checked{% endif %}>
+        <div class="merge-card__inner">
+          <div class="merge-card__check">
+            <span class="merge-card__badge">Keep as primary</span>
+          </div>
+          <div class="merge-card__name">{{ displayName ?: user.email }}</div>
+          <div class="merge-card__detail">
+            <span class="card__label" style="display:inline;">Email</span>
+            {{ user.email }}
+            {% if user.email2 %}<br>{{ user.email2 }}{% endif %}
+            {% if user.email3 %}<br>{{ user.email3 }}{% endif %}
+          </div>
+          {% if user.phone %}
+            <div class="merge-card__detail">
+              <span class="card__label" style="display:inline;">Phone</span> {{ user.phone }}
+            </div>
+          {% endif %}
+          {% if user.firstName or user.lastName %}
+            <div class="merge-card__detail">
+              <span class="card__label" style="display:inline;">Name</span>
+              {{ user.firstName }} {{ user.lastName }}
+            </div>
+          {% endif %}
+          {% if user.tags is not empty %}
+            <div class="merge-card__detail" style="margin-top:0.5rem;">
+              {% for tag in user.tags %}
+                <span class="tag-badge">{{ tag.name }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="merge-card__detail" style="color:var(--muted);font-size:0.8rem;margin-top:0.5rem;">
+            Joined {{ user.createdAt|date('j M Y') }} · {{ user.notes|length }} note(s)
+          </div>
+        </div>
+      </label>
+    {% endfor %}
+  </div>
+
+  <div class="form-actions" style="margin-top:1.5rem;">
+    <button type="submit" class="btn btn--teal">Merge members</button>
+    <a href="{{ path('app_admin_users') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .merge-cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  }
+  @media (max-width: 560px) { .merge-cards { grid-template-columns: 1fr; } }
+
+  .merge-card {
+    cursor: pointer; display: block;
+    border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--white); transition: border-color 0.15s;
+  }
+  .merge-card:has(.merge-radio:checked) {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(42,157,143,0.15);
+  }
+  .merge-card__inner { padding: 1.1rem 1.1rem 1.1rem 1.1rem; }
+  .merge-radio { display: none; }
+  .merge-card__check { margin-bottom: 0.6rem; }
+  .merge-card__badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.2rem 0.6rem; border-radius: 99px;
+    background: #f3f4f6; color: var(--muted);
+    transition: background 0.15s, color 0.15s;
+  }
+  .merge-card:has(.merge-radio:checked) .merge-card__badge {
+    background: #ccfbf1; color: #065f46;
+  }
+  .merge-card__name { font-size: 1rem; font-weight: 600; margin-bottom: 0.6rem; }
+  .merge-card__detail { font-size: 0.875rem; margin-bottom: 0.3rem; color: var(--black); }
+</style>
+<script>
+  const form       = document.getElementById('merge-form');
+  const primaryIn  = document.getElementById('primaryId');
+  const secondaryIn = document.getElementById('secondaryId');
+  const radios     = document.querySelectorAll('.merge-radio');
+  const allIds     = {{ users|map(u => u.id)|json_encode|raw }};
+
+  function syncHiddenInputs() {
+    const picked = document.querySelector('.merge-radio:checked');
+    if (!picked) return;
+    primaryIn.value   = picked.value;
+    secondaryIn.value = allIds.find(id => id != picked.value);
+  }
+
+  radios.forEach(r => r.addEventListener('change', syncHiddenInputs));
+  syncHiddenInputs();
+</script>
+{% endblock %}

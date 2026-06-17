@@ -88,10 +88,15 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user): Response
+    public function showUser(User $user, UserRepository $userRepository): Response
     {
+        $duplicates = ($user->getFirstName() && $user->getLastName())
+            ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
+            : [];
+
         return $this->render('admin/users/show.html.twig', [
-            'user' => $user,
+            'user'       => $user,
+            'duplicates' => $duplicates,
         ]);
     }
 
@@ -112,6 +117,8 @@ class AdminController extends AbstractController
             $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
             $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
             $user->setEmail(trim($request->request->get('email', '')));
+            $user->setEmail2(trim($request->request->get('email2', '')) ?: null);
+            $user->setEmail3(trim($request->request->get('email3', '')) ?: null);
             $user->setOptIn($request->request->has('optIn'));
             $user->setPhone(trim($request->request->get('phone', '')) ?: null);
             $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
@@ -142,6 +149,96 @@ class AdminController extends AbstractController
             'user'    => $user,
             'allTags' => $allTags,
         ]);
+    }
+
+    #[Route('/users/merge', name: 'app_admin_user_merge', methods: ['GET', 'POST'])]
+    public function mergeUsers(
+        Request $request,
+        UserRepository $userRepository,
+        EntityManagerInterface $em,
+    ): Response {
+        if ($request->isMethod('GET')) {
+            $ids = array_map('intval', array_filter((array) $request->query->all('ids')));
+            if (count($ids) !== 2) {
+                $this->addFlash('error', 'Select exactly 2 members to merge.');
+                return $this->redirectToRoute('app_admin_users');
+            }
+            $users = array_values(array_filter(array_map(fn($id) => $userRepository->find($id), $ids)));
+            if (count($users) !== 2) {
+                $this->addFlash('error', 'One or more members not found.');
+                return $this->redirectToRoute('app_admin_users');
+            }
+            return $this->render('admin/users/merge.html.twig', ['users' => $users]);
+        }
+
+        if (!$this->isCsrfTokenValid('merge_users', $request->request->get('_csrf_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $primaryId   = (int) $request->request->get('primaryId');
+        $secondaryId = (int) $request->request->get('secondaryId');
+
+        if ($primaryId === $secondaryId) {
+            $this->addFlash('error', 'Cannot merge a member with themselves.');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
+        $primary   = $userRepository->find($primaryId);
+        $secondary = $userRepository->find($secondaryId);
+
+        if (!$primary || !$secondary) {
+            $this->addFlash('error', 'One or more members not found.');
+            return $this->redirectToRoute('app_admin_users');
+        }
+
+        // Reassign notes via raw SQL to bypass Doctrine cascade-remove
+        $em->getConnection()->executeStatement(
+            'UPDATE note SET user_id = :p WHERE user_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId]
+        );
+
+        // Clear identity map so re-fetched secondary has an empty notes collection
+        $em->clear();
+        $primary   = $userRepository->find($primaryId);
+        $secondary = $userRepository->find($secondaryId);
+
+        // Transfer tags
+        foreach ($secondary->getTags() as $tag) {
+            $primary->addTag($tag);
+        }
+
+        // Fill blank fields on primary from secondary
+        if (!$primary->getFirstName() && $secondary->getFirstName())   $primary->setFirstName($secondary->getFirstName());
+        if (!$primary->getLastName()  && $secondary->getLastName())    $primary->setLastName($secondary->getLastName());
+        if (!$primary->getPhone()     && $secondary->getPhone())       $primary->setPhone($secondary->getPhone());
+        if (!$primary->getAddressLine1() && $secondary->getAddressLine1()) $primary->setAddressLine1($secondary->getAddressLine1());
+        if (!$primary->getAddressLine2() && $secondary->getAddressLine2()) $primary->setAddressLine2($secondary->getAddressLine2());
+        if (!$primary->getTown()      && $secondary->getTown())        $primary->setTown($secondary->getTown());
+        if (!$primary->getPostcode()  && $secondary->getPostcode())    $primary->setPostcode($secondary->getPostcode());
+        if ($secondary->isOptIn()) $primary->setOptIn(true);
+
+        // Collect all unique emails from secondary not already on primary
+        $existingEmails = array_filter([$primary->getEmail(), $primary->getEmail2(), $primary->getEmail3()]);
+        $overflow = [];
+        foreach (array_filter([$secondary->getEmail(), $secondary->getEmail2(), $secondary->getEmail3()]) as $alt) {
+            if (!in_array($alt, $existingEmails, true)) {
+                if (!$primary->addAlternateEmail($alt)) {
+                    $overflow[] = $alt;
+                }
+                $existingEmails[] = $alt;
+            }
+        }
+
+        $em->remove($secondary);
+        $em->flush();
+
+        if ($overflow) {
+            $this->addFlash('error', 'Merge complete, but could not store all alternate emails (slots full): ' . implode(', ', $overflow));
+        } else {
+            $this->addFlash('success', 'Members merged successfully.');
+        }
+
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $primary->getId()]);
     }
 
     #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]

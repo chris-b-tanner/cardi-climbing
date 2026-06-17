@@ -18,6 +18,17 @@
   </div>
 </div>
 
+{% if duplicates is not empty %}
+  {% set dupeQuery = user.firstName ~ ' ' ~ user.lastName %}
+  <div class="duplicate-warning">
+    <span class="duplicate-warning__icon">⚠</span>
+    <span>
+      {{ duplicates|length }} other {{ duplicates|length == 1 ? 'member' : 'members' }} found with the name <strong>{{ dupeQuery }}</strong>.
+      <a href="{{ path('app_admin_users', {q: dupeQuery}) }}" class="duplicate-warning__link">View all matches</a>
+    </span>
+  </div>
+{% endif %}
+
 <div class="card">
   <div class="detail-grid">
     <div>
@@ -32,6 +43,12 @@
       <div class="card__label">Email</div>
       <div class="card__value">
         <a href="mailto:{{ user.email }}" style="color:var(--teal);">{{ user.email }}</a>
+        {% if user.email2 %}
+          <br><a href="mailto:{{ user.email2 }}" style="color:var(--teal);font-size:0.85rem;">{{ user.email2 }}</a>
+        {% endif %}
+        {% if user.email3 %}
+          <br><a href="mailto:{{ user.email3 }}" style="color:var(--teal);font-size:0.85rem;">{{ user.email3 }}</a>
+        {% endif %}
       </div>
     </div>
     <div>

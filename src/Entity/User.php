@@ -60,6 +60,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $postcode = null;
 
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $email2 = null;
+
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $email3 = null;
+
     #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'users')]
     #[ORM\JoinTable(name: 'user_tag')]
     private Collection $tags;
@@ -205,6 +211,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getPostcode(): ?string { return $this->postcode; }
     public function setPostcode(?string $postcode): static { $this->postcode = $postcode; return $this; }
+
+    public function getEmail2(): ?string { return $this->email2; }
+    public function setEmail2(?string $email2): static { $this->email2 = $email2; return $this; }
+
+    public function getEmail3(): ?string { return $this->email3; }
+    public function setEmail3(?string $email3): static { $this->email3 = $email3; return $this; }
+
+    /** Stores an email in the next available alternate slot. Returns false if all slots are full. */
+    public function addAlternateEmail(string $email): bool
+    {
+        if (!$this->email2) { $this->email2 = $email; return true; }
+        if (!$this->email3) { $this->email3 = $email; return true; }
+        return false;
+    }
 
     public function getNotes(): Collection { return $this->notes; }
 }
