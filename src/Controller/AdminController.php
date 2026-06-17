@@ -75,6 +75,17 @@ class AdminController extends AbstractController
                 $user->setPassword($hasher->hashPassword($user, $password));
 
                 $em->persist($user);
+
+                /** @var User $admin */
+                $admin = $this->getUser();
+                $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
+
+                $note = new Note();
+                $note->setUser($user);
+                $note->setContent('Contact added manually by ' . $adminName . '.');
+                $note->setAddedBy($admin);
+                $em->persist($note);
+
                 $em->flush();
 
                 $this->addFlash('success', 'Member created.');

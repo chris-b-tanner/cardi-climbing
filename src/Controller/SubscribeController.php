@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,11 @@ class SubscribeController extends AbstractController
             $user->setEmail($email);
             $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
             $em->persist($user);
+
+            $note = new Note();
+            $note->setUser($user);
+            $note->setContent('Contact added via website subscription form.');
+            $em->persist($note);
         }
 
         if ($firstName) {

@@ -81,6 +81,11 @@ class WebhookController extends AbstractController
 
         $em->persist($user);
 
+        $sourceNote = new Note();
+        $sourceNote->setUser($user);
+        $sourceNote->setContent('Contact added via inbound email from ' . $fromEmail . '.');
+        $em->persist($sourceNote);
+
         if ($textBody !== '') {
             $note = new Note();
             $note->setUser($user);
