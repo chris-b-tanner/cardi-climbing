@@ -50,8 +50,18 @@ class WebhookController extends AbstractController
             return new JsonResponse(['error' => 'No valid sender email in payload'], 422);
         }
 
-        if ($userRepository->findOneBy(['email' => $fromEmail])) {
-            return new JsonResponse(['status' => 'exists']);
+        $user     = $userRepository->findByAnyEmail($fromEmail);
+        $textBody = trim($payload['TextBody'] ?? '');
+
+        if ($user !== null) {
+            if ($textBody !== '') {
+                $note = new Note();
+                $note->setUser($user);
+                $note->setContent($textBody);
+                $em->persist($note);
+                $em->flush();
+            }
+            return new JsonResponse(['status' => 'noted', 'id' => $user->getId()]);
         }
 
         if ($fromName !== '') {
@@ -71,7 +81,6 @@ class WebhookController extends AbstractController
 
         $em->persist($user);
 
-        $textBody = trim($payload['TextBody'] ?? '');
         if ($textBody !== '') {
             $note = new Note();
             $note->setUser($user);
