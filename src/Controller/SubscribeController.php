@@ -22,7 +22,8 @@ class SubscribeController extends AbstractController
         UserPasswordHasherInterface $hasher,
     ): Response {
         if (!$this->isCsrfTokenValid('subscribe', $request->request->get('_csrf_token'))) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
         }
 
         $email     = strtolower(trim($request->request->get('email', '')));

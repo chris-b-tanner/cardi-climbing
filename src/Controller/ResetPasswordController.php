@@ -33,7 +33,8 @@ class ResetPasswordController extends AbstractController
     {
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('forgot-password', $request->request->get('_csrf_token'))) {
-                throw $this->createAccessDeniedException('Invalid CSRF token.');
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
             }
             return $this->processForgotPassword($request, $mailer, $userRepository);
         }
@@ -72,7 +73,8 @@ class ResetPasswordController extends AbstractController
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('reset-password', $request->request->get('_csrf_token'))) {
-                throw $this->createAccessDeniedException('Invalid CSRF token.');
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
             }
 
             $password  = $request->request->get('password', '');

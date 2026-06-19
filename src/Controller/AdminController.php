@@ -53,7 +53,8 @@ class AdminController extends AbstractController
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('admin_user_new', $request->request->get('_csrf_token'))) {
-                throw $this->createAccessDeniedException('Invalid CSRF token.');
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
             }
 
             $email = trim($request->request->get('email', ''));
@@ -122,7 +123,8 @@ class AdminController extends AbstractController
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('admin_edit_' . $user->getId(), $request->request->get('_csrf_token'))) {
-                throw $this->createAccessDeniedException('Invalid CSRF token.');
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
             }
 
             $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
@@ -183,7 +185,8 @@ class AdminController extends AbstractController
         }
 
         if (!$this->isCsrfTokenValid('merge_users', $request->request->get('_csrf_token'))) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
         }
 
         $primaryId   = (int) $request->request->get('primaryId');
@@ -256,7 +259,8 @@ class AdminController extends AbstractController
     public function deleteUser(Request $request, User $user, EntityManagerInterface $em): Response
     {
         if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
         }
 
         if ($user === $this->getUser()) {
@@ -275,7 +279,8 @@ class AdminController extends AbstractController
     public function addNote(Request $request, User $user, EntityManagerInterface $em): Response
     {
         if (!$this->isCsrfTokenValid('note_' . $user->getId(), $request->request->get('_csrf_token'))) {
-            throw $this->createAccessDeniedException('Invalid CSRF token.');
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
         }
 
         $content = trim($request->request->get('content', ''));

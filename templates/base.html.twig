@@ -74,6 +74,12 @@
         <li><a href="#involved">{{ 'nav_involved'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
+          <li><a href="{{ path('app_logout') }}">Sign out</a></li>
+        {% elseif is_granted('ROLE_USER') %}
+          <li><a href="{{ path('app_account') }}">My account</a></li>
+          <li><a href="{{ path('app_logout') }}">Sign out</a></li>
+        {% else %}
+          <li><a href="{{ path('app_login') }}">Sign in</a></li>
         {% endif %}
       </ul>
       <div class="lang-switch nav__lang-desktop">
@@ -95,6 +101,12 @@
         <li><a href="#involved"   class="nav__mobile-link">{{ 'nav_involved'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}" class="nav__mobile-link">Admin</a></li>
+          <li><a href="{{ path('app_logout') }}" class="nav__mobile-link">Sign out</a></li>
+        {% elseif is_granted('ROLE_USER') %}
+          <li><a href="{{ path('app_account') }}" class="nav__mobile-link">My account</a></li>
+          <li><a href="{{ path('app_logout') }}" class="nav__mobile-link">Sign out</a></li>
+        {% else %}
+          <li><a href="{{ path('app_login') }}" class="nav__mobile-link">Sign in</a></li>
         {% endif %}
       </ul>
       <div class="nav__mobile-footer">
@@ -109,6 +121,32 @@
   </div>
 </nav>
 {% endblock %}
+
+{% set _successFlashes = app.flashes('success') %}
+{% set _errorFlashes   = app.flashes('error') %}
+{% if _successFlashes or _errorFlashes %}
+  <div id="toast-stack" style="position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:0.5rem;min-width:280px;max-width:90vw;">
+    {% for msg in _successFlashes %}
+      <div class="toast" style="background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;border-radius:8px;padding:0.7rem 2.5rem 0.7rem 1.1rem;font-size:0.875rem;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.08);position:relative;">
+        {{ msg }}
+        <button onclick="this.closest('.toast').remove()" aria-label="Dismiss" style="position:absolute;top:50%;right:0.6rem;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1;color:inherit;opacity:0.6;padding:0.2rem;">×</button>
+      </div>
+    {% endfor %}
+    {% for msg in _errorFlashes %}
+      <div class="toast" style="background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:0.7rem 2.5rem 0.7rem 1.1rem;font-size:0.875rem;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.08);position:relative;">
+        {{ msg }}
+        <button onclick="this.closest('.toast').remove()" aria-label="Dismiss" style="position:absolute;top:50%;right:0.6rem;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1;color:inherit;opacity:0.6;padding:0.2rem;">×</button>
+      </div>
+    {% endfor %}
+  </div>
+  <script>
+    // Auto-dismiss after 6 seconds
+    setTimeout(() => {
+      const stack = document.getElementById('toast-stack');
+      if (stack) stack.remove();
+    }, 6000);
+  </script>
+{% endif %}
 
 {% block content %}{% endblock %}
 

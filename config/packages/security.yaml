@@ -16,11 +16,13 @@ security:
         main:
             lazy: true
             provider: app_user_provider
+            access_denied_handler: App\Security\AccessDeniedHandler
             form_login:
                 login_path: app_login
                 check_path: app_login
                 enable_csrf: true
-                default_target_path: app_home
+                default_target_path: app_login_success
+                always_use_default_target_path: true
             logout:
                 path: app_logout
                 target: app_home
