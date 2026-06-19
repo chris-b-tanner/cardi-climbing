@@ -1,0 +1,33 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}Thanks for signing up — Cardigan Climbing{% endblock %}
+
+{% block emailBody %}
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 8px;">
+    You're on the list!
+  </h1>
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 28px;">
+    Cardigan Climbing
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Thanks for signing up &mdash; we&rsquo;re really glad you&rsquo;re interested in Cardigan Climbing.
+    We&rsquo;ll keep you in the loop as the project develops, and let you know as soon as there&rsquo;s
+    news about the wall.
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 32px;">
+    In the meantime, if you have any questions or want to get involved, just reply to this email.
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;line-height:1.6;margin:0;">
+    You&rsquo;re receiving this because you signed up at
+    <a href="https://www.cardiganclimbing.org" style="color:#1e4f41;text-decoration:none;">www.cardiganclimbing.org</a>.
+  </p>
+{% endblock %}

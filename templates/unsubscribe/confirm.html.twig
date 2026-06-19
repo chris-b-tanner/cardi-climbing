@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+{% block title %}Unsubscribe — Cardigan Climbing{% endblock %}
+
+{% block content %}
+<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:3rem 1rem;">
+  <div style="max-width:440px;width:100%;text-align:center;">
+    {% if success %}
+      <div style="font-size:2.5rem;margin-bottom:1rem;">✓</div>
+      <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.6rem;">You've been unsubscribed</h1>
+      <p style="color:#6b7280;font-size:0.9375rem;line-height:1.6;margin-bottom:1.5rem;">
+        You won't receive newsletter emails from us any more.<br>
+        You can re-subscribe at any time from our website.
+      </p>
+    {% else %}
+      <div style="font-size:2.5rem;margin-bottom:1rem;">✗</div>
+      <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:0.6rem;">Invalid unsubscribe link</h1>
+      <p style="color:#6b7280;font-size:0.9375rem;line-height:1.6;margin-bottom:1.5rem;">
+        This link is not valid or has already been used.<br>
+        Please email us directly if you'd like to unsubscribe.
+      </p>
+    {% endif %}
+    <a href="{{ path('app_home') }}" class="btn btn--teal">Back to site</a>
+  </div>
+</div>
+{% endblock %}

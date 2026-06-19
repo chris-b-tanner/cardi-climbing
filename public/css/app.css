@@ -1,9 +1,10 @@
 /* ── Tokens ─────────────────────────────────────────── */
 :root {
   --black:    #141414;
-  --teal:     #2d6b5a;
+  --lichen:   #f0f5f1;
+  --teal:     #b0bd80;
   --teal-dk:  #1e4f41;
-  --sand:     #c4a87a;
+  --sand:     #ecbe49;
   --white:    #ffffff;
   --offwhite: #f6f6f3;
   --border:   #e4e2dc;
@@ -79,7 +80,7 @@ p + p { margin-top: 1rem; }
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  background: var(--white);
+  background: var(--lichen);
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
 }

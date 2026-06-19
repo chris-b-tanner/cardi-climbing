@@ -6,20 +6,30 @@ use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class SubscribeController extends AbstractController
 {
+    public function __construct(
+        #[Autowire('%env(MAILER_FROM)%')]     private readonly string $mailerFrom,
+        #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
+    ) {}
+
     #[Route('/subscribe', name: 'app_subscribe', methods: ['POST'])]
     public function subscribe(
         Request $request,
         UserRepository $userRepository,
         EntityManagerInterface $em,
         UserPasswordHasherInterface $hasher,
+        MailerInterface $mailer,
     ): Response {
         if (!$this->isCsrfTokenValid('subscribe', $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -37,7 +47,9 @@ class SubscribeController extends AbstractController
 
         $user = $userRepository->findOneBy(['email' => $email]);
 
-        if (!$user) {
+        $isNew = !$user;
+
+        if ($isNew) {
             $user = new User();
             $user->setEmail($email);
             $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
@@ -58,6 +70,18 @@ class SubscribeController extends AbstractController
         $user->setOptIn(true);
 
         $em->flush();
+
+        if ($isNew) {
+            $thanksEmail = (new TemplatedEmail())
+                ->from(new Address($this->mailerFrom, $this->mailerFromName))
+                ->to($user->getEmail())
+                ->subject('Thanks for signing up — Cardigan Climbing')
+                ->htmlTemplate('email/subscribe_thanks.html.twig')
+                ->textTemplate('email/subscribe_thanks.txt.twig')
+                ->context(['user' => $user, 'recipientEmail' => $user->getEmail()]);
+
+            $mailer->send($thanksEmail);
+        }
 
         $this->addFlash('subscribe_success', 'Thanks for signing up — we\'ll keep you in the loop!');
         return $this->redirectToRoute('app_home');

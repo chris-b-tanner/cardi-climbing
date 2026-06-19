@@ -11,7 +11,7 @@ nav_cta: "Get Involved"
 nav_adventures: "Adventures"
 
 hero_label: "Cardigan · Aberteifi · West Wales"
-hero_h1: "Climb.<br><em>Connect.</em><br>Community."
+hero_h1: "<span style=\"color:var(--muted)\">Climb.</span><br><em>Connect.</em><br><span style=\"color:var(--sand)\">Community.</span>"
 hero_sub: "We are building a community-owned indoor climbing and bouldering wall in the heart of Cardigan — open to all ages, abilities, and backgrounds. Help us make it happen."
 hero_cta_primary: "Get Involved"
 hero_cta_secondary: "Our Mission"
