@@ -96,6 +96,14 @@
     {% endif %}
   </div>
 
+  <div class="card">
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="memo">Memo</label>
+      <textarea id="memo" name="memo" class="form-control" rows="5"
+                placeholder="Skills, experience, background…" style="resize:vertical;">{{ user.memo }}</textarea>
+    </div>
+  </div>
+
   <div class="form-actions">
     <button type="submit" class="btn btn--teal">Save changes</button>
     <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>

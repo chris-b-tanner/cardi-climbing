@@ -105,6 +105,13 @@
   {% endif %}
 </div>
 
+{% if user.memo %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.5rem;">Memo</div>
+  <div class="card__value" style="white-space:pre-wrap;line-height:1.7;">{{ user.memo }}</div>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card__label" style="margin-bottom:0.75rem;">Notes</div>
 

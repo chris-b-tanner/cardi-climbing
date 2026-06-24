@@ -60,6 +60,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $postcode = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $memo = null;
+
     #[ORM\Column(length: 180, nullable: true)]
     private ?string $email2 = null;
 
@@ -211,6 +214,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getPostcode(): ?string { return $this->postcode; }
     public function setPostcode(?string $postcode): static { $this->postcode = $postcode; return $this; }
+
+    public function getMemo(): ?string { return $this->memo; }
+    public function setMemo(?string $memo): static { $this->memo = $memo; return $this; }
 
     public function getEmail2(): ?string { return $this->email2; }
     public function setEmail2(?string $email2): static { $this->email2 = $email2; return $this; }

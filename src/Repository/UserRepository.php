@@ -34,11 +34,13 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
+            ->leftJoin('u.notes', 'n')
             ->addSelect('t');
 
         if ($query !== '') {
-            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q')
-               ->setParameter('q', '%' . $query . '%');
+            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.memo LIKE :q OR n.content LIKE :q')
+               ->setParameter('q', '%' . $query . '%')
+               ->distinct();
         }
 
         if ($tagId !== null) {
