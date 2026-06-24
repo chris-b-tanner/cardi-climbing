@@ -2,6 +2,8 @@
 
 {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
 {% block title %}{{ displayName ?: user.email }}{% endblock %}
+{% block og_title %}{{ displayName ?: user.email }} — Cardigan Climbing{% endblock %}
+{% block og_description %}{{ displayName ?: user.email }}{% if user.email %} · {{ user.email }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="page-header">
