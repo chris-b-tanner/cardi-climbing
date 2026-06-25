@@ -140,7 +140,7 @@ class AdminController extends AbstractController
             $user->setTown(trim($request->request->get('town', '')) ?: null);
             $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
 
-            $submittedTagIds = array_map('intval', $request->request->all()['tags'] ?? []);
+            $submittedTagIds = array_map('intval', $request->request->all('tags'));
 
             foreach ($user->getTags() as $tag) {
                 if (!in_array($tag->getId(), $submittedTagIds, true)) {

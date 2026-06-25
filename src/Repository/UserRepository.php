@@ -55,6 +55,25 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getResult();
     }
 
+    /** @param int[] $tagIds Empty = all opted-in members */
+    public function findForBulkEmail(array $tagIds = []): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->leftJoin('u.tags', 't')
+            ->addSelect('t')
+            ->where('u.optIn = true')
+            ->orderBy('u.lastName', 'ASC')
+            ->addOrderBy('u.firstName', 'ASC');
+
+        if ($tagIds) {
+            $qb->andWhere('t.id IN (:tagIds)')
+               ->setParameter('tagIds', $tagIds)
+               ->distinct();
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     public function findByAnyEmail(string $email): ?User
     {
         return $this->createQueryBuilder('u')

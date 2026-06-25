@@ -191,6 +191,7 @@
     <span>Cardigan</span> Admin
   </a>
   <div class="admin-bar__right">
+    <a href="{{ path('app_admin_email_compose') }}" class="admin-bar__logout">✉ Email members</a>
     {% if app.user %}
       <span class="admin-bar__user">{{ app.user.firstName ?? app.user.email }}</span>
     {% endif %}
