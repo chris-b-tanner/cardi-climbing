@@ -26,6 +26,7 @@
       --red:     #dc2626;
       --green:   #16a34a;
       --radius:  8px;
+      --sidebar-w: 220px;
     }
 
     body {
@@ -36,30 +37,84 @@
       min-height: 100vh;
     }
 
-    .admin-bar {
-      position: sticky; top: 0; z-index: 100;
-      background: var(--black); color: #fff;
-      padding: 0 1rem;
-      display: flex; align-items: center; justify-content: space-between;
-      height: 52px;
-    }
-    .admin-bar__brand {
-      font-weight: 600; font-size: 0.9rem; color: #fff; text-decoration: none;
-    }
-    .admin-bar__brand span { color: var(--teal); }
-    .admin-bar__right {
-      display: flex; align-items: center; gap: 0.75rem;
-      font-size: 0.8rem; color: #aaa;
-    }
-    .admin-bar__user { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-    .admin-bar__logout {
-      color: #aaa; text-decoration: none;
-      border: 1px solid #444; padding: 0.25rem 0.6rem;
-      border-radius: 4px; font-size: 0.78rem; flex-shrink: 0;
-    }
-    .admin-bar__logout:hover { border-color: #888; color: #fff; }
+    /* ── App shell ────────────────────────────────────── */
+    .admin-shell { display: flex; min-height: 100vh; }
 
-    .admin-wrap { max-width: 960px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .admin-sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--black); color: #fff;
+      display: flex; flex-direction: column;
+      position: sticky; top: 0; align-self: flex-start; height: 100vh;
+    }
+    .admin-sidebar__brand {
+      display: block; padding: 1.35rem 1.25rem 1.1rem;
+      font-weight: 600; font-size: 0.95rem; color: #fff; text-decoration: none;
+      border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;
+    }
+    .admin-sidebar__brand span { color: var(--teal); }
+    .admin-sidebar__brand small {
+      display: block; font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(255,255,255,0.4); margin-top: 0.2rem;
+    }
+
+    .admin-nav { list-style: none; padding: 0.75rem 0; overflow-y: auto; }
+    .admin-nav__link {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.875rem; font-weight: 500;
+      color: rgba(255,255,255,0.65);
+      border-left: 3px solid transparent;
+      text-decoration: none;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .admin-nav__link:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .admin-nav__link.is-active {
+      background: rgba(255,255,255,0.06); color: #fff;
+      border-left-color: var(--teal);
+    }
+    .admin-nav__badge {
+      margin-left: auto; font-size: 0.62rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.55);
+      padding: 0.15rem 0.4rem; border-radius: 3px; flex-shrink: 0;
+    }
+
+    .admin-main { flex: 1; min-width: 0; }
+
+    .admin-topbar {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 0.75rem; padding: 0.85rem 1.5rem;
+      border-bottom: 1px solid var(--border); background: var(--white);
+      font-size: 0.8rem; color: var(--muted);
+    }
+    .admin-topbar__user { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+    .admin-topbar__link {
+      color: var(--muted); text-decoration: none;
+      border: 1px solid var(--border); padding: 0.3rem 0.7rem;
+      border-radius: 6px; font-size: 0.78rem; flex-shrink: 0;
+    }
+    .admin-topbar__link:hover { border-color: #9ca3af; color: var(--black); }
+
+    .admin-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+
+    @media (max-width: 860px) {
+      .admin-shell { flex-direction: column; }
+      .admin-sidebar {
+        width: 100%; height: auto; position: static;
+        flex-direction: row; align-items: stretch; overflow-x: auto;
+      }
+      .admin-sidebar__brand {
+        border-bottom: none; border-right: 1px solid rgba(255,255,255,0.08);
+        flex-shrink: 0; display: flex; flex-direction: column; justify-content: center;
+      }
+      .admin-nav { display: flex; padding: 0; overflow-y: visible; }
+      .admin-nav__link {
+        border-left: none; border-bottom: 3px solid transparent;
+        white-space: nowrap;
+      }
+      .admin-nav__link.is-active { border-left-color: transparent; border-bottom-color: var(--teal); }
+    }
 
     .flash { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.875rem; }
     .flash--success { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
@@ -193,29 +248,72 @@
 </head>
 <body>
 
-<div class="admin-bar">
-  <a href="{{ path('app_admin_users') }}" class="admin-bar__brand">
-    <span>Y Wal</span> Admin
-  </a>
-  <div class="admin-bar__right">
-    <a href="{{ path('app_admin_news') }}" class="admin-bar__logout">News</a>
-    <a href="{{ path('app_admin_email_compose') }}" class="admin-bar__logout">✉ Email members</a>
-    {% if app.user %}
-      <span class="admin-bar__user">{{ app.user.firstName ?? app.user.email }}</span>
-    {% endif %}
-    <a href="{{ path('app_logout') }}" class="admin-bar__logout">Sign out</a>
+{% set currentRoute   = app.request.attributes.get('_route') %}
+{% set currentSection = app.request.attributes.get('section') %}
+
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <a href="{{ path('app_admin_users') }}" class="admin-sidebar__brand">
+      <span>Y Wal</span> Admin
+      <small>Booking system</small>
+    </a>
+    <ul class="admin-nav">
+      <li>
+        <a href="{{ path('app_admin_users') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_user' ? ' is-active' : '' }}">
+          Members
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_placeholder', {section: 'calendar'}) }}"
+           class="admin-nav__link{{ currentSection == 'calendar' ? ' is-active' : '' }}">
+          Calendar
+          <span class="admin-nav__badge">Soon</span>
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_placeholder', {section: 'events'}) }}"
+           class="admin-nav__link{{ currentSection == 'events' ? ' is-active' : '' }}">
+          Events
+          <span class="admin-nav__badge">Soon</span>
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_news') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_news' ? ' is-active' : '' }}">
+          News
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_placeholder', {section: 'settings'}) }}"
+           class="admin-nav__link{{ currentSection == 'settings' ? ' is-active' : '' }}">
+          Settings
+          <span class="admin-nav__badge">Soon</span>
+        </a>
+      </li>
+    </ul>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <a href="{{ path('app_admin_email_compose') }}" class="admin-topbar__link">Email members</a>
+      {% if app.user %}
+        <span class="admin-topbar__user">{{ app.user.firstName ?? app.user.email }}</span>
+      {% endif %}
+      <a href="{{ path('app_logout') }}" class="admin-topbar__link">Sign out</a>
+    </div>
+
+    <div class="admin-wrap">
+      {% for msg in app.flashes('success') %}
+        <div class="flash flash--success">{{ msg }}</div>
+      {% endfor %}
+      {% for msg in app.flashes('error') %}
+        <div class="flash flash--error">{{ msg }}</div>
+      {% endfor %}
+
+      {% block content %}{% endblock %}
+    </div>
   </div>
-</div>
-
-<div class="admin-wrap">
-  {% for msg in app.flashes('success') %}
-    <div class="flash flash--success">{{ msg }}</div>
-  {% endfor %}
-  {% for msg in app.flashes('error') %}
-    <div class="flash flash--error">{{ msg }}</div>
-  {% endfor %}
-
-  {% block content %}{% endblock %}
 </div>
 
 {% block scripts %}{% endblock %}

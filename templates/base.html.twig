@@ -160,9 +160,9 @@
       <div class="footer__col">
         <h4>{{ 'footer_nav'|trans }}</h4>
         <ul>
-          <li><a href="#mission">{{ 'footer_nav_mission'|trans }}</a></li>
-          <li><a href="#plan">{{ 'footer_nav_plan'|trans }}</a></li>
-          <li><a href="#involved">{{ 'footer_nav_involved'|trans }}</a></li>
+          <li><a href="{{ path('app_home') }}#mission">{{ 'footer_nav_mission'|trans }}</a></li>
+          <li><a href="{{ path('app_home') }}#plan">{{ 'footer_nav_plan'|trans }}</a></li>
+          <li><a href="{{ path('app_home') }}#involved">{{ 'footer_nav_involved'|trans }}</a></li>
           <li><a href="{{ path('app_news') }}">{{ 'footer_nav_news'|trans }}</a></li>
         </ul>
       </div>
