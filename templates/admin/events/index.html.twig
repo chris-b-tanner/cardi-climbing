@@ -1,0 +1,48 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Events{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Events</h1>
+  <a href="{{ path('app_admin_event_new') }}" class="btn btn--teal btn--sm">+ New event</a>
+</div>
+
+{% if events is empty %}
+  <div class="empty">
+    <strong>No events yet</strong>
+    Create your first bookable event.
+  </div>
+{% else %}
+  <div class="user-list">
+    {% for event in events %}
+      <div class="user-item">
+        <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="user-item__link">
+          <div class="user-item__main">
+            <div class="user-item__name">{{ event.title }}</div>
+            <div class="user-item__email">
+              {{ event.date|date('d M Y') }} · {{ event.timeFrom }}–{{ event.timeTo }} · {{ event.location }}
+              {% if event.isRecurring %} · repeats{% endif %}
+            </div>
+          </div>
+          <span class="news-status-pill{{ event.isPublished ? ' news-status-pill--published' : '' }}">
+            {{ event.isPublished ? 'Published' : 'Draft' }}
+          </span>
+          <span class="user-item__arrow">›</span>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .news-status-pill {
+    display: inline-block; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem; border-radius: 4px;
+    background: #f3f4f6; color: var(--muted); flex-shrink: 0;
+  }
+  .news-status-pill--published { background: #dcfce7; color: var(--green); }
+</style>
+{% endblock %}

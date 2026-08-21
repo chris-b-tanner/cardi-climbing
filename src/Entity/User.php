@@ -73,16 +73,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\JoinTable(name: 'user_tag')]
     private Collection $tags;
 
+    /** This member's induction/certification records (started/completed), used to gate booking onto restricted events. */
+    #[ORM\OneToMany(targetEntity: UserCertification::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['startedAt' => 'DESC'])]
+    private Collection $certifications;
+
     #[ORM\OneToMany(targetEntity: Note::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $notes;
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
-        $this->roles     = [self::ROLE_MEMBER];
-        $this->tags      = new ArrayCollection();
-        $this->notes     = new ArrayCollection();
+        $this->createdAt      = new \DateTimeImmutable();
+        $this->roles          = [self::ROLE_MEMBER];
+        $this->tags           = new ArrayCollection();
+        $this->certifications = new ArrayCollection();
+        $this->notes          = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -198,6 +204,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->tags->removeElement($tag);
         return $this;
+    }
+
+    /** This member's induction/certification records, most recently started first. */
+    public function getCertifications(): Collection
+    {
+        return $this->certifications;
+    }
+
+    /** Whether this member has a completed (signed-off) induction for the given certification. */
+    public function hasCertification(Certification $certification): bool
+    {
+        foreach ($this->certifications as $record) {
+            if ($record->getCertification() === $certification && $record->isComplete()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function getPhone(): ?string { return $this->phone; }

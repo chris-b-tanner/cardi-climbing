@@ -1,0 +1,150 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New event{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New event</h1>
+  <a href="{{ path('app_admin_events') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+{% set req = app.request.request %}
+
+<form method="post" action="{{ path('app_admin_event_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_new') }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" class="form-control"
+             value="{{ req.get('title') }}" autocomplete="off" required>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="5"
+                style="resize:vertical;font-family:inherit;line-height:1.6;">{{ req.get('description') }}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="date">Date</label>
+        <input type="date" id="date" name="date" class="form-control" value="{{ req.get('date') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location" class="form-control"
+               value="{{ req.get('location') }}" placeholder="e.g. The Tabernacle" autocomplete="off" required>
+      </div>
+      <div class="form-group">
+        <label for="timeFrom">Time from</label>
+        <input type="time" id="timeFrom" name="timeFrom" class="form-control" value="{{ req.get('timeFrom') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="timeTo">Time to</label>
+        <input type="time" id="timeTo" name="timeTo" class="form-control" value="{{ req.get('timeTo') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="maxAttendees">Max attendees</label>
+        <input type="number" id="maxAttendees" name="maxAttendees" class="form-control" min="1"
+               value="{{ req.get('maxAttendees') }}" placeholder="Leave blank for unlimited">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="price">Price (£)</label>
+        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
+               value="{{ req.get('price') }}" placeholder="Leave blank if free">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;margin-top:1rem;">
+      <label for="externalUrl">URL</label>
+      <input type="url" id="externalUrl" name="externalUrl" class="form-control"
+             value="{{ req.get('externalUrl') }}" placeholder="https://…" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="card">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem;">
+      <input type="checkbox" id="isRecurring" name="isRecurring" value="1"
+             style="width:1.1rem;height:1.1rem;accent-color:var(--teal);"
+             {% if req.has('isRecurring') %}checked{% endif %}>
+      This is a recurring event
+    </label>
+    <p style="font-size:0.78rem;color:var(--muted);margin:0.4rem 0 0;">
+      e.g. a weekly social night or daily opening slots. The date above is the first occurrence.
+    </p>
+
+    <div id="recurring-fields" style="margin-top:1rem;">
+      <div class="form-group">
+        <label for="recurUntil">Recurs until</label>
+        <input type="date" id="recurUntil" name="recurUntil" class="form-control" value="{{ req.get('recurUntil') }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Repeats on</label>
+        <div class="tag-grid">
+          {% set reqDays = req.all('recurDays') %}
+          {% set dayNames = {1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun'} %}
+          {% for value, label in dayNames %}
+            <input type="checkbox" id="day_{{ value }}" name="recurDays[]" value="{{ value }}"
+                   class="tag-check" {% if value in reqDays %}checked{% endif %}>
+            <label for="day_{{ value }}" class="tag-check-label">{{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Restrict booking to certifications</label>
+    <p style="font-size:0.78rem;color:var(--muted);margin:0.2rem 0 0.75rem;">
+      Only members holding at least one selected certification can book. Leave blank to allow any member.
+    </p>
+    {% if certifications is empty %}
+      <p class="tag-badge--none">No certifications set up yet.</p>
+    {% else %}
+      <div class="tag-grid">
+        {% set reqRestrictions = req.all('restrictions') %}
+        {% for certification in certifications %}
+          <input type="checkbox" id="cert_{{ certification.id }}" name="restrictions[]"
+                 value="{{ certification.id }}" class="tag-check"
+                 {% if certification.id in reqRestrictions %}checked{% endif %}>
+          <label for="cert_{{ certification.id }}" class="tag-check-label">{{ certification.name }}</label>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem;">
+      <input type="checkbox" name="published" value="1" style="width:1.1rem;height:1.1rem;accent-color:var(--teal);"
+             {% if req.has('published') %}checked{% endif %}>
+      Publish immediately
+    </label>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+      Leave unchecked to save as a draft.
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save event</button>
+    <a href="{{ path('app_admin_events') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const recurCheck  = document.getElementById('isRecurring');
+  const recurFields = document.getElementById('recurring-fields');
+
+  function syncRecurringFields() {
+    recurFields.style.display = recurCheck.checked ? 'block' : 'none';
+  }
+
+  recurCheck.addEventListener('change', syncRecurringFields);
+  syncRecurringFields();
+</script>
+{% endblock %}

@@ -272,10 +272,9 @@
         </a>
       </li>
       <li>
-        <a href="{{ path('app_admin_placeholder', {section: 'events'}) }}"
-           class="admin-nav__link{{ currentSection == 'events' ? ' is-active' : '' }}">
+        <a href="{{ path('app_admin_events') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
           Events
-          <span class="admin-nav__badge">Soon</span>
         </a>
       </li>
       <li>
