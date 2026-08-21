@@ -130,7 +130,7 @@ class ResetPasswordController extends AbstractController
         $message = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))
             ->to((string) $user->getEmail())
-            ->subject('Password reset request — Cardigan Climbing')
+            ->subject('Password reset request — Y Wal')
             ->htmlTemplate('email/reset_password.html.twig')
             ->textTemplate('email/reset_password.txt.twig')
             ->context(['resetToken' => $resetToken, 'user' => $user]);

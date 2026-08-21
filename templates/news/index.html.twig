@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'news_meta_title'|trans }}{% endblock %}
+
+{% block content %}
+<section class="section news-hero">
+  <div class="wrap">
+    <h1 class="news-hero__h1">{{ 'news_h1'|trans }}</h1>
+  </div>
+</section>
+
+<section class="section section--off news-list-section">
+  <div class="wrap">
+    {% if posts is empty %}
+      <p>{{ 'news_empty'|trans }}</p>
+    {% else %}
+      <div class="news-list">
+        {% for post in posts %}
+          <a href="{{ path('app_news_show', {slug: post.slug}) }}" class="news-card">
+            <span class="news-card__date">{{ post.publishedAt|date('d F Y') }}</span>
+            <h2 class="news-card__title">{{ post.title }}</h2>
+            <span class="news-card__link">{{ 'news_read_more'|trans }} &rarr;</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

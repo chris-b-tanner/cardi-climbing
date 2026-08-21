@@ -49,8 +49,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         }
 
         return $qb
-            ->orderBy('u.lastName', 'ASC')
-            ->addOrderBy('u.firstName', 'ASC')
+            ->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
+            ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')
+            ->orderBy('sortLast', 'ASC')
+            ->addOrderBy('sortFirst', 'ASC')
             ->getQuery()
             ->getResult();
     }

@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ post.title }} — Y Wal{% endblock %}
+
+{% block content %}
+<section class="section news-post">
+  <div class="wrap news-post__wrap">
+    <a href="{{ path('app_news') }}" class="news-post__back">&larr; {{ 'news_back'|trans }}</a>
+    <span class="eyebrow">{{ post.publishedAt|date('d F Y') }}</span>
+    <h1 class="news-post__h1">{{ post.title }}</h1>
+    <div class="news-post__body">{{ post.body|raw }}</div>
+  </div>
+</section>
+{% endblock %}

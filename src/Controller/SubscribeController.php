@@ -75,7 +75,7 @@ class SubscribeController extends AbstractController
             $thanksEmail = (new TemplatedEmail())
                 ->from(new Address($this->mailerFrom, $this->mailerFromName))
                 ->to($user->getEmail())
-                ->subject('Thanks for signing up — Cardigan Climbing')
+                ->subject('Thanks for signing up — Y Wal')
                 ->htmlTemplate('email/subscribe_thanks.html.twig')
                 ->textTemplate('email/subscribe_thanks.txt.twig')
                 ->context(['user' => $user, 'recipientEmail' => $user->getEmail()]);

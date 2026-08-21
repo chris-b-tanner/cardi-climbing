@@ -1,0 +1,53 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New news post{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New news post</h1>
+  <a href="{{ path('app_admin_news') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_news_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_news_new') }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" class="form-control"
+             value="{{ app.request.request.get('title') }}" autocomplete="off" required>
+    </div>
+    <div class="form-group">
+      <label for="slug">URL slug</label>
+      <input type="text" id="slug" name="slug" class="form-control"
+             value="{{ app.request.request.get('slug') }}"
+             placeholder="Leave blank to generate from the title" autocomplete="off">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="body">Body</label>
+      <textarea id="body" name="body" class="form-control" rows="16"
+                placeholder="Write the update here. Basic HTML like <p>, <strong>, <ul><li> and <a> is supported."
+                required style="resize:vertical;font-family:inherit;line-height:1.7;">{{ app.request.request.get('body') }}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem;">
+      <input type="checkbox" name="published" value="1" style="width:1.1rem;height:1.1rem;accent-color:var(--teal);"
+             {% if app.request.request.has('published') %}checked{% endif %}>
+      Publish immediately
+    </label>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+      Leave unchecked to save as a draft — it won't appear on the public news page yet.
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save news post</button>
+    <a href="{{ path('app_admin_news') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

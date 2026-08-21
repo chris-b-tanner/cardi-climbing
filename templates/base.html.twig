@@ -20,7 +20,7 @@
   <meta property="og:description" content="{{ 'meta_desc'|trans }}">
   <meta property="og:image"       content="https://www.cardiganclimbing.org/images/Bouldering-wall-cardigan.jpg">
   <meta property="og:locale"      content="{{ 'og_locale'|trans }}">
-  <meta property="og:site_name"   content="Cardigan Climbing">
+  <meta property="og:site_name"   content="Y Wal">
 
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:title"       content="{{ 'meta_title'|trans }}">
@@ -31,7 +31,7 @@
   {
     "@context": "https://schema.org",
     "@type": "SportsActivityLocation",
-    "name": "Cardigan Climbing",
+    "name": "Y Wal",
     "description": "{{ 'meta_desc'|trans }}",
     "url": "https://www.cardiganclimbing.org",
     "email": "cardiganclimbing@gmail.com",
@@ -56,7 +56,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/app.css?t=2345ddd4">
+  <link rel="stylesheet" href="/css/app.css?t=9ba87895">
 
   {% block head %}{% endblock %}
 </head>
@@ -68,10 +68,10 @@
     <div class="nav__inner">
       <a href="/" class="nav__logo">{{ 'nav_logo'|trans|raw }}</a>
       <ul class="nav__links">
-        <li><a href="#mission">{{ 'nav_mission'|trans }}</a></li>
-        <li><a href="#plan">{{ 'nav_plan'|trans }}</a></li>
-        <li><a href="#adventures">{{ 'nav_adventures'|trans }}</a></li>
-        <li><a href="#involved">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#mission">{{ 'nav_mission'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#plan">{{ 'nav_plan'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#involved">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_news') }}">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
           <li><a href="{{ path('app_logout') }}">Sign out</a></li>
@@ -87,7 +87,7 @@
         <span class="lang-switch__sep">/</span>
         <a href="/?lang=cy" class="{{ app.request.locale == 'cy' ? 'lang-switch__current' : '' }}">CY</a>
       </div>
-      <a href="#involved" class="btn btn--teal nav__cta">{{ 'nav_cta'|trans }}</a>
+      <a href="{{ path('app_home') }}#involved" class="btn btn--teal nav__cta">{{ 'nav_cta'|trans }}</a>
       <button class="nav__hamburger" id="nav-toggle" aria-label="Menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -95,10 +95,10 @@
 
     <div class="nav__mobile" id="nav-mobile">
       <ul>
-        <li><a href="#mission"    class="nav__mobile-link">{{ 'nav_mission'|trans }}</a></li>
-        <li><a href="#plan"       class="nav__mobile-link">{{ 'nav_plan'|trans }}</a></li>
-        <li><a href="#adventures" class="nav__mobile-link">{{ 'nav_adventures'|trans }}</a></li>
-        <li><a href="#involved"   class="nav__mobile-link">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#mission"    class="nav__mobile-link">{{ 'nav_mission'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#plan"       class="nav__mobile-link">{{ 'nav_plan'|trans }}</a></li>
+        <li><a href="{{ path('app_home') }}#involved"   class="nav__mobile-link">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_news') }}" class="nav__mobile-link">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}" class="nav__mobile-link">Admin</a></li>
           <li><a href="{{ path('app_logout') }}" class="nav__mobile-link">Sign out</a></li>
@@ -115,7 +115,7 @@
           <span class="lang-switch__sep">/</span>
           <a href="/?lang=cy" class="{{ app.request.locale == 'cy' ? 'lang-switch__current' : '' }}">CY</a>
         </div>
-        <a href="#involved" class="btn btn--teal nav__mobile-link">{{ 'nav_cta'|trans }}</a>
+        <a href="{{ path('app_home') }}#involved" class="btn btn--teal nav__mobile-link">{{ 'nav_cta'|trans }}</a>
       </div>
     </div>
   </div>
@@ -163,6 +163,7 @@
           <li><a href="#mission">{{ 'footer_nav_mission'|trans }}</a></li>
           <li><a href="#plan">{{ 'footer_nav_plan'|trans }}</a></li>
           <li><a href="#involved">{{ 'footer_nav_involved'|trans }}</a></li>
+          <li><a href="{{ path('app_news') }}">{{ 'footer_nav_news'|trans }}</a></li>
         </ul>
       </div>
       <div class="footer__col">
@@ -185,7 +186,7 @@
       #}
     </div>
     <div class="footer__bottom">
-      <span>&copy; {{ "now"|date("Y") }} Cardigan Climbing. {{ 'footer_rights'|trans }}</span>
+      <span>&copy; {{ "now"|date("Y") }} Y Wal. {{ 'footer_rights'|trans }}</span>
       <span>{{ 'footer_tagline'|trans }}</span>
     </div>
   </div>

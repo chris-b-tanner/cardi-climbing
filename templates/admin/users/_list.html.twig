@@ -15,8 +15,11 @@
         </label>
         <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="user-item__link">
           <div class="user-item__main">
-            <div class="user-item__name">{{ displayName ?: user.email }}</div>
-            <div class="user-item__email">{{ user.email }}</div>
+            <div class="user-item__name">
+              <span class="member-id">#{{ user.id }}</span>
+              {{ displayName ?: user.email }}
+            </div>
+
           </div>
           <div class="user-item__tags">
             {% for tag in user.tags %}

@@ -1,13 +1,13 @@
 {% extends 'admin/base.html.twig' %}
 
 {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
-{% block title %}{{ displayName ?: user.email }}{% endblock %}
-{% block og_title %}{{ displayName ?: user.email }} — Cardigan Climbing{% endblock %}
+{% block title %}#{{ user.id }} {{ displayName ?: user.email }}{% endblock %}
+{% block og_title %}{{ displayName ?: user.email }} — Y Wal{% endblock %}
 {% block og_description %}{{ displayName ?: user.email }}{% if user.email %} · {{ user.email }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ displayName ?: user.email }}</h1>
+  <h1><span class="member-id">#{{ user.id }}</span> {{ displayName ?: user.email }}</h1>
   <div class="btn-row">
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
     <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
