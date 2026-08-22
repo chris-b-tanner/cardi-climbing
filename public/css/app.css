@@ -10,7 +10,7 @@
   --border:   #e4e2dc;
   --muted:    #5a5857;
   --max-w:    1140px;
-  --f-head:   'Oswald', sans-serif;
+  --f-head:   'Varela Round', sans-serif;
   --f-body:   'Inter', sans-serif;
 }
 
@@ -32,7 +32,6 @@ h2 {
   font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
   line-height: 1.05;
   margin-bottom: 1.5rem;
 }
@@ -216,7 +215,6 @@ p + p { margin-top: 1rem; }
   font-weight: 700;
   text-transform: uppercase;
   line-height: 0.95;
-  letter-spacing: -0.02em;
   margin-bottom: 2rem;
   max-width: 12ch;
 }
@@ -565,7 +563,6 @@ p + p { margin-top: 1rem; }
   font-size: 2rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
   line-height: 1.05;
   color: var(--black);
   margin-bottom: 0.4rem;
@@ -627,7 +624,6 @@ p + p { margin-top: 1rem; }
   font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
   line-height: 1.05;
   margin-bottom: 1.25rem;
 }
@@ -679,7 +675,6 @@ p + p { margin-top: 1rem; }
   font-size: clamp(1.75rem, 4vw, 2.5rem);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
   line-height: 1.1;
   margin-bottom: 1.75rem;
 }
