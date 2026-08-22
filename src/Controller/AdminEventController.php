@@ -156,6 +156,7 @@ class AdminEventController extends AbstractController
 
         $event->setTitle($title);
         $event->setDescription(trim($request->request->get('description', '')) ?: null);
+        $event->setAttendeeInfo(trim($request->request->get('attendeeInfo', '')) ?: null);
         $event->setDate($date);
         $event->setTimeFrom($timeFrom);
         $event->setTimeTo($timeTo);

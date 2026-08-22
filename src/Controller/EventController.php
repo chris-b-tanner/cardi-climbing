@@ -47,13 +47,31 @@ class EventController extends AbstractController
         $user  = $this->getUser();
         $today = new \DateTimeImmutable('today');
 
+        // Fetch every booking for these events across the whole grid in one query, then
+        // derive per-occurrence counts/booked-state from it in memory — avoids running a
+        // count + booking-lookup query for every single occurrence shown on the calendar.
+        $eventIds        = array_map(static fn (Event $e) => $e->getId(), $events);
+        $activeAttendees = $attendeeRepository->findActiveForEventsInRange($eventIds, $gridStart, $gridEnd);
+
+        $occurrenceStats = [];
+        foreach ($activeAttendees as $attendee) {
+            $key = $this->occurrenceKey($attendee->getEvent(), $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate());
+            $occurrenceStats[$key] ??= ['count' => 0, 'bookedByUser' => false];
+            $occurrenceStats[$key]['count']++;
+
+            if ($user && $attendee->getUser()->getId() === $user->getId()) {
+                $occurrenceStats[$key]['bookedByUser'] = true;
+            }
+        }
+
         $occurrencesByDay = [];
         $period = new \DatePeriod($gridStart, new \DateInterval('P1D'), $gridEnd->modify('+1 day'));
         foreach ($period as $day) {
             $dayOccurrences = [];
             foreach ($events as $event) {
                 if ($event->isValidForDate($day)) {
-                    $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $attendeeRepository, $today);
+                    $stats = $occurrenceStats[$this->occurrenceKey($event, $day)] ?? ['count' => 0, 'bookedByUser' => false];
+                    $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $today, $stats);
                 }
             }
             $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
@@ -70,6 +88,38 @@ class EventController extends AbstractController
             'nextMonth'        => $monthStart->modify('+1 month')->format('n'),
             'today'            => $today,
         ]);
+    }
+
+    /**
+     * A stable, deep-linkable page for a single event. For a recurring event this shows the
+     * one canonical event (not one page per occurrence), but keeps track of which occurrence
+     * is being booked via a `date` query param — e.g. when arriving from a specific day on the
+     * calendar — falling back to the next upcoming occurrence when none is given.
+     */
+    #[Route('/events/{id}', name: 'app_event_show', requirements: ['id' => '\d+'])]
+    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    {
+        if (!$event->isPublished()) {
+            throw $this->createNotFoundException('Event not found.');
+        }
+
+        $today          = new \DateTimeImmutable('today');
+        $requestedDate  = $this->parseDate($request->query->get('date', ''));
+        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
+
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        $stats = [
+            'count'        => $event->getMaxAttendees() !== null
+                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
+                : 0,
+            'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
+        ];
+
+        return $this->render('event/show.html.twig', $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats));
     }
 
     #[Route('/events/{id}/book', name: 'app_event_book', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -89,36 +139,39 @@ class EventController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $occurrenceDate  = $this->parseDate($request->request->get('occurrenceDate', ''));
-        $redirectParams  = $occurrenceDate ? ['year' => $occurrenceDate->format('Y'), 'month' => $occurrenceDate->format('n')] : [];
+        $occurrenceDate = $this->parseDate($request->request->get('occurrenceDate', ''));
+        $redirectParams = ['id' => $event->getId()];
+        if ($occurrenceDate) {
+            $redirectParams['date'] = $occurrenceDate->format('Y-m-d');
+        }
 
         if (!$event->isPublished() || $occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
             $this->addFlash('error', 'That event is no longer available.');
-            return $this->redirectToRoute('app_events', $redirectParams);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
         if ($occurrenceDate < new \DateTimeImmutable('today')) {
             $this->addFlash('error', 'That date has already passed.');
-            return $this->redirectToRoute('app_events', $redirectParams);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
         if (!$event->allowsUser($user)) {
             $this->addFlash('error', 'You do not hold the certification required to book this event.');
-            return $this->redirectToRoute('app_events', $redirectParams);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
         $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
 
         if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
             $this->addFlash('error', 'You are already booked onto this event.');
-            return $this->redirectToRoute('app_events', $redirectParams);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
         if ($event->getMaxAttendees() !== null
             && $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
         ) {
             $this->addFlash('error', 'Sorry, this event is fully booked.');
-            return $this->redirectToRoute('app_events', $redirectParams);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
         $attendee = new Attendee();
@@ -183,31 +236,21 @@ class EventController extends AbstractController
         return $this->redirect($this->generateUrl('app_account') . '#bookings');
     }
 
-    private function buildOccurrenceView(
-        Event $event,
-        \DateTimeImmutable $date,
-        ?User $user,
-        AttendeeRepository $attendeeRepository,
-        \DateTimeImmutable $today,
-    ): array {
-        $isPast               = $date < $today;
-        $storedOccurrenceDate = $event->isRecurring() ? $date : null;
+    /** @param array{count: int, bookedByUser: bool} $stats */
+    private function buildOccurrenceView(Event $event, \DateTimeImmutable $date, ?User $user, \DateTimeImmutable $today, array $stats): array
+    {
+        $isPast = $date < $today;
 
         $isFull    = false;
         $spotsLeft = null;
 
         if ($event->getMaxAttendees() !== null) {
-            $spotsLeft = max(0, $event->getMaxAttendees() - $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate));
+            $spotsLeft = max(0, $event->getMaxAttendees() - $stats['count']);
             $isFull    = $spotsLeft <= 0;
         }
 
-        $isBooked     = false;
-        $isRestricted = false;
-
-        if ($user) {
-            $isBooked     = $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null;
-            $isRestricted = !$event->allowsUser($user);
-        }
+        $isBooked     = $user ? $stats['bookedByUser'] : false;
+        $isRestricted = $user ? !$event->allowsUser($user) : false;
 
         return [
             'event'        => $event,
@@ -219,6 +262,53 @@ class EventController extends AbstractController
             'isRestricted' => $isRestricted,
             'canBook'      => $user !== null && !$isPast && !$isBooked && !$isFull && !$isRestricted,
         ];
+    }
+
+    /**
+     * Which occurrence to show/book on the event page: the requested date if it's a real
+     * occurrence of this event, otherwise the next upcoming one, falling back to the most
+     * recent past occurrence if the event (or its recurrence window) has already ended.
+     */
+    private function resolveOccurrenceDate(Event $event, ?\DateTimeImmutable $requested, \DateTimeImmutable $today): \DateTimeImmutable
+    {
+        if ($requested !== null && $event->isValidForDate($requested)) {
+            return $requested;
+        }
+
+        if (!$event->isRecurring()) {
+            return $event->getDate();
+        }
+
+        $searchFrom = max($event->getDate(), $today);
+
+        for ($i = 0; $i < 7; $i++) {
+            $candidate = $searchFrom->modify("+{$i} days");
+            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
+                break;
+            }
+            if ($event->isValidForDate($candidate)) {
+                return $candidate;
+            }
+        }
+
+        if ($event->getRecurUntil()) {
+            for ($i = 0; $i < 7; $i++) {
+                $candidate = $event->getRecurUntil()->modify("-{$i} days");
+                if ($candidate < $event->getDate()) {
+                    break;
+                }
+                if ($event->isValidForDate($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $event->getDate();
+    }
+
+    private function occurrenceKey(Event $event, \DateTimeImmutable $date): string
+    {
+        return $event->getId() . '|' . ($event->isRecurring() ? $date->format('Y-m-d') : 'single');
     }
 
     private function parseDate(string $raw): ?\DateTimeImmutable

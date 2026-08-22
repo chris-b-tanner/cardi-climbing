@@ -43,6 +43,16 @@
     </p>
   {% endif %}
 
+  {% if event.attendeeInfo %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;background:#f0f5f1;">
+      <tr>
+        <td style="padding:16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#5a5857;line-height:1.7;">
+          {{ event.attendeeInfo|nl2br }}
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
   <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#5a5857;line-height:1.7;margin:0 0 32px;">
     Can't make it any more? You can cancel your place any time from the
     <a href="https://www.cardiganclimbing.org/account#bookings" style="color:#1e4f41;">bookings tab in your account</a>.

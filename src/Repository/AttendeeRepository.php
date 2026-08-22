@@ -51,6 +51,33 @@ class AttendeeRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    /**
+     * All non-cancelled bookings for the given events whose occurrence falls within the
+     * given range, for batch-computing per-occurrence counts/booked-state in one query
+     * instead of one query per occurrence.
+     *
+     * @param int[] $eventIds
+     * @return Attendee[]
+     */
+    public function findActiveForEventsInRange(array $eventIds, \DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
+    {
+        if (!$eventIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
+            ->where('a.event IN (:eventIds)')
+            ->andWhere('a.status != :cancelled')
+            ->andWhere('(a.occurrenceDate BETWEEN :start AND :end) OR (a.occurrenceDate IS NULL AND e.date BETWEEN :start AND :end)')
+            ->setParameter('eventIds', $eventIds)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->setParameter('start', $rangeStart)
+            ->setParameter('end', $rangeEnd)
+            ->getQuery()
+            ->getResult();
+    }
+
     /** All of this member's bookings, including cancelled ones, newest first. */
     public function findAllForUser(User $user): array
     {

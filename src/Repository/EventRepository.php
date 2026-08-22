@@ -35,6 +35,7 @@ class EventRepository extends ServiceEntityRepository
     public function findPublishedOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
     {
         return $this->createQueryBuilder('e')
+            ->leftJoin('e.restrictions', 'r')->addSelect('r')
             ->where('e.status = :published')
             ->andWhere('
                 (e.isRecurring = false AND e.date BETWEEN :start AND :end)

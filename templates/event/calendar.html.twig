@@ -67,13 +67,10 @@
               <div class="agenda-day__events">
                 {% for occ in dayEvents %}
                   {% set event = occ.event %}
-                  <div class="agenda-event">
+                  <a href="{{ path('app_event_show', {id: event.id, date: occ.date|date('Y-m-d')}) }}" class="agenda-event">
                     <div class="agenda-event__time">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
                     <div class="agenda-event__body">
                       <h3 class="agenda-event__title">{{ event.title }}</h3>
-                      {% if event.description %}
-                        <p class="agenda-event__desc">{{ event.description|nl2br }}</p>
-                      {% endif %}
                       <div class="agenda-event__meta">
                         <span>{{ event.location }}</span>
                         <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>
@@ -86,6 +83,9 @@
                             {% endif %}
                           </span>
                         {% endif %}
+                        {% if occ.isBooked %}
+                          <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
+                        {% endif %}
                         {% if event.restrictions is not empty %}
                           <span class="agenda-event__restricted">
                             {{ 'events_restricted_to'|trans }}
@@ -93,35 +93,8 @@
                           </span>
                         {% endif %}
                       </div>
-
-                      {% if event.externalUrl %}
-                        <div class="agenda-event__details">
-                          <a href="{{ event.externalUrl }}" target="_blank" rel="noopener" class="agenda-event__signin">{{ 'events_view_details'|trans }}</a>
-                        </div>
-                      {% endif %}
-
-                      {% if not occ.isPast %}
-                        <div class="agenda-event__actions">
-                          {% if occ.isBooked %}
-                            <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
-                            <a href="{{ path('app_account') }}#bookings" class="agenda-event__signin">{{ 'events_manage_booking'|trans }}</a>
-                          {% elseif app.user is null %}
-                            <a href="{{ path('app_login') }}" class="agenda-event__signin">{{ 'events_sign_in_to_book'|trans }}</a>
-                          {% elseif occ.isFull %}
-                            <span class="agenda-event__status">{{ 'events_full'|trans }}</span>
-                          {% elseif occ.isRestricted %}
-                            <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
-                          {% elseif occ.canBook %}
-                            <form method="post" action="{{ path('app_event_book', {id: event.id}) }}" class="agenda-event__form">
-                              <input type="hidden" name="occurrenceDate" value="{{ occ.date|date('Y-m-d') }}">
-                              <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
-                              <button type="submit" class="btn btn--teal btn--sm">{{ 'events_book'|trans }}</button>
-                            </form>
-                          {% endif %}
-                        </div>
-                      {% endif %}
                     </div>
-                  </div>
+                  </a>
                 {% endfor %}
               </div>
             </div>

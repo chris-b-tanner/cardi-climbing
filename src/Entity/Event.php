@@ -34,6 +34,10 @@ class Event
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
+    /** Sent in the booking confirmation email — e.g. what to bring, where to park. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $attendeeInfo = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $date;
 
@@ -116,6 +120,17 @@ class Event
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+        return $this;
+    }
+
+    public function getAttendeeInfo(): ?string
+    {
+        return $this->attendeeInfo;
+    }
+
+    public function setAttendeeInfo(?string $attendeeInfo): static
+    {
+        $this->attendeeInfo = $attendeeInfo;
         return $this;
     }
 

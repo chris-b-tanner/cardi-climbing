@@ -28,6 +28,18 @@
   </div>
 
   <div class="card">
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="attendeeInfo">Attendee information</label>
+      <textarea id="attendeeInfo" name="attendeeInfo" class="form-control" rows="5"
+                placeholder="e.g. what to bring, where to park, what to expect on the day…"
+                style="resize:vertical;font-family:inherit;line-height:1.6;">{{ event.attendeeInfo }}</textarea>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+        Sent in the booking confirmation email — not shown on the public events page.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="detail-grid">
       <div class="form-group">
         <label for="date">Date</label>

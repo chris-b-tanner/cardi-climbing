@@ -830,7 +830,10 @@ p + p { margin-top: 1rem; }
   display: flex; gap: 1rem;
   background: var(--white); border: 1px solid var(--border);
   padding: 1.1rem 1.25rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
+.agenda-event:hover { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
+.agenda-event:hover .agenda-event__title { text-decoration: underline; text-underline-offset: 2px; }
 .agenda-event__time {
   flex-shrink: 0; width: 5.5rem;
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
@@ -842,9 +845,8 @@ p + p { margin-top: 1rem; }
   font-size: 1rem; font-weight: 700;
   text-transform: none; letter-spacing: 0;
   margin-bottom: 0.4rem;
+  color: var(--black);
 }
-.agenda-event__title a { text-decoration: underline; text-underline-offset: 2px; }
-.agenda-event__desc { font-size: 0.85rem; margin-bottom: 0.6rem; max-width: none; }
 .agenda-event__meta {
   display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem;
   font-size: 0.78rem; color: var(--muted);
@@ -893,3 +895,21 @@ p + p { margin-top: 1rem; }
 }
 .booking-confirm-card__meta { font-size: 0.9rem; color: var(--muted); line-height: 1.7; }
 .booking-confirm-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
+
+/* ── Event detail page ────────────────────────────────── */
+.event-show__back {
+  display: inline-block; font-size: 0.85rem; font-weight: 600;
+  color: var(--muted); margin-bottom: 1.5rem;
+}
+.event-show__back:hover { color: var(--black); }
+.event-show__wrap { max-width: 720px; }
+.event-show__meta {
+  display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem;
+  font-size: 0.9rem; color: var(--muted); margin-bottom: 1.25rem;
+}
+.event-show__meta-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.event-show__meta-icon { flex-shrink: 0; color: var(--teal-dk); opacity: 0.8; }
+.event-show__recurring { font-size: 0.9rem; color: var(--teal-dk); font-weight: 600; margin-bottom: 1.5rem; }
+.event-show__desc { margin-bottom: 1.5rem; max-width: none; color: var(--muted); }
+.event-show__actions { margin-top: 2rem; }
+.event-show__past { color: var(--muted); font-style: italic; }
