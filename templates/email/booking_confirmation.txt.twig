@@ -1,0 +1,24 @@
+Y WAL — You're booked!
+=======================
+
+Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+
+Your place on {{ event.title }} is confirmed. Here are the details:
+
+Date:     {{ occurrenceDate|date('l j F Y') }}
+Time:     {{ event.timeFrom }}–{{ event.timeTo }}
+Location: {{ event.location }}
+Price:    Free
+
+{% if event.description %}
+{{ event.description }}
+
+{% endif %}
+Can't make it any more? You can cancel your place any time from the bookings tab in your account:
+https://www.cardiganclimbing.org/account#bookings
+
+---
+You're receiving this because you booked onto an event at https://www.cardiganclimbing.org
+
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+cardiganclimbing@gmail.com | https://www.cardiganclimbing.org

@@ -1,0 +1,47 @@
+<div class="result-count">{{ attendees|length }} {{ attendees|length == 1 ? 'booking' : 'bookings' }}</div>
+
+{% if attendees is empty %}
+  <div class="empty">
+    <strong>No bookings found</strong>
+    Try adjusting your search.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Event</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Price</th>
+          <th>Paid</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for attendee in attendees %}
+          {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+          {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
+                {{ displayName ?: attendee.user.email }}
+              </a>
+            </td>
+            <td>
+              <a href="{{ path('app_admin_event_edit', {id: attendee.event.id}) }}" class="admin-table__link">
+                {{ attendee.event.title }}
+              </a>
+            </td>
+            <td class="admin-table__muted">{{ (attendee.occurrenceDate ?? attendee.event.date)|date('d M Y') }}</td>
+            <td>
+              <span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span>
+            </td>
+            <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
+            <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

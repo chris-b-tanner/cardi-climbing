@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,8 +17,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AccountController extends AbstractController
 {
     #[Route('', name: 'app_account', methods: ['GET', 'POST'])]
-    public function edit(Request $request, EntityManagerInterface $em, UserRepository $userRepository): Response
-    {
+    public function edit(
+        Request $request,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+    ): Response {
         /** @var User $user */
         $user  = $this->getUser();
         $error = null;
@@ -56,8 +61,10 @@ class AccountController extends AbstractController
         }
 
         return $this->render('account/edit.html.twig', [
-            'user'  => $user,
-            'error' => $error,
+            'user'      => $user,
+            'error'     => $error,
+            'attendees' => $attendeeRepository->findAllForUser($user),
+            'today'     => new \DateTimeImmutable('today'),
         ]);
     }
 }

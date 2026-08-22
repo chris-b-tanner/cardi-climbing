@@ -6,29 +6,43 @@
     Try adjusting your search or filter.
   </div>
 {% else %}
-  <div class="user-list">
-    {% for user in users %}
-      {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
-      <div class="user-item">
-        <label class="user-item__check-wrap" title="Select for merge">
-          <input type="checkbox" class="merge-check" value="{{ user.id }}">
-        </label>
-        <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="user-item__link">
-          <div class="user-item__main">
-            <div class="user-item__name">
-              <span class="member-id">#{{ user.id }}</span>
-              {{ displayName ?: user.email }}
-            </div>
-
-          </div>
-          <div class="user-item__tags">
-            {% for tag in user.tags %}
-              <span class="tag-badge">{{ tag.name }}</span>
-            {% endfor %}
-          </div>
-          <span class="user-item__arrow">›</span>
-        </a>
-      </div>
-    {% endfor %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th class="admin-table__check"><span class="sr-only">Select</span></th>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Tags</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+          <tr>
+            <td class="admin-table__check">
+              <label title="Select for merge">
+                <input type="checkbox" class="merge-check" value="{{ user.id }}">
+              </label>
+            </td>
+            <td class="admin-table__muted">#{{ user.id }}</td>
+            <td>
+              <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">
+                {{ displayName ?: '—' }}
+              </a>
+            </td>
+            <td class="admin-table__muted">{{ user.email }}</td>
+            <td>
+              {% for tag in user.tags %}
+                <span class="tag-badge">{{ tag.name }}</span>
+              {% else %}
+                <span class="admin-table__muted">—</span>
+              {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 {% endif %}

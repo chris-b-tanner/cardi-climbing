@@ -13,39 +13,31 @@
     Create your first community update.
   </div>
 {% else %}
-  <div class="user-list">
-    {% for post in posts %}
-      <div class="user-item">
-        <a href="{{ path('app_admin_news_edit', {id: post.id}) }}" class="user-item__link">
-          <div class="user-item__main">
-            <div class="user-item__name">{{ post.title }}</div>
-            <div class="user-item__email">
-              {% if post.isPublished %}
-                Published {{ post.publishedAt|date('d M Y') }}
-              {% else %}
-                Draft
-              {% endif %}
-            </div>
-          </div>
-          <span class="news-status-pill{{ post.isPublished ? ' news-status-pill--published' : '' }}">
-            {{ post.isPublished ? 'Published' : 'Draft' }}
-          </span>
-          <span class="user-item__arrow">›</span>
-        </a>
-      </div>
-    {% endfor %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Published</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for post in posts %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_news_edit', {id: post.id}) }}" class="admin-table__link">{{ post.title }}</a>
+            </td>
+            <td class="admin-table__muted">{{ post.isPublished ? post.publishedAt|date('d M Y') : '—' }}</td>
+            <td>
+              <span class="status-pill{{ post.isPublished ? ' status-pill--published' : '' }}">
+                {{ post.isPublished ? 'Published' : 'Draft' }}
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<style>
-  .news-status-pill {
-    display: inline-block; font-size: 0.7rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 0.15rem 0.5rem; border-radius: 4px;
-    background: #f3f4f6; color: var(--muted); flex-shrink: 0;
-  }
-  .news-status-pill--published { background: #dcfce7; color: var(--green); }
-</style>
 {% endblock %}

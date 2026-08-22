@@ -1,0 +1,134 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'events_meta_title'|trans }}{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+{#    <span class="eyebrow">{{ 'events_eyebrow'|trans }}</span>#}
+    <h1 class="page-hero__h1">{{ 'events_h1'|trans }}</h1>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap">
+    <nav class="calendar-nav" aria-label="Month">
+      <a href="{{ path('app_events', {year: prevYear, month: prevMonth}) }}" class="calendar-nav__link" aria-label="{{ 'events_prev_month'|trans }}">&lsaquo;</a>
+      <h2 class="calendar-nav__title">{{ monthStart|date('F Y') }}</h2>
+      <a href="{{ path('app_events', {year: nextYear, month: nextMonth}) }}" class="calendar-nav__link" aria-label="{{ 'events_next_month'|trans }}">&rsaquo;</a>
+    </nav>
+
+    <div class="calendar-grid">
+      {% for weekday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+        <div class="calendar-grid__weekday">{{ weekday }}</div>
+      {% endfor %}
+
+      {% for dateKey, dayEvents in occurrencesByDay %}
+        {% set inMonth = (dateKey|date('Y-m')) == monthStart|date('Y-m') %}
+        {% set isToday = dateKey == today|date('Y-m-d') %}
+        {% set cellClass = 'calendar-cell' ~ (inMonth ? '' : ' calendar-cell--outside') ~ (isToday ? ' calendar-cell--today' : '') %}
+        {% if dayEvents is not empty %}
+          <a href="#day-{{ dateKey }}" class="{{ cellClass }} calendar-cell--has-events">
+            <span class="calendar-cell__num">{{ dateKey|date('j') }}</span>
+            <span class="calendar-cell__dot" aria-hidden="true"></span>
+            <span class="calendar-cell__count">{{ dayEvents|length }} event{{ dayEvents|length == 1 ? '' : 's' }}</span>
+          </a>
+        {% else %}
+          <div class="{{ cellClass }}">
+            <span class="calendar-cell__num">{{ dateKey|date('j') }}</span>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2 class="agenda-section__title">{{ monthStart|date('F Y') }}</h2>
+
+    {% set anyEvents = false %}
+    {% for dateKey, dayEvents in occurrencesByDay %}
+      {% if dayEvents is not empty %}{% set anyEvents = true %}{% endif %}
+    {% endfor %}
+
+    {% if not anyEvents %}
+      <p>{{ 'events_empty'|trans }}</p>
+    {% else %}
+      <div class="agenda-list">
+        {% for dateKey, dayEvents in occurrencesByDay %}
+          {% if dayEvents is not empty %}
+            <div class="agenda-day" id="day-{{ dateKey }}">
+              <div class="agenda-day__date">
+                <span class="agenda-day__weekday">{{ dateKey|date('D') }}</span>
+                <span class="agenda-day__daynum">{{ dateKey|date('j') }}</span>
+                <span class="agenda-day__month">{{ dateKey|date('M') }}</span>
+              </div>
+              <div class="agenda-day__events">
+                {% for occ in dayEvents %}
+                  {% set event = occ.event %}
+                  <div class="agenda-event">
+                    <div class="agenda-event__time">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
+                    <div class="agenda-event__body">
+                      <h3 class="agenda-event__title">{{ event.title }}</h3>
+                      {% if event.description %}
+                        <p class="agenda-event__desc">{{ event.description|nl2br }}</p>
+                      {% endif %}
+                      <div class="agenda-event__meta">
+                        <span>{{ event.location }}</span>
+                        <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>
+                        {% if occ.spotsLeft is not null %}
+                          <span>
+                            {% if occ.spotsLeft > 0 %}
+                              {{ occ.spotsLeft }} {{ occ.spotsLeft == 1 ? 'events_place_left'|trans : 'events_places_left'|trans }}
+                            {% else %}
+                              {{ 'events_full'|trans }}
+                            {% endif %}
+                          </span>
+                        {% endif %}
+                        {% if event.restrictions is not empty %}
+                          <span class="agenda-event__restricted">
+                            {{ 'events_restricted_to'|trans }}
+                            {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor %}
+                          </span>
+                        {% endif %}
+                      </div>
+
+                      {% if event.externalUrl %}
+                        <div class="agenda-event__details">
+                          <a href="{{ event.externalUrl }}" target="_blank" rel="noopener" class="agenda-event__signin">{{ 'events_view_details'|trans }}</a>
+                        </div>
+                      {% endif %}
+
+                      {% if not occ.isPast %}
+                        <div class="agenda-event__actions">
+                          {% if occ.isBooked %}
+                            <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
+                            <a href="{{ path('app_account') }}#bookings" class="agenda-event__signin">{{ 'events_manage_booking'|trans }}</a>
+                          {% elseif app.user is null %}
+                            <a href="{{ path('app_login') }}" class="agenda-event__signin">{{ 'events_sign_in_to_book'|trans }}</a>
+                          {% elseif occ.isFull %}
+                            <span class="agenda-event__status">{{ 'events_full'|trans }}</span>
+                          {% elseif occ.isRestricted %}
+                            <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
+                          {% elseif occ.canBook %}
+                            <form method="post" action="{{ path('app_event_book', {id: event.id}) }}" class="agenda-event__form">
+                              <input type="hidden" name="occurrenceDate" value="{{ occ.date|date('Y-m-d') }}">
+                              <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
+                              <button type="submit" class="btn btn--teal btn--sm">{{ 'events_book'|trans }}</button>
+                            </form>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

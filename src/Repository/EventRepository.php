@@ -24,4 +24,29 @@ class EventRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Published events whose date (or, for recurring events, whose recurrence window)
+     * overlaps the given range. Callers expand recurring rows into occurrences themselves
+     * via Event::isValidForDate().
+     *
+     * @return Event[]
+     */
+    public function findPublishedOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.status = :published')
+            ->andWhere('
+                (e.isRecurring = false AND e.date BETWEEN :start AND :end)
+                OR
+                (e.isRecurring = true AND e.date <= :end AND (e.recurUntil IS NULL OR e.recurUntil >= :start))
+            ')
+            ->setParameter('published', Event::STATUS_PUBLISHED)
+            ->setParameter('start', $rangeStart)
+            ->setParameter('end', $rangeEnd)
+            ->orderBy('e.date', 'ASC')
+            ->addOrderBy('e.timeFrom', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

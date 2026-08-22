@@ -1,0 +1,45 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Bookings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Bookings</h1>
+</div>
+
+<div class="filter-form">
+  <input type="search" id="search-q" placeholder="Search member or event…"
+         value="{{ currentQuery }}" aria-label="Search bookings" autocomplete="off">
+</div>
+
+<div id="results">
+  {% include 'admin/bookings/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput = document.getElementById('search-q');
+  const results      = document.getElementById('results');
+  const endpoint      = '{{ path('app_admin_bookings') }}';
+  let debounce;
+
+  function fetchResults() {
+    const params = new URLSearchParams();
+    if (searchInput.value) params.set('q', searchInput.value);
+
+    const qs = params.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+    fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+</script>
+{% endblock %}

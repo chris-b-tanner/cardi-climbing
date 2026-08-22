@@ -96,7 +96,7 @@
     }
     .admin-topbar__link:hover { border-color: #9ca3af; color: var(--black); }
 
-    .admin-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+    .admin-wrap { margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
 
     @media (max-width: 860px) {
       .admin-shell { flex-direction: column; }
@@ -181,20 +181,45 @@
 
     .result-count { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
 
-    .user-list { display: flex; flex-direction: column; gap: 0.4rem; }
-    .user-item {
-      background: var(--white); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 0.85rem 1rem;
-      display: flex; align-items: center; gap: 0.75rem;
-      text-decoration: none; color: inherit;
-      transition: border-color 0.1s, box-shadow 0.1s;
+    .status-pill {
+      display: inline-block; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0.15rem 0.5rem; border-radius: 4px;
+      background: #f3f4f6; color: var(--muted);
     }
-    .user-item:hover { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(42,157,143,0.12); }
-    .user-item__main { flex: 1; min-width: 0; }
-    .user-item__name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .user-item__email { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .user-item__tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.2rem; flex-shrink: 0; max-width: 45%; }
-    .user-item__arrow { color: #d1d5db; flex-shrink: 0; }
+    .status-pill--published { background: #dcfce7; color: var(--green); }
+    .status-pill--cancelled { background: #fee2e2; color: var(--red); }
+
+    .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .admin-table {
+      width: 100%; min-width: 640px;
+      border-collapse: collapse;
+      background: var(--white);
+      font-size: 0.875rem;
+    }
+    .admin-table th, .admin-table td {
+      padding: 0.7rem 0.9rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .admin-table th {
+      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+      background: var(--bg); white-space: nowrap;
+    }
+    .admin-table tbody tr:last-child td { border-bottom: none; }
+    .admin-table tbody tr:hover { background: var(--bg); }
+    .admin-table tbody tr.is-selected { background: #e0f2fe; }
+    .admin-table td.admin-table__check,
+    .admin-table th.admin-table__check { width: 2.25rem; }
+    .admin-table__link { color: var(--black); font-weight: 500; text-decoration: none; }
+    .admin-table__link:hover { color: var(--teal-dk); text-decoration: underline; }
+    .admin-table__muted { color: var(--muted); }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
 
     .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
     .empty strong { display: block; margin-bottom: 0.4rem; color: var(--black); }
@@ -255,7 +280,6 @@
   <aside class="admin-sidebar">
     <a href="{{ path('app_admin_users') }}" class="admin-sidebar__brand">
       <span>Y Wal</span> Admin
-      <small>Booking system</small>
     </a>
     <ul class="admin-nav">
       <li>
@@ -275,6 +299,12 @@
         <a href="{{ path('app_admin_events') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
           Events
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_bookings') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_booking' ? ' is-active' : '' }}">
+          Bookings
         </a>
       </li>
       <li>

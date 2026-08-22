@@ -71,6 +71,7 @@
         <li><a href="{{ path('app_home') }}#mission">{{ 'nav_mission'|trans }}</a></li>
         <li><a href="{{ path('app_home') }}#plan">{{ 'nav_plan'|trans }}</a></li>
         <li><a href="{{ path('app_home') }}#involved">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_events') }}">{{ 'nav_events'|trans }}</a></li>
         <li><a href="{{ path('app_news') }}">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
@@ -98,6 +99,7 @@
         <li><a href="{{ path('app_home') }}#mission"    class="nav__mobile-link">{{ 'nav_mission'|trans }}</a></li>
         <li><a href="{{ path('app_home') }}#plan"       class="nav__mobile-link">{{ 'nav_plan'|trans }}</a></li>
         <li><a href="{{ path('app_home') }}#involved"   class="nav__mobile-link">{{ 'nav_involved'|trans }}</a></li>
+        <li><a href="{{ path('app_events') }}" class="nav__mobile-link">{{ 'nav_events'|trans }}</a></li>
         <li><a href="{{ path('app_news') }}" class="nav__mobile-link">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
           <li><a href="{{ path('app_admin_users') }}" class="nav__mobile-link">Admin</a></li>
@@ -163,6 +165,7 @@
           <li><a href="{{ path('app_home') }}#mission">{{ 'footer_nav_mission'|trans }}</a></li>
           <li><a href="{{ path('app_home') }}#plan">{{ 'footer_nav_plan'|trans }}</a></li>
           <li><a href="{{ path('app_home') }}#involved">{{ 'footer_nav_involved'|trans }}</a></li>
+          <li><a href="{{ path('app_events') }}">{{ 'footer_nav_events'|trans }}</a></li>
           <li><a href="{{ path('app_news') }}">{{ 'footer_nav_news'|trans }}</a></li>
         </ul>
       </div>
@@ -170,6 +173,9 @@
         <h4>{{ 'footer_contact'|trans }}</h4>
         <ul>
           <li><a href="mailto:cardiganclimbing@gmail.com">cardiganclimbing@gmail.com</a></li>
+          {% if is_granted('ROLE_USER') %}
+            <li><a href="{{ path('app_account') }}">My account</a></li>
+          {% endif %}
           <li>{{ 'footer_address_1'|trans }}</li>
           <li>{{ 'footer_address_2'|trans }}</li>
         </ul>
