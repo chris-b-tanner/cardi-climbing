@@ -14,7 +14,7 @@
 <main class="login-page">
   <div class="login-card">
     <h1>Sign In</h1>
-    <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;">Members &amp; staff area</p>
+    <p style="color:var(--muted);font-size:0.875rem;margin:0.4rem 0 1.75rem;">Never logged in before? Need a password? Use the 'forgot password' link at the bottom.</p>
 
     {% if error %}
       <div class="alert alert--error">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
@@ -41,7 +41,7 @@
     </form>
 
     <div class="login-footer">
-      <a href="{{ path('app_forgot_password_request') }}">Forgot your password?</a>
+      <a href="{{ path('app_forgot_password_request') }}">Forgot your password</a>
       &nbsp;&bull;&nbsp;
       <a href="/">← Back to site</a>
     </div>
