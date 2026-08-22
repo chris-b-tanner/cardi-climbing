@@ -24,7 +24,6 @@ stat_2_label: "Cefnogwyr cymunedol"
 stat_3_label: "Pobl o fewn 30 milltir"
 stat_4_label: "Ysgol i bartneru â nhw"
 
-mission_eyebrow: "Ein Cenhadaeth"
 mission_h2: "Dylai dringo berthyn i bawb"
 mission_p1: "Mae Y Wal yn fenter dan arweiniad y gymuned i ddod â chyfleuster dringo dan do i Aberteifi a rhanbarth ehangach Gorllewin Cymru. Mae'r wal ddringo agosaf dros awr o daith car i ffwrdd — rydym am newid hynny."
 mission_p2: "Ein gweledigaeth yw gofod cynhwysol, fforddiadwy lle gall plant, teuluoedd, dringwyr profiadol a dechreuwyr hollol ddarganfod llawenydd symud ar y wal. Mae dringo'n meithrin hyder, cryfder corfforol, sgiliau datrys problemau, a chysylltiadau cymunedol gwirioneddol."
@@ -40,7 +39,6 @@ pillar_3_body: "Yn eiddo i'r gymuned ac yn cael ei lywodraethu ganddi, yn ategu'
 pillar_4_title: "Di-elw"
 pillar_4_body: "Mae gwarged yn mynd yn ôl i'r cyfleuster a mynediad â chymhorthdal — nid cyfranddalwyr."
 
-plan_eyebrow: "Y Cynllun"
 plan_h2: "O Weledigaeth<br>i Realiti"
 plan_intro: "Mae gennym ffordd glir, raddedig i fynd â Y Wal o uchelgais cymunedol i agor y drysau. Dyma lle rydym ac i ble rydym yn mynd."
 phase_label: "CAM"
@@ -64,7 +62,6 @@ feature_6: "Archebu hyblyg i ysgolion a grwpiau"
 feature_7: "Sesiynau hyfforddi a chyfarwyddyd"
 feature_8: "Tocynnau dydd, aelodaethau, ac archebu bloc"
 
-adv_eyebrow: "Hwb Antur"
 adv_h2: "Eich Porth i Antur Gorllewin Cymru"
 adv_intro: "Mae Y Wal yn fwy na wal. Rydym yn adeiladu hwb ar gyfer antur awyr agored — yn cysylltu ymwelwyr a phobl leol â gweithgareddau o'r radd flaenaf ar hyd un o arfordiroedd mwyaf trawiadol Prydain."
 adv_guided_title: "Tywys Preifat"
@@ -79,7 +76,6 @@ adv_partners_intro: "Rydym yn gweithio'n agos gyda grŵp dethol o arbenigwyr lle
 adv_cta: "Yn cynllunio ymweliad grŵp, taith ysgol, neu wyliau antur? Cysylltwch â ni a byddwn yn adeiladu eich rhaglen."
 adv_cta_btn: "Cysylltwch â Ni"
 
-involved_eyebrow: "Cymerwch Ran"
 involved_h2: "Byddwch yn Rhan ohono"
 way_1_title: "Gwirfoddoli"
 way_1_body: "Rydym angen pobl â phob math o sgiliau — o godi arian a dylunio i reoli prosiectau, adeiladu, ac allgymorth cymunedol. Mae pob awr yn cyfrif."
@@ -88,7 +84,6 @@ way_2_body: "Pan fydd ein hymgyrch godi arian yn lansio, byddem wrth ein bodd pe
 way_3_title: "Lledaenwch y Gair"
 way_3_body: "Dywedwch wrth eich ffrindiau, rhannwch ein stori gyda busnesau lleol, a siaradwch â ni am gyfleoedd partneriaeth, nawdd, neu gefnogaeth mewn nwyddau."
 
-signup_eyebrow: "Cadwch mewn Cysylltiad"
 signup_h2: "Derbyn Diweddariadau"
 signup_body: "Cofrestrwch ar gyfer newyddion y prosiect, digwyddiadau cymunedol, a byddwch y cyntaf i glywed pan fydd ein hymgyrch godi arian yn mynd yn fyw."
 
@@ -115,7 +110,6 @@ news_empty: "Dim negeseuon newyddion eto — dewch yn ôl yn fuan."
 news_read_more: "Darllen mwy"
 
 events_meta_title: "Digwyddiadau — Y Wal"
-events_eyebrow: "Beth Sy'n Digwydd"
 events_h1: "Calendr Digwyddiadau"
 events_empty: "Dim digwyddiadau wedi'u trefnu'r mis hwn."
 events_prev_month: "Mis blaenorol"
