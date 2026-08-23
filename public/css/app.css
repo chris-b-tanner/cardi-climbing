@@ -606,6 +606,7 @@ p + p { margin-top: 1rem; }
 .alert--error   { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .alert--success { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 .alert--dev     { background: #fefce8; border-color: #fde047; color: #854d0e; font-family: monospace; word-break: break-all; }
+.alert a { text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
 .login-footer {
   margin-top: 1.75rem;
   padding-top: 1.5rem;
@@ -813,6 +814,7 @@ p + p { margin-top: 1rem; }
   display: flex; flex-direction: column; gap: 0.85rem;
 }
 .agenda-event {
+  position: relative;
   display: flex; gap: 1rem;
   background: var(--white); border: 1px solid var(--border);
   padding: 1.1rem 1.25rem;
@@ -820,6 +822,13 @@ p + p { margin-top: 1rem; }
 }
 .agenda-event:hover { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
 .agenda-event:hover .agenda-event__title { text-decoration: underline; text-underline-offset: 2px; }
+.agenda-event__cta {
+  position: relative; z-index: 1;
+  margin-top: 0.9rem;
+}
+.agenda-event__cta::after {
+  content: ''; position: absolute; inset: 0;
+}
 .agenda-event__time {
   flex-shrink: 0; width: 5.5rem;
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
@@ -899,3 +908,24 @@ p + p { margin-top: 1rem; }
 .event-show__desc { margin-bottom: 1.5rem; max-width: none; color: var(--muted); }
 .event-show__actions { margin-top: 2rem; }
 .event-show__past { color: var(--muted); font-style: italic; }
+
+.event-show__guest-booking {
+  background: var(--white); border: 1px solid var(--border);
+  padding: 1.75rem;
+}
+.event-show__guest-booking-title {
+  font-family: var(--f-head); font-size: 1.1rem; font-weight: 700;
+  text-transform: none; letter-spacing: 0; margin-bottom: 0.5rem;
+}
+.event-show__guest-booking-intro { font-size: 0.88rem; margin-bottom: 1.5rem; }
+.event-show__guest-booking-intro a { color: var(--teal-dk); text-decoration: underline; text-underline-offset: 2px; }
+.event-show__guest-form .form-group { margin-bottom: 1.1rem; }
+.event-show__name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 480px) { .event-show__name-row { grid-template-columns: 1fr; } }
+.event-show__guest-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; max-width: none; }
+.event-show__optin-label {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.88rem; color: var(--black); cursor: pointer;
+}
+.event-show__optin-label input { width: 1rem; height: 1rem; accent-color: var(--teal); }
+.event-show__guest-form .form-actions .btn { width: auto; }

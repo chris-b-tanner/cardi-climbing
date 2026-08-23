@@ -7,11 +7,14 @@ use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
+use App\Repository\UserRepository;
 use App\Service\BookingMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -111,7 +114,10 @@ class EventController extends AbstractController
             'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
         ];
 
-        return $this->render('event/show.html.twig', $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats));
+        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats);
+        $view['accountConflict'] = (bool) $request->query->get('accountConflict');
+
+        return $this->render('event/show.html.twig', $view);
     }
 
     #[Route('/events/{id}/book', name: 'app_event_book', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -131,53 +137,117 @@ class EventController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $occurrenceDate = $this->parseDate($request->request->get('occurrenceDate', ''));
-        $redirectParams = ['id' => $event->getId()];
-        if ($occurrenceDate) {
-            $redirectParams['date'] = $occurrenceDate->format('Y-m-d');
-        }
+        [$occurrenceDate, $redirectParams, $error] = $this->validateBookableOccurrence(
+            $event,
+            $request->request->get('occurrenceDate', ''),
+        );
 
-        if (!$event->isPublished() || $occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
-            $this->addFlash('error', 'That event is no longer available.');
+        if ($error) {
+            $this->addFlash('error', $error);
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        if ($occurrenceDate < new \DateTimeImmutable('today')) {
-            $this->addFlash('error', 'That date has already passed.');
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em);
+
+        if (is_string($result)) {
+            $this->addFlash('error', $result);
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
-
-        if (!$event->allowsUser($user)) {
-            $this->addFlash('error', 'You do not hold the certification required to book this event.');
-            return $this->redirectToRoute('app_event_show', $redirectParams);
-        }
-
-        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
-
-        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
-            $this->addFlash('error', 'You are already booked onto this event.');
-            return $this->redirectToRoute('app_event_show', $redirectParams);
-        }
-
-        if ($event->getMaxAttendees() !== null
-            && $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
-        ) {
-            $this->addFlash('error', 'Sorry, this event is fully booked.');
-            return $this->redirectToRoute('app_event_show', $redirectParams);
-        }
-
-        $attendee = new Attendee();
-        $attendee->setEvent($event);
-        $attendee->setUser($user);
-        $attendee->setOccurrenceDate($storedOccurrenceDate);
-        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
-
-        $em->persist($attendee);
-        $em->flush();
 
         $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
 
-        return $this->redirectToRoute('app_booking_confirmation', ['id' => $attendee->getId()]);
+        return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
+    }
+
+    /**
+     * Lets an anonymous visitor book onto an event without a separate sign-up step: they enter
+     * their name, email, and a password, and we create (or log them into) their account and book
+     * them in one action. If the email already has an account and the password doesn't match, we
+     * don't touch that account or book anything — we send them back with a prompt to reset their
+     * password instead, so we never silently take over or duplicate an existing member's account.
+     */
+    #[Route('/events/{id}/book-guest', name: 'app_event_book_guest', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function bookGuest(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        AttendeeRepository $attendeeRepository,
+        UserRepository $userRepository,
+        UserPasswordHasherInterface $passwordHasher,
+        BookingMailer $bookingMailer,
+        Security $security,
+    ): Response {
+        if (!$this->isCsrfTokenValid('book_guest_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_events');
+        }
+
+        if ($this->getUser()) {
+            return $this->redirectToRoute('app_event_show', ['id' => $event->getId()]);
+        }
+
+        [$occurrenceDate, $redirectParams, $error] = $this->validateBookableOccurrence(
+            $event,
+            $request->request->get('occurrenceDate', ''),
+        );
+
+        if ($error) {
+            $this->addFlash('error', $error);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
+        }
+
+        $firstName = trim($request->request->get('firstName', ''));
+        $lastName  = trim($request->request->get('lastName', ''));
+        $email     = strtolower(trim($request->request->get('email', '')));
+        $password  = $request->request->get('password', '');
+        $optIn     = $request->request->has('optIn');
+
+        if ($firstName === '' || $lastName === '' || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
+            $this->addFlash('error', 'Please fill in your name, email, and a password.');
+            return $this->redirectToRoute('app_event_show', $redirectParams);
+        }
+
+        if (strlen($password) < 8) {
+            $this->addFlash('error', 'Your password must be at least 8 characters.');
+            return $this->redirectToRoute('app_event_show', $redirectParams);
+        }
+
+        $existingUser = $userRepository->findOneBy(['email' => $email]);
+
+        if ($existingUser) {
+            if (!$passwordHasher->isPasswordValid($existingUser, $password)) {
+                return $this->redirectToRoute('app_event_show', array_merge($redirectParams, ['accountConflict' => 1]));
+            }
+
+            $user = $existingUser;
+            if ($optIn && !$user->isOptIn()) {
+                $user->setOptIn(true);
+            }
+        } else {
+            $user = new User();
+            $user->setEmail($email);
+            $user->setFirstName($firstName);
+            $user->setLastName($lastName);
+            $user->setOptIn($optIn);
+            $user->setPassword($passwordHasher->hashPassword($user, $password));
+
+            $em->persist($user);
+        }
+
+        $em->flush();
+
+        $security->login($user);
+
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em);
+
+        if (is_string($result)) {
+            $this->addFlash('error', $result);
+            return $this->redirectToRoute('app_event_show', $redirectParams);
+        }
+
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
+
+        return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
     }
 
     #[Route('/bookings/{id}/confirmation', name: 'app_booking_confirmation', requirements: ['id' => '\d+'])]
@@ -226,6 +296,67 @@ class EventController extends AbstractController
 
         $this->addFlash('success', 'Your booking has been cancelled.');
         return $this->redirect($this->generateUrl('app_account') . '#bookings');
+    }
+
+    /**
+     * Parses and validates a submitted occurrence date against the event, returning the params
+     * needed to redirect back to the event page either way.
+     *
+     * @return array{0: ?\DateTimeImmutable, 1: array, 2: ?string}
+     */
+    private function validateBookableOccurrence(Event $event, string $rawDate): array
+    {
+        $occurrenceDate = $this->parseDate($rawDate);
+        $redirectParams = ['id' => $event->getId()];
+        if ($occurrenceDate) {
+            $redirectParams['date'] = $occurrenceDate->format('Y-m-d');
+        }
+
+        if (!$event->isPublished() || $occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
+            return [null, $redirectParams, 'That event is no longer available.'];
+        }
+
+        if ($occurrenceDate < new \DateTimeImmutable('today')) {
+            return [null, $redirectParams, 'That date has already passed.'];
+        }
+
+        return [$occurrenceDate, $redirectParams, null];
+    }
+
+    /** Validates and creates the booking, returning the new Attendee or an error message. */
+    private function tryCreateBooking(
+        Event $event,
+        User $user,
+        \DateTimeImmutable $occurrenceDate,
+        AttendeeRepository $attendeeRepository,
+        EntityManagerInterface $em,
+    ): Attendee|string {
+        if (!$event->allowsUser($user)) {
+            return 'You do not hold the certification required to book this event.';
+        }
+
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
+            return 'You are already booked onto this event.';
+        }
+
+        if ($event->getMaxAttendees() !== null
+            && $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
+        ) {
+            return 'Sorry, this event is fully booked.';
+        }
+
+        $attendee = new Attendee();
+        $attendee->setEvent($event);
+        $attendee->setUser($user);
+        $attendee->setOccurrenceDate($storedOccurrenceDate);
+        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
+
+        $em->persist($attendee);
+        $em->flush();
+
+        return $attendee;
     }
 
     /** @param array{count: int, bookedByUser: bool} $stats */
@@ -311,5 +442,4 @@ class EventController extends AbstractController
             return null;
         }
     }
-
 }

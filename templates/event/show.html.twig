@@ -71,24 +71,77 @@
     {% if isPast %}
       <p class="event-show__past">{{ 'events_event_passed'|trans }}</p>
     {% else %}
-      <div class="agenda-event__actions event-show__actions">
-        {% if isBooked %}
+      {% if isBooked %}
+        <div class="agenda-event__actions event-show__actions">
           <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
           <a href="{{ path('app_account') }}#bookings" class="agenda-event__signin">{{ 'events_manage_booking'|trans }}</a>
-        {% elseif app.user is null %}
-          <a href="{{ path('app_login') }}" class="agenda-event__signin">{{ 'events_sign_in_to_book'|trans }}</a>
-        {% elseif isFull %}
+        </div>
+      {% elseif isFull %}
+        <div class="agenda-event__actions event-show__actions">
           <span class="agenda-event__status">{{ 'events_full'|trans }}</span>
-        {% elseif isRestricted %}
+        </div>
+      {% elseif app.user is null %}
+        {% if accountConflict %}
+          <div class="alert alert--error">
+            {{ 'events_account_conflict'|trans }}
+            <a href="{{ path('app_forgot_password_request') }}">{{ 'events_request_new_password'|trans }}</a>
+            {{ 'events_account_conflict_or'|trans }}
+            <a href="{{ path('app_login') }}">{{ 'events_account_conflict_signin'|trans }}</a>.
+          </div>
+        {% else %}
+          <div class="event-show__guest-booking">
+            <h3 class="event-show__guest-booking-title">{{ 'events_guest_booking_title'|trans }}</h3>
+
+            <form method="post" action="{{ path('app_event_book_guest', {id: event.id}) }}" class="event-show__guest-form">
+              <input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_guest_event_' ~ event.id) }}">
+
+              <div class="event-show__name-row">
+                <div class="form-group">
+                  <label for="guestFirstName">{{ 'events_first_name'|trans }}</label>
+                  <input type="text" id="guestFirstName" name="firstName" class="form-control" autocomplete="given-name" required>
+                </div>
+                <div class="form-group">
+                  <label for="guestLastName">{{ 'events_last_name'|trans }}</label>
+                  <input type="text" id="guestLastName" name="lastName" class="form-control" autocomplete="family-name" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="guestEmail">{{ 'events_email'|trans }}</label>
+                <input type="email" id="guestEmail" name="email" class="form-control" autocomplete="email" required>
+              </div>
+
+              <div class="form-group">
+                <label for="guestPassword">{{ 'events_password'|trans }}</label>
+                <input type="password" id="guestPassword" name="password" class="form-control" autocomplete="new-password" minlength="8" required>
+                <p class="event-show__guest-hint">{{ 'events_password_hint'|trans }}</p>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="event-show__optin-label">
+                  <input type="checkbox" name="optIn" value="1">
+                  {{ 'events_subscribe_news'|trans }}
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn--teal">{{ 'events_book'|trans }}</button>
+              </div>
+            </form>
+          </div>
+        {% endif %}
+      {% elseif isRestricted %}
+        <div class="agenda-event__actions event-show__actions">
           <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
-        {% elseif canBook %}
+        </div>
+      {% elseif canBook %}
+        <div class="agenda-event__actions event-show__actions">
           <form method="post" action="{{ path('app_event_book', {id: event.id}) }}" class="agenda-event__form">
             <input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
             <button type="submit" class="btn btn--teal">{{ 'events_book'|trans }}</button>
           </form>
-        {% endif %}
-      </div>
+        </div>
+      {% endif %}
     {% endif %}
 
   </div>
