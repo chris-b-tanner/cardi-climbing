@@ -7,24 +7,16 @@ use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
+use App\Service\BookingMailer;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Address;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 class EventController extends AbstractController
 {
-    public function __construct(
-        #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
-        #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
-    ) {}
-
     #[Route('/events', name: 'app_events')]
     public function index(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
     {
@@ -129,7 +121,7 @@ class EventController extends AbstractController
         Event $event,
         EntityManagerInterface $em,
         AttendeeRepository $attendeeRepository,
-        MailerInterface $mailer,
+        BookingMailer $bookingMailer,
     ): Response {
         if (!$this->isCsrfTokenValid('book_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -183,7 +175,7 @@ class EventController extends AbstractController
         $em->persist($attendee);
         $em->flush();
 
-        $this->sendBookingConfirmation($mailer, $user, $event, $occurrenceDate);
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
 
         return $this->redirectToRoute('app_booking_confirmation', ['id' => $attendee->getId()]);
     }
@@ -320,20 +312,4 @@ class EventController extends AbstractController
         }
     }
 
-    private function sendBookingConfirmation(MailerInterface $mailer, User $user, Event $event, \DateTimeImmutable $occurrenceDate): void
-    {
-        $email = (new TemplatedEmail())
-            ->from(new Address($this->mailerFrom, $this->mailerFromName))
-            ->to($user->getEmail())
-            ->subject('Booking confirmed: ' . $event->getTitle() . ' — Y Wal')
-            ->htmlTemplate('email/booking_confirmation.html.twig')
-            ->textTemplate('email/booking_confirmation.txt.twig')
-            ->context([
-                'user'           => $user,
-                'event'          => $event,
-                'occurrenceDate' => $occurrenceDate,
-            ]);
-
-        $mailer->send($email);
-    }
 }

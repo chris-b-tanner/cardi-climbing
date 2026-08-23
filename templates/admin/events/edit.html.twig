@@ -144,6 +144,47 @@
   </div>
 </form>
 
+<div class="card" style="margin-top:1.5rem;">
+  <div class="page-header" style="margin-bottom:0.75rem;">
+    <div class="card__label" style="margin-bottom:0;">Attendees ({{ attendees|length }})</div>
+    <a href="{{ path('app_admin_booking_new', {eventId: event.id}) }}" class="btn btn--teal btn--sm">+ Add attendee</a>
+  </div>
+  {% if attendees is empty %}
+    <p class="tag-badge--none">No one booked yet.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Price</th>
+            <th>Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attendee in attendees %}
+            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+            <tr>
+              <td>
+                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
+                  {{ displayName ?: attendee.user.email }}
+                </a>
+              </td>
+              <td class="admin-table__muted">{{ (attendee.occurrenceDate ?? event.date)|date('d M Y') }}</td>
+              <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
+              <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
+              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
 <form method="post" action="{{ path('app_admin_event_delete', {id: event.id}) }}"
       onsubmit="return confirm('Delete this event? This cannot be undone.');" style="margin-top:1rem;">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_event_' ~ event.id) }}">

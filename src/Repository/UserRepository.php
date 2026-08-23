@@ -30,7 +30,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
-    public function search(string $query = '', ?int $tagId = null): array
+    public function search(string $query = '', ?int $tagId = null, ?int $limit = null): array
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
@@ -46,6 +46,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         if ($tagId !== null) {
             $qb->andWhere('t.id = :tagId')
                ->setParameter('tagId', $tagId);
+        }
+
+        if ($limit !== null) {
+            $qb->setMaxResults($limit);
         }
 
         return $qb

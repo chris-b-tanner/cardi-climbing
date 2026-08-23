@@ -1,0 +1,186 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New booking{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New booking</h1>
+  <a href="{{ path('app_admin_bookings') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_booking_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_new') }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="eventId">Event</label>
+      <select id="eventId" name="eventId" class="form-control" required>
+        <option value="">Select an event…</option>
+        {% for event in events %}
+          <option value="{{ event.id }}"
+                  data-recurring="{{ event.isRecurring ? '1' : '0' }}"
+                  data-date="{{ event.date|date('Y-m-d') }}"
+                  {% if event.id == selectedEventId %}selected{% endif %}>
+            {{ event.title }} — {{ event.date|date('d M Y') }}{{ event.isRecurring ? ' (recurring)' : '' }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" id="occurrence-date-group" style="margin-bottom:0;">
+      <label for="occurrenceDate">Occurrence date</label>
+      <input type="date" id="occurrenceDate" name="occurrenceDate" class="form-control"
+             value="{{ app.request.request.get('occurrenceDate') }}">
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+        Only needed for recurring events — must be a real occurrence date for the selected event.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="form-group" style="margin-bottom:0;position:relative;">
+      <label for="memberSearch">Member</label>
+      <input type="text" id="memberSearch" class="form-control" placeholder="Search by name or email…"
+             autocomplete="off"
+             value="{% if selectedMember %}{{ (selectedMember.firstName ~ ' ' ~ selectedMember.lastName)|trim ?: selectedMember.email }} — {{ selectedMember.email }}{% endif %}">
+      <input type="hidden" id="userId" name="userId" value="{{ selectedMember ? selectedMember.id : '' }}">
+      <div id="member-results" class="member-search-results"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="price">Price override (£)</label>
+        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
+               placeholder="Leave blank to use the event price">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="paidAmount">Paid amount (£)</label>
+        <input type="number" id="paidAmount" name="paidAmount" class="form-control" min="0" step="0.01" value="0.00">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem;">
+      <input type="checkbox" name="sendEmail" value="1" checked
+             style="width:1.1rem;height:1.1rem;accent-color:var(--teal);">
+      Send booking confirmation email
+    </label>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Create booking</button>
+    <a href="{{ path('app_admin_bookings') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .member-search-results {
+    display: none; position: absolute; z-index: 10;
+    top: 100%; left: 0; right: 0; margin-top: 0.25rem;
+    background: var(--white); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    max-height: 260px; overflow-y: auto;
+  }
+  .member-search-results.is-open { display: block; }
+  .member-search-item {
+    display: block; width: 100%; text-align: left;
+    padding: 0.55rem 0.75rem; border: none; background: none;
+    font-family: inherit; font-size: 0.875rem; color: var(--black); cursor: pointer;
+  }
+  .member-search-item:hover,
+  .member-search-item.is-active { background: var(--bg); }
+  .member-search-empty { padding: 0.6rem 0.75rem; font-size: 0.82rem; color: var(--muted); }
+</style>
+<script>
+  const eventSelect = document.getElementById('eventId');
+  const dateGroup   = document.getElementById('occurrence-date-group');
+  const dateInput   = document.getElementById('occurrenceDate');
+
+  function syncOccurrenceDate() {
+    const opt = eventSelect.options[eventSelect.selectedIndex];
+    const isRecurring = !!opt && opt.dataset.recurring === '1';
+    dateGroup.style.display = isRecurring ? 'block' : 'none';
+    if (opt && !isRecurring && opt.dataset.date) {
+      dateInput.value = opt.dataset.date;
+    }
+  }
+
+  eventSelect.addEventListener('change', syncOccurrenceDate);
+  syncOccurrenceDate();
+
+  // ── Member search ─────────────────────────────────────────
+  const memberSearch  = document.getElementById('memberSearch');
+  const memberResults = document.getElementById('member-results');
+  const memberIdInput = document.getElementById('userId');
+  const memberSearchUrl = '{{ path('app_admin_booking_member_search') }}';
+  let memberDebounce;
+
+  function closeMemberResults() {
+    memberResults.classList.remove('is-open');
+    memberResults.innerHTML = '';
+  }
+
+  function clearMemberSelection() {
+    memberIdInput.value = '';
+  }
+
+  memberSearch.addEventListener('input', () => {
+    clearMemberSelection();
+    clearTimeout(memberDebounce);
+
+    const q = memberSearch.value.trim();
+    if (q.length < 2) {
+      closeMemberResults();
+      return;
+    }
+
+    memberDebounce = setTimeout(() => {
+      fetch(`${memberSearchUrl}?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(members => {
+          if (!members.length) {
+            memberResults.innerHTML = '<div class="member-search-empty">No members found</div>';
+            memberResults.classList.add('is-open');
+            return;
+          }
+          memberResults.innerHTML = members.map(m => `
+            <button type="button" class="member-search-item" data-id="${m.id}" data-label="${m.label.replace(/"/g, '&quot;')}">${m.label}</button>
+          `).join('');
+          memberResults.classList.add('is-open');
+        });
+    }, 250);
+  });
+
+  memberResults.addEventListener('click', (e) => {
+    const btn = e.target.closest('.member-search-item');
+    if (!btn) return;
+    memberIdInput.value = btn.dataset.id;
+    memberSearch.value = btn.dataset.label;
+    closeMemberResults();
+  });
+
+  memberSearch.addEventListener('blur', () => {
+    // Give the click on a result time to register before we validate/close.
+    setTimeout(() => {
+      if (!memberIdInput.value) {
+        memberSearch.value = '';
+      }
+      closeMemberResults();
+    }, 150);
+  });
+</script>
+{% endblock %}

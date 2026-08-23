@@ -78,6 +78,19 @@ class AttendeeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** Every booking (any status) for the given event, earliest occurrence first. */
+    public function findForEvent(Event $event): array
+    {
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.user', 'u')->addSelect('u')
+            ->where('a.event = :event')
+            ->setParameter('event', $event)
+            ->orderBy('a.occurrenceDate', 'ASC')
+            ->addOrderBy('a.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** All of this member's bookings, including cancelled ones, newest first. */
     public function findAllForUser(User $user): array
     {

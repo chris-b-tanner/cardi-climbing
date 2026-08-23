@@ -289,13 +289,6 @@
         </a>
       </li>
       <li>
-        <a href="{{ path('app_admin_placeholder', {section: 'calendar'}) }}"
-           class="admin-nav__link{{ currentSection == 'calendar' ? ' is-active' : '' }}">
-          Calendar
-          <span class="admin-nav__badge">Soon</span>
-        </a>
-      </li>
-      <li>
         <a href="{{ path('app_admin_events') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
           Events
@@ -311,13 +304,6 @@
         <a href="{{ path('app_admin_news') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_news' ? ' is-active' : '' }}">
           News
-        </a>
-      </li>
-      <li>
-        <a href="{{ path('app_admin_placeholder', {section: 'settings'}) }}"
-           class="admin-nav__link{{ currentSection == 'settings' ? ' is-active' : '' }}">
-          Settings
-          <span class="admin-nav__badge">Soon</span>
         </a>
       </li>
     </ul>

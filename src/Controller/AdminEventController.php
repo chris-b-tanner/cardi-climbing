@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Event;
 use App\Entity\User;
+use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\EventRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -69,6 +70,7 @@ class AdminEventController extends AbstractController
         Event $event,
         EntityManagerInterface $em,
         CertificationRepository $certificationRepository,
+        AttendeeRepository $attendeeRepository,
     ): Response {
         $allCertifications = $certificationRepository->findBy([], ['name' => 'ASC']);
         $error = null;
@@ -93,6 +95,7 @@ class AdminEventController extends AbstractController
             'event'         => $event,
             'error'         => $error,
             'certifications' => $allCertifications,
+            'attendees'     => $attendeeRepository->findForEvent($event),
         ]);
     }
 
