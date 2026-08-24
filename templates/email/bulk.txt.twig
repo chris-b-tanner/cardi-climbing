@@ -1,6 +1,6 @@
 Hi{% if user is defined and user.firstName %} {{ user.firstName }}{% endif %},
 
-{{ body }}
+{{ body|striptags }}
 
 ---
 Y Wal | Cardigan (Aberteifi), Ceredigion, Wales

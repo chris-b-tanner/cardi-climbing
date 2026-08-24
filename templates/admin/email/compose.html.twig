@@ -51,8 +51,11 @@
         <div class="form-group" style="margin-bottom:0;">
           <label for="body">Message</label>
           <textarea id="body" name="body" class="form-control" rows="16"
-                    placeholder="Write your message here…" required
+                    placeholder="Write your message here… HTML is allowed, e.g. &lt;img src=&quot;https://…&quot;&gt; to embed an image." required
                     style="resize:vertical;font-family:inherit;line-height:1.7;"></textarea>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+            HTML is supported — each line becomes its own paragraph. To embed an image already hosted online, put its tag on its own line, e.g. <code>&lt;img src="https://example.com/photo.jpg" style="max-width:100%"&gt;</code>.
+          </div>
         </div>
       </div>
 

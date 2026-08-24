@@ -9,7 +9,7 @@
 
   {% for line in body|split('\n') %}
     {% if line|trim %}
-      <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">{{ line }}</p>
+      <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">{{ line|raw }}</p>
     {% else %}
       <p style="margin:0 0 8px;"></p>
     {% endif %}
