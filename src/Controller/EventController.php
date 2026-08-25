@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Attendee;
 use App\Entity\Event;
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
@@ -232,6 +233,11 @@ class EventController extends AbstractController
             $user->setPassword($passwordHasher->hashPassword($user, $password));
 
             $em->persist($user);
+
+            $note = new Note();
+            $note->setUser($user);
+            $note->setContent('Contact added via event booking: "' . $event->getTitle() . '".');
+            $em->persist($note);
         }
 
         $em->flush();
