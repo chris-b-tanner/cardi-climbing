@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Note;
 use App\Entity\User;
+use App\Repository\AttendeeRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -100,7 +101,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -109,6 +110,7 @@ class AdminController extends AbstractController
         return $this->render('admin/users/show.html.twig', [
             'user'       => $user,
             'duplicates' => $duplicates,
+            'bookings'   => $attendeeRepository->findAllForUser($user),
         ]);
     }
 
