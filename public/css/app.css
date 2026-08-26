@@ -423,6 +423,7 @@ p + p { margin-top: 1rem; }
 .adv__card p  { font-size: 0.9rem; }
 .adv__partners {
   border: 1px solid var(--border);
+  background: var(--white);
   padding: 2.5rem;
   margin-bottom: 2.5rem;
 }
@@ -442,9 +443,14 @@ p + p { margin-top: 1rem; }
   border-left: 1px solid var(--border);
 }
 .adv__partner-list li {
-  padding: 0.85rem 1.5rem;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+}
+.adv__partner-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.5rem;
   font-family: var(--f-head);
   font-size: 0.85rem;
   font-weight: 700;
@@ -452,6 +458,7 @@ p + p { margin-top: 1rem; }
   letter-spacing: 0.06em;
   color: var(--black);
 }
+.adv__partner-logo { height: 18px; width: auto; }
 .adv__cta-block {
   display: flex;
   flex-wrap: wrap;

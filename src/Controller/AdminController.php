@@ -208,13 +208,21 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_users');
         }
 
-        // Reassign notes via raw SQL to bypass Doctrine cascade-remove
+        // Reassign notes, bookings, and certifications via raw SQL to bypass Doctrine cascade-remove
         $em->getConnection()->executeStatement(
             'UPDATE note SET user_id = :p WHERE user_id = :s',
             ['p' => $primaryId, 's' => $secondaryId]
         );
+        $em->getConnection()->executeStatement(
+            'UPDATE attendee SET user_id = :p WHERE user_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId]
+        );
+        $em->getConnection()->executeStatement(
+            'UPDATE user_certification SET user_id = :p WHERE user_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId]
+        );
 
-        // Clear identity map so re-fetched secondary has an empty notes collection
+        // Clear identity map so re-fetched secondary has empty notes/bookings/certifications collections
         $em->clear();
         $primary   = $userRepository->find($primaryId);
         $secondary = $userRepository->find($secondaryId);

@@ -137,6 +137,13 @@ class AdminBookingController extends AbstractController
 
         $selectedEventId = (int) $request->query->get('eventId', $request->request->get('eventId', 0));
 
+        if ($user === null) {
+            $userId = (int) $request->query->get('userId', 0);
+            if ($userId) {
+                $user = $userRepository->find($userId);
+            }
+        }
+
         return $this->render('admin/bookings/new.html.twig', [
             'error'           => $error,
             'events'          => $eventRepository->findAllOrdered(),

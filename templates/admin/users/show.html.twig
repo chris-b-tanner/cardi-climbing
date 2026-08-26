@@ -154,7 +154,10 @@
 <div class="member-col-right">
 
 <div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Bookings</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+    <div class="card__label" style="margin-bottom:0;">Bookings</div>
+    <a href="{{ path('app_admin_booking_new', {userId: user.id}) }}" class="btn btn--teal btn--sm">+ Add booking</a>
+  </div>
   {% if bookings is empty %}
     <p style="color:var(--muted);font-size:0.875rem;">No bookings yet.</p>
   {% else %}
