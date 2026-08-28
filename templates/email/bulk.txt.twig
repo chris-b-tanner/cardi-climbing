@@ -6,4 +6,6 @@ Hi{% if user is defined and user.firstName %} {{ user.firstName }}{% endif %},
 Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
 cardiganclimbing@gmail.com | https://www.cardiganclimbing.org
 
+{% if recipientEmail is defined and recipientEmail %}
 Unsubscribe: {{ unsubscribe_url(recipientEmail) }}
+{% endif %}

@@ -4,7 +4,11 @@
 {% block content %}
 <div class="page-header">
   <h1>Compose email</h1>
-  <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
+  {% if eventAudience %}
+    <a href="{{ path('app_admin_event_edit', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
+  {% else %}
+    <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
+  {% endif %}
 </div>
 
 <div class="bulk-wrap">
@@ -16,30 +20,45 @@
 
       <div class="card">
         <div class="card__label" style="margin-bottom:0.75rem;">Audience</div>
-        <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <label class="audience-option">
-            <input type="radio" name="audience" value="all" id="aud-all" checked>
-            <span>All opted-in members <span class="audience-count" id="count-all">({{ totalOptedIn }})</span></span>
-          </label>
-          {% if tags is not empty %}
-            <label class="audience-option">
-              <input type="radio" name="audience" value="tags" id="aud-tags">
-              <span>Filter by tag</span>
-            </label>
-            <div id="tag-panel" style="display:none;padding:0.5rem 0 0 1.6rem;">
-              <div class="tag-grid" style="margin-bottom:0.5rem;">
-                {% for tag in tags %}
-                  <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
-                         value="{{ tag.id }}" class="tag-check bulk-tag">
-                  <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
-                {% endfor %}
-              </div>
-              <div style="font-size:0.8rem;color:var(--muted);">
-                Recipients: <strong id="tag-count">0</strong> opted-in member(s)
-              </div>
-            </div>
+        {% if eventAudience %}
+          <input type="hidden" name="eventId" value="{{ eventAudience.event.id }}">
+          <input type="hidden" name="scope" value="{{ eventAudience.upcomingOnly ? 'series' : 'date' }}">
+          {% if eventAudience.occurrenceDate %}
+            <input type="hidden" name="occurrenceDate" value="{{ eventAudience.occurrenceDate|date('Y-m-d') }}">
           {% endif %}
-        </div>
+          <p style="font-size:0.9rem;">
+            Attendees of <strong>{{ eventAudience.event.title }}</strong>{% if eventAudience.upcomingOnly %} — all remaining dates in the series{% elseif eventAudience.occurrenceDate %} — {{ eventAudience.occurrenceDate|date('d M Y') }}{% endif %}
+          </p>
+          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
+            {{ eventAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about an event they're booked onto.
+          </p>
+          <a href="{{ path('app_admin_email_compose') }}" style="display:inline-block;margin-top:0.6rem;font-size:0.8rem;color:var(--teal-dk);font-weight:600;">Switch to a general audience instead</a>
+        {% else %}
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            <label class="audience-option">
+              <input type="radio" name="audience" value="all" id="aud-all" checked>
+              <span>All opted-in members <span class="audience-count" id="count-all">({{ totalOptedIn }})</span></span>
+            </label>
+            {% if tags is not empty %}
+              <label class="audience-option">
+                <input type="radio" name="audience" value="tags" id="aud-tags">
+                <span>Filter by tag</span>
+              </label>
+              <div id="tag-panel" style="display:none;padding:0.5rem 0 0 1.6rem;">
+                <div class="tag-grid" style="margin-bottom:0.5rem;">
+                  {% for tag in tags %}
+                    <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
+                           value="{{ tag.id }}" class="tag-check bulk-tag">
+                    <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
+                  {% endfor %}
+                </div>
+                <div style="font-size:0.8rem;color:var(--muted);">
+                  Recipients: <strong id="tag-count">0</strong> opted-in member(s)
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
       </div>
 
       <div class="card">
@@ -61,7 +80,7 @@
 
       <div class="form-actions">
         <button type="submit" class="btn btn--teal" id="send-btn">Send email</button>
-        <span id="send-label" style="font-size:0.8rem;color:var(--muted);"></span>
+        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% endif %}</span>
       </div>
     </form>
   </div>
@@ -139,6 +158,9 @@
   bodyEl.addEventListener('input',    schedulePreview);
 
   // ── Audience / recipient count ─────────────────────────────
+  {% if eventAudience %}
+  // Fixed audience (event attendees) — recipient count is already rendered server-side.
+  {% else %}
   function getSelectedTagIds() {
     return [...bulkTags].filter(c => c.checked).map(c => c.value);
   }
@@ -188,6 +210,7 @@
   }
 
   updateSendLabel({{ totalOptedIn }});
+  {% endif %}
 
   // ── Send confirmation ──────────────────────────────────────
   document.getElementById('send-form').addEventListener('submit', function(e) {

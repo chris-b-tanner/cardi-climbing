@@ -11,18 +11,19 @@
 <style>
   body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
   img{-ms-interpolation-mode:bicubic}
-  body{margin:0;padding:0;background-color:#f0f5f1;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif}
+  body{margin:0;padding:0;background-color:#f6f6f3;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif}
   table{border-collapse:collapse}
   a{color:#1e4f41}
   @media only screen and (max-width:600px){
     .email-wrapper{width:100%!important}
-    .email-card{padding:32px 24px!important}
+    .email-card{padding:36px 28px!important}
+    .email-footer{padding:24px 28px 28px!important}
   }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f0f5f1;">
+<body style="margin:0;padding:0;background-color:#f6f6f3;">
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f5f1;padding:40px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f6f3;padding:40px 0;">
   <tr>
     <td align="center">
 
@@ -31,7 +32,7 @@
 
         <!-- Header -->
         <tr>
-          <td style="background-color:#141414;padding:24px 40px;">
+          <td style="background-color:#141414;padding:26px 40px;border-radius:16px 16px 0 0;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
@@ -46,29 +47,35 @@
 
         <!-- Body card -->
         <tr>
-          <td class="email-card" style="background-color:#ffffff;padding:48px 40px;border-left:1px solid #e4e2dc;border-right:1px solid #e4e2dc;">
+          <td class="email-card" style="background-color:#ffffff;padding:48px 40px 40px;">
             {% block emailBody %}{% endblock %}
+          </td>
+        </tr>
+
+        <!-- Footer image — fades from white into brand green -->
+        <tr>
+          <td style="background-color:#ffffff;line-height:0;font-size:0;">
+            <img src="https://www.cardiganclimbing.org/images/email-footer.png" width="600" alt=""
+                 style="display:block;width:100%;max-width:600px;height:auto;border:0;">
           </td>
         </tr>
 
         <!-- Footer -->
         <tr>
-          <td style="background-color:#f0f5f1;padding:24px 40px;border:1px solid #e4e2dc;border-top:none;">
+          <td class="email-footer" style="background-color:#b0bd80;padding:28px 40px 32px;border-radius:0 0 16px 16px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;">
-                  <p style="margin:0 0 4px;">
-                    <strong style="color:#5a5857;">Y Wal</strong> &mdash; Cardigan (Aberteifi), Ceredigion, Wales
-                  </p>
-                  <p style="margin:0 0 {% if recipientEmail is defined and recipientEmail %}8px{% else %}0{% endif %};">
-                    <a href="mailto:cardiganclimbing@gmail.com" style="color:#1e4f41;text-decoration:none;">cardiganclimbing@gmail.com</a>
+                <td align="center" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#ffffff;line-height:1.6;">
+                  <p style="margin:0 0 4px;font-weight:700;letter-spacing:0.02em;">Y Wal</p>
+                  <p style="margin:0 0 10px;color:rgba(255,255,255,0.85);">Cardigan (Aberteifi), Ceredigion, Wales</p>
+                  <p style="margin:0 0 {% if recipientEmail is defined and recipientEmail %}10px{% else %}0{% endif %};">
+                    <a href="mailto:cardiganclimbing@gmail.com" style="color:#ffffff;text-decoration:underline;">cardiganclimbing@gmail.com</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://www.cardiganclimbing.org" style="color:#1e4f41;text-decoration:none;">www.cardiganclimbing.org</a>
+                    <a href="https://www.cardiganclimbing.org" style="color:#ffffff;text-decoration:underline;">www.cardiganclimbing.org</a>
                   </p>
                   {% if recipientEmail is defined and recipientEmail %}
                   <p style="margin:0;">
-                    <a href="{{ unsubscribe_url(recipientEmail) }}" style="color:#9a9895;text-decoration:underline;">Unsubscribe</a>
-                    from these emails
+                    <a href="{{ unsubscribe_url(recipientEmail) }}" style="color:rgba(255,255,255,0.85);text-decoration:underline;">Unsubscribe</a> from these emails
                   </p>
                   {% endif %}
                 </td>

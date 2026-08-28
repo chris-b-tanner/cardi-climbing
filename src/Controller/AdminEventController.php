@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -91,11 +92,23 @@ class AdminEventController extends AbstractController
             }
         }
 
+        $attendees = $attendeeRepository->findForEvent($event);
+
+        $bookedOccurrenceDates = [];
+        foreach ($attendees as $attendee) {
+            $occurrenceDate = $attendee->getOccurrenceDate();
+            if ($occurrenceDate !== null && $attendee->getStatus() !== Attendee::STATUS_CANCELLED) {
+                $bookedOccurrenceDates[$occurrenceDate->format('Y-m-d')] = $occurrenceDate;
+            }
+        }
+        ksort($bookedOccurrenceDates);
+
         return $this->render('admin/events/edit.html.twig', [
-            'event'         => $event,
-            'error'         => $error,
-            'certifications' => $allCertifications,
-            'attendees'     => $attendeeRepository->findForEvent($event),
+            'event'                 => $event,
+            'error'                 => $error,
+            'certifications'        => $allCertifications,
+            'attendees'             => $attendees,
+            'bookedOccurrenceDates' => array_values($bookedOccurrenceDates),
         ]);
     }
 

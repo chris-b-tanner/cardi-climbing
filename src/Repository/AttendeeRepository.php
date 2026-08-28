@@ -91,6 +91,38 @@ class AttendeeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Distinct, non-cancelled attendees of an event, for emailing.
+     *
+     * - $upcomingOnly true: everyone booked onto any occurrence today or later (whole series).
+     * - $upcomingOnly false + $occurrenceDate given: just that occurrence.
+     * - $upcomingOnly false + $occurrenceDate null: the event's one-off booking (occurrenceDate IS NULL).
+     *
+     * @return User[]
+     */
+    public function findAttendeeUsersForEvent(Event $event, ?\DateTimeImmutable $occurrenceDate, bool $upcomingOnly): array
+    {
+        // Rooted at User (rather than the usual Attendee root) since Doctrine won't let a DQL
+        // query select an entity that isn't the root/from alias.
+        $qb = $this->getEntityManager()->createQueryBuilder()
+            ->select('DISTINCT u')
+            ->from(User::class, 'u')
+            ->innerJoin(Attendee::class, 'a', 'WITH', 'a.user = u')
+            ->where('a.event = :event')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('event', $event)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED);
+
+        if ($upcomingOnly) {
+            $qb->andWhere('a.occurrenceDate IS NULL OR a.occurrenceDate >= :today')
+               ->setParameter('today', new \DateTimeImmutable('today'));
+        } else {
+            $this->whereOccurrence($qb, $occurrenceDate);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     /** All of this member's bookings, including cancelled ones, newest first. */
     public function findAllForUser(User $user): array
     {
