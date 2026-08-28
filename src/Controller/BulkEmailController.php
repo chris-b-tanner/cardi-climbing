@@ -3,13 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Event;
-use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -79,7 +77,6 @@ class BulkEmailController extends AbstractController
         UserRepository $userRepository,
         EventRepository $eventRepository,
         AttendeeRepository $attendeeRepository,
-        EntityManagerInterface $em,
         MailerInterface $mailer,
     ): Response {
         $eventId          = (int) $request->request->get('eventId', 0);
@@ -106,16 +103,10 @@ class BulkEmailController extends AbstractController
         $eventAudience = $this->resolveEventAudience($eventId, $scope, $occurrenceDateRaw, $eventRepository, $attendeeRepository);
 
         if ($eventAudience) {
-            $recipients  = $eventAudience['recipients'];
-            $noteSuffix  = ' (attendees: ' . $eventAudience['event']->getTitle()
-                . ($eventAudience['upcomingOnly']
-                    ? ', all remaining dates'
-                    : ($eventAudience['occurrenceDate'] ? ', ' . $eventAudience['occurrenceDate']->format('d M Y') : ''))
-                . ')';
+            $recipients = $eventAudience['recipients'];
         } else {
-            $tagIds      = array_map('intval', array_filter($request->request->all('tagIds')));
-            $recipients  = $userRepository->findForBulkEmail($tagIds);
-            $noteSuffix  = '';
+            $tagIds     = array_map('intval', array_filter($request->request->all('tagIds')));
+            $recipients = $userRepository->findForBulkEmail($tagIds);
         }
 
         if (!$recipients) {
@@ -123,9 +114,7 @@ class BulkEmailController extends AbstractController
             return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
         }
 
-        /** @var User $admin */
-        $admin = $this->getUser();
-        $sent  = 0;
+        $sent = 0;
 
         foreach ($recipients as $user) {
             $context = [
@@ -150,15 +139,7 @@ class BulkEmailController extends AbstractController
 
             $mailer->send($email);
             $sent++;
-
-            $note = new Note();
-            $note->setUser($user);
-            $note->setContent('Bulk email sent: "' . $subject . '"' . $noteSuffix);
-            $note->setAddedBy($admin);
-            $em->persist($note);
         }
-
-        $em->flush();
 
         $this->addFlash('success', sprintf('Email sent to %d member%s.', $sent, $sent === 1 ? '' : 's'));
         return $this->redirectToRoute('app_admin_email_compose');
