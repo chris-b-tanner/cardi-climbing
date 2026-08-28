@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/admin')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_TEAM')]
 class AdminController extends AbstractController
 {
     #[Route('/users', name: 'app_admin_users')]
@@ -69,7 +69,7 @@ class AdminController extends AbstractController
                 $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
 
                 $role = $request->request->get('role', User::ROLE_MEMBER);
-                if (in_array($role, [User::ROLE_ADMIN, User::ROLE_STAFF, User::ROLE_MEMBER], true)) {
+                if ($this->isGranted('ROLE_ADMIN') && in_array($role, [User::ROLE_ADMIN, User::ROLE_TEAM, User::ROLE_MEMBER], true)) {
                     $user->setRoles([$role]);
                 }
 
@@ -142,6 +142,17 @@ class AdminController extends AbstractController
             $user->setTown(trim($request->request->get('town', '')) ?: null);
             $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
 
+            if ($this->isGranted('ROLE_ADMIN')) {
+                $role = $request->request->get('role', User::ROLE_MEMBER);
+                if (in_array($role, [User::ROLE_ADMIN, User::ROLE_TEAM, User::ROLE_MEMBER], true)) {
+                    if ($user === $this->getUser() && $role !== User::ROLE_ADMIN) {
+                        $this->addFlash('error', 'You cannot change your own role.');
+                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                    }
+                    $user->setRoles([$role]);
+                }
+            }
+
             $submittedTagIds = array_map('intval', $request->request->all('tags'));
 
             foreach ($user->getTags() as $tag) {
@@ -168,6 +179,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/merge', name: 'app_admin_user_merge', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function mergeUsers(
         Request $request,
         UserRepository $userRepository,
@@ -267,6 +279,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function deleteUser(Request $request, User $user, EntityManagerInterface $em): Response
     {
         if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {

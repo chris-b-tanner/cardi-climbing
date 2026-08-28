@@ -17,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/admin/bookings')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_TEAM')]
 class AdminBookingController extends AbstractController
 {
     #[Route('', name: 'app_admin_bookings')]
@@ -131,7 +131,11 @@ class AdminBookingController extends AbstractController
                 }
 
                 $this->addFlash('success', 'Booking created.');
-                return $this->redirectToRoute('app_admin_event_edit', ['id' => $event->getId()]);
+                $showParams = ['id' => $event->getId()];
+                if ($storedOccurrenceDate) {
+                    $showParams['date'] = $storedOccurrenceDate->format('Y-m-d');
+                }
+                return $this->redirectToRoute('app_admin_event_show', $showParams);
             }
         }
 

@@ -10,7 +10,7 @@
     <table class="admin-table">
       <thead>
         <tr>
-          <th class="admin-table__check"><span class="sr-only">Select</span></th>
+          {% if is_granted('ROLE_ADMIN') %}<th class="admin-table__check"><span class="sr-only">Select</span></th>{% endif %}
           <th>ID</th>
           <th>Name</th>
           <th>Email</th>
@@ -21,11 +21,13 @@
         {% for user in users %}
           {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
           <tr>
-            <td class="admin-table__check">
-              <label title="Select for merge">
-                <input type="checkbox" class="merge-check" value="{{ user.id }}">
-              </label>
-            </td>
+            {% if is_granted('ROLE_ADMIN') %}
+              <td class="admin-table__check">
+                <label title="Select for merge">
+                  <input type="checkbox" class="merge-check" value="{{ user.id }}">
+                </label>
+              </td>
+            {% endif %}
             <td class="admin-table__muted">#{{ user.id }}</td>
             <td>
               <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">

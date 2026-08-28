@@ -11,12 +11,14 @@
   <div class="btn-row">
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
     <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
-    <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
-          style="display:inline;"
-          onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
-      <button type="submit" class="btn btn--danger btn--sm">Delete</button>
-    </form>
+    {% if is_granted('ROLE_ADMIN') %}
+      <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
+            style="display:inline;"
+            onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
+        <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+      </form>
+    {% endif %}
   </div>
 </div>
 
@@ -69,8 +71,8 @@
       <div class="card__value">
         {% if 'ROLE_ADMIN' in user.roles %}
           <span class="role-pill role-pill--admin">Admin</span>
-        {% elseif 'ROLE_STAFF' in user.roles %}
-          <span class="role-pill role-pill--staff">Staff</span>
+        {% elseif 'ROLE_TEAM' in user.roles %}
+          <span class="role-pill role-pill--team">Team</span>
         {% else %}
           <span class="role-pill">Member</span>
         {% endif %}
@@ -166,7 +168,7 @@
         {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
         <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <a href="{{ path('app_admin_event_edit', {id: booking.event.id}) }}" class="admin-table__link" style="font-size:0.9375rem;">
+            <a href="{{ path('app_admin_event_show', {id: booking.event.id}) }}" class="admin-table__link" style="font-size:0.9375rem;">
               {{ booking.event.title }}
             </a>
             <span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span>

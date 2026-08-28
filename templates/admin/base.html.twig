@@ -172,7 +172,7 @@
       background: #f3f4f6; color: var(--muted);
     }
     .role-pill--admin { background: #fef3c7; color: #92400e; }
-    .role-pill--staff { background: #ede9fe; color: #5b21b6; }
+    .role-pill--team { background: #ede9fe; color: #5b21b6; }
 
     .filter-form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
     .filter-form input[type="search"],
@@ -185,6 +185,23 @@
     .filter-form select:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: transparent; }
 
     .result-count { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; }
+
+    .member-search-results {
+      display: none; position: absolute; z-index: 10;
+      top: 100%; left: 0; right: 0; margin-top: 0.25rem;
+      background: var(--white); border: 1px solid var(--border); border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      max-height: 260px; overflow-y: auto;
+    }
+    .member-search-results.is-open { display: block; }
+    .member-search-item {
+      display: block; width: 100%; text-align: left;
+      padding: 0.55rem 0.75rem; border: none; background: none;
+      font-family: inherit; font-size: 0.875rem; color: var(--black); cursor: pointer;
+    }
+    .member-search-item:hover,
+    .member-search-item.is-active { background: var(--bg); }
+    .member-search-empty { padding: 0.6rem 0.75rem; font-size: 0.82rem; color: var(--muted); }
 
     .status-pill {
       display: inline-block; font-size: 0.7rem; font-weight: 600;
@@ -311,6 +328,14 @@
           News
         </a>
       </li>
+      {% if is_granted('ROLE_ADMIN') %}
+        <li>
+          <a href="{{ path('app_admin_team') }}"
+             class="admin-nav__link{{ currentRoute starts with 'app_admin_team' ? ' is-active' : '' }}">
+            Team
+          </a>
+        </li>
+      {% endif %}
     </ul>
   </aside>
 

@@ -1,0 +1,178 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}{{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ event.title }}</h1>
+  <div class="btn-row">
+    <a href="{{ path('app_admin_events') }}" class="btn btn--ghost btn--sm">← Events</a>
+    {% if is_granted('ROLE_ADMIN') %}
+      <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="btn btn--teal btn--sm">Edit</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="member-columns">
+<div class="member-col-left">
+
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Status</div>
+      <div class="card__value">
+        <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
+          {{ event.isPublished ? 'Published' : 'Draft' }}
+        </span>
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Date</div>
+      <div class="card__value">
+        {{ event.date|date('d M Y') }}
+        {% if event.isRecurring %}
+          <span style="color:var(--muted);font-size:0.85rem;">
+            (recurring{% if event.recurUntil %} until {{ event.recurUntil|date('d M Y') }}{% endif %})
+          </span>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Time</div>
+      <div class="card__value">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
+    </div>
+    <div>
+      <div class="card__label">Location</div>
+      <div class="card__value">{{ event.location }}</div>
+    </div>
+    <div>
+      <div class="card__label">Price</div>
+      <div class="card__value">{{ event.price ? '£' ~ event.price : 'Free' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Max attendees</div>
+      <div class="card__value">{{ event.maxAttendees ?: 'Unlimited' }}</div>
+    </div>
+    {% if event.externalUrl %}
+      <div style="grid-column:1 / -1;">
+        <div class="card__label">URL</div>
+        <div class="card__value">
+          <a href="{{ event.externalUrl }}" target="_blank" rel="noopener" style="color:var(--teal-dk);">{{ event.externalUrl }}</a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if event.description %}
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.5rem;">Description</div>
+    <div class="card__value" style="white-space:pre-wrap;line-height:1.7;">{{ event.description }}</div>
+  </div>
+{% endif %}
+
+{% if event.attendeeInfo %}
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.5rem;">Attendee information</div>
+    <div class="card__value" style="white-space:pre-wrap;line-height:1.7;">{{ event.attendeeInfo }}</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">
+      Sent in the booking confirmation email — not shown on the public events page.
+    </p>
+  </div>
+{% endif %}
+
+{% if event.restrictions is not empty %}
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.5rem;">Restricted to</div>
+    {% for certification in event.restrictions %}
+      <span class="tag-badge">{{ certification.name }}</span>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if event.isRecurring %}
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.75rem;">Viewing occurrence</div>
+    <form method="get" action="{{ path('app_admin_event_show', {id: event.id}) }}" class="occurrence-picker">
+      {% if prevDate %}
+        <a href="{{ path('app_admin_event_show', {id: event.id, date: prevDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm">&lsaquo; Previous</a>
+      {% else %}
+        <span class="btn btn--ghost btn--sm" style="opacity:0.4;pointer-events:none;">&lsaquo; Previous</span>
+      {% endif %}
+      <input type="date" name="date" value="{{ occurrenceDate|date('Y-m-d') }}"
+             min="{{ event.date|date('Y-m-d') }}"
+             max="{{ event.recurUntil ? event.recurUntil|date('Y-m-d') : '' }}"
+             class="form-control" style="max-width:170px;" onchange="this.form.submit()">
+      {% if nextDate %}
+        <a href="{{ path('app_admin_event_show', {id: event.id, date: nextDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm">Next &rsaquo;</a>
+      {% else %}
+        <span class="btn btn--ghost btn--sm" style="opacity:0.4;pointer-events:none;">Next &rsaquo;</span>
+      {% endif %}
+      <noscript><button type="submit" class="btn btn--teal btn--sm">Go</button></noscript>
+    </form>
+  </div>
+{% endif %}
+
+</div>
+<div class="member-col-right">
+
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+    <div class="card__label" style="margin-bottom:0;">
+      Attendees ({{ attendees|length }}){% if event.isRecurring %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}
+    </div>
+    <div class="btn-row">
+      {% if attendees is not empty %}
+        {% if event.isRecurring %}
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm">✉ Email this date</a>
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm">✉ Email series</a>
+        {% else %}
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm">✉ Email attendees</a>
+        {% endif %}
+      {% endif %}
+      <a href="{{ path('app_admin_booking_new', event.isRecurring ? {eventId: event.id, occurrenceDate: occurrenceDate|date('Y-m-d')} : {eventId: event.id}) }}" class="btn btn--teal btn--sm">+ Add attendee</a>
+    </div>
+  </div>
+
+  {% if attendees is empty %}
+    <p class="tag-badge--none">No one booked{% if event.isRecurring %} onto this date{% endif %} yet.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Status</th>
+            <th>Price</th>
+            <th>Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attendee in attendees %}
+            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+            <tr>
+              <td>
+                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
+                  {{ displayName ?: attendee.user.email }}
+                </a>
+              </td>
+              <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
+              <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
+              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .occurrence-picker { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+</style>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Team{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Team</h1>
+  <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
+</div>
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.75rem;">Admins &amp; team ({{ team|length }})</div>
+  <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
+    To give someone team access, open their member profile, click Edit, and change their role.
+  </p>
+  {% if team is empty %}
+    <p class="tag-badge--none">No admins or team members yet.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in team %}
+            {% set displayName = (member.firstName ~ ' ' ~ member.lastName)|trim %}
+            {% set memberIsAdmin = 'ROLE_ADMIN' in member.roles %}
+            <tr>
+              <td>
+                <a href="{{ path('app_admin_user_show', {id: member.id}) }}" class="admin-table__link">
+                  {{ displayName ?: member.email }}
+                </a>
+              </td>
+              <td class="admin-table__muted">{{ member.email }}</td>
+              <td>
+                <span class="role-pill{{ memberIsAdmin ? ' role-pill--admin' : ' role-pill--team' }}">
+                  {{ memberIsAdmin ? 'Admin' : 'Team' }}
+                </span>
+              </td>
+              <td>
+                {% if not memberIsAdmin %}
+                  <form method="post" action="{{ path('app_admin_team_remove', {id: member.id}) }}"
+                        onsubmit="return confirm('Remove team access for {{ (displayName ?: member.email)|e('js') }}? They\'ll still be able to sign in as a member.');">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_team_remove_' ~ member.id) }}">
+                    <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

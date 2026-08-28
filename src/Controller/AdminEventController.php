@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -16,7 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/admin/events')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_TEAM')]
 class AdminEventController extends AbstractController
 {
     #[Route('', name: 'app_admin_events')]
@@ -65,13 +64,53 @@ class AdminEventController extends AbstractController
         ]);
     }
 
+    /**
+     * The event info screen — static details plus the attendee list. Available to team and
+     * admins alike. For a recurring event, ?date= picks which occurrence's attendees are shown.
+     */
+    #[Route('/{id}', name: 'app_admin_event_show', requirements: ['id' => '\d+'])]
+    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    {
+        $occurrenceDate = null;
+        $prevDate       = null;
+        $nextDate       = null;
+
+        if ($event->isRecurring()) {
+            $requestedDate = null;
+            $requestedRaw  = $request->query->get('date', '');
+            if ($requestedRaw !== '') {
+                try {
+                    $requestedDate = new \DateTimeImmutable($requestedRaw);
+                } catch (\Exception) {
+                    $requestedDate = null;
+                }
+            }
+
+            $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate);
+            $prevDate       = $this->adjacentOccurrence($event, $occurrenceDate, -1);
+            $nextDate       = $this->adjacentOccurrence($event, $occurrenceDate, 1);
+
+            $attendees = $attendeeRepository->findForEventOccurrence($event, $occurrenceDate);
+        } else {
+            $attendees = $attendeeRepository->findForEvent($event);
+        }
+
+        return $this->render('admin/events/show.html.twig', [
+            'event'          => $event,
+            'attendees'      => $attendees,
+            'occurrenceDate' => $occurrenceDate,
+            'prevDate'       => $prevDate,
+            'nextDate'       => $nextDate,
+        ]);
+    }
+
     #[Route('/{id}/edit', name: 'app_admin_event_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function edit(
         Request $request,
         Event $event,
         EntityManagerInterface $em,
         CertificationRepository $certificationRepository,
-        AttendeeRepository $attendeeRepository,
     ): Response {
         $allCertifications = $certificationRepository->findBy([], ['name' => 'ASC']);
         $error = null;
@@ -88,31 +127,19 @@ class AdminEventController extends AbstractController
                 $em->flush();
 
                 $this->addFlash('success', 'Event updated.');
-                return $this->redirectToRoute('app_admin_events');
+                return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
             }
         }
-
-        $attendees = $attendeeRepository->findForEvent($event);
-
-        $bookedOccurrenceDates = [];
-        foreach ($attendees as $attendee) {
-            $occurrenceDate = $attendee->getOccurrenceDate();
-            if ($occurrenceDate !== null && $attendee->getStatus() !== Attendee::STATUS_CANCELLED) {
-                $bookedOccurrenceDates[$occurrenceDate->format('Y-m-d')] = $occurrenceDate;
-            }
-        }
-        ksort($bookedOccurrenceDates);
 
         return $this->render('admin/events/edit.html.twig', [
-            'event'                 => $event,
-            'error'                 => $error,
-            'certifications'        => $allCertifications,
-            'attendees'             => $attendees,
-            'bookedOccurrenceDates' => array_values($bookedOccurrenceDates),
+            'event'          => $event,
+            'error'          => $error,
+            'certifications' => $allCertifications,
         ]);
     }
 
     #[Route('/{id}/delete', name: 'app_admin_event_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function delete(Request $request, Event $event, EntityManagerInterface $em): Response
     {
         if (!$this->isCsrfTokenValid('delete_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
@@ -195,6 +222,68 @@ class AdminEventController extends AbstractController
         foreach ($allCertifications as $certification) {
             if (in_array($certification->getId(), $submittedCertIds, true)) {
                 $event->addRestriction($certification);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Which occurrence to show on the event info screen: the requested date if it's a real
+     * occurrence, otherwise the next upcoming one, falling back to the most recent past
+     * occurrence once the recurrence window has ended.
+     */
+    private function resolveOccurrenceDate(Event $event, ?\DateTimeImmutable $requested): \DateTimeImmutable
+    {
+        if ($requested !== null && $event->isValidForDate($requested)) {
+            return $requested;
+        }
+
+        $today      = new \DateTimeImmutable('today');
+        $searchFrom = max($event->getDate(), $today);
+
+        for ($i = 0; $i < 7; $i++) {
+            $candidate = $searchFrom->modify("+{$i} days");
+            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
+                break;
+            }
+            if ($event->isValidForDate($candidate)) {
+                return $candidate;
+            }
+        }
+
+        if ($event->getRecurUntil()) {
+            for ($i = 0; $i < 7; $i++) {
+                $candidate = $event->getRecurUntil()->modify("-{$i} days");
+                if ($candidate < $event->getDate()) {
+                    break;
+                }
+                if ($event->isValidForDate($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $event->getDate();
+    }
+
+    /** The previous/next valid occurrence date relative to $from, or null if there isn't one. */
+    private function adjacentOccurrence(Event $event, \DateTimeImmutable $from, int $direction): ?\DateTimeImmutable
+    {
+        $step      = $direction >= 0 ? '+1 day' : '-1 day';
+        $candidate = $from;
+
+        for ($i = 0; $i < 400; $i++) {
+            $candidate = $candidate->modify($step);
+
+            if ($candidate < $event->getDate()) {
+                return null;
+            }
+            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
+                return null;
+            }
+            if ($event->isValidForDate($candidate)) {
+                return $candidate;
             }
         }
 

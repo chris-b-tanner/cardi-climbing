@@ -45,13 +45,28 @@
       <input type="tel" id="phone" name="phone" class="form-control"
              value="{{ user.phone }}" autocomplete="tel">
     </div>
-    <div class="form-group" style="margin-bottom:0;">
+    <div class="form-group"{% if not is_granted('ROLE_ADMIN') %} style="margin-bottom:0;"{% endif %}>
       <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
         <input type="checkbox" name="optIn" value="1"{% if user.optIn %} checked{% endif %}
                style="width:1rem;height:1rem;accent-color:var(--teal);">
         Opted in to mailing list
       </label>
     </div>
+    {% if is_granted('ROLE_ADMIN') %}
+      {% set isSelf = user == app.user %}
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="role">Role</label>
+        <select id="role" name="role" class="form-control"{% if isSelf %} disabled{% endif %}>
+          <option value="ROLE_MEMBER"{% if 'ROLE_ADMIN' not in user.roles and 'ROLE_TEAM' not in user.roles %} selected{% endif %}>Member</option>
+          <option value="ROLE_TEAM"{% if 'ROLE_TEAM' in user.roles and 'ROLE_ADMIN' not in user.roles %} selected{% endif %}>Team</option>
+          <option value="ROLE_ADMIN"{% if 'ROLE_ADMIN' in user.roles %} selected{% endif %}>Admin</option>
+        </select>
+        {% if isSelf %}
+          <input type="hidden" name="role" value="{{ 'ROLE_ADMIN' in user.roles ? 'ROLE_ADMIN' : ('ROLE_TEAM' in user.roles ? 'ROLE_TEAM' : 'ROLE_MEMBER') }}">
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">You can't change your own role.</p>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 
   <div class="card">

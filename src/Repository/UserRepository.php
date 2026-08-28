@@ -92,6 +92,30 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getOneOrNullResult();
     }
 
+    /**
+     * Everyone on the team — admins and volunteers with admin-area access — sorted by name.
+     *
+     * Filters in PHP rather than in DQL since roles are stored as a JSON column,
+     * which isn't reliably queryable across DB engines.
+     *
+     * @return User[]
+     */
+    public function findTeam(): array
+    {
+        $all = $this->createQueryBuilder('u')
+            ->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
+            ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')
+            ->orderBy('sortLast', 'ASC')
+            ->addOrderBy('sortFirst', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return array_values(array_filter($all, static function (User $user) {
+            $roles = $user->getRoles();
+            return in_array(User::ROLE_ADMIN, $roles, true) || in_array(User::ROLE_TEAM, $roles, true);
+        }));
+    }
+
     public function findByFullName(string $firstName, string $lastName, int $excludeId): array
     {
         return $this->createQueryBuilder('u')

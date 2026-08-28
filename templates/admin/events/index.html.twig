@@ -29,7 +29,7 @@
         {% for event in events %}
           <tr>
             <td>
-              <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
+              <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
             </td>
             <td class="admin-table__muted">{{ event.date|date('d M Y') }}</td>
             <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>

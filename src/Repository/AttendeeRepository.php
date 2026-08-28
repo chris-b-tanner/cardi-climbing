@@ -91,6 +91,20 @@ class AttendeeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** Every booking (any status) for one occurrence of a recurring event. */
+    public function findForEventOccurrence(Event $event, \DateTimeImmutable $occurrenceDate): array
+    {
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.user', 'u')->addSelect('u')
+            ->where('a.event = :event')
+            ->andWhere('a.occurrenceDate = :occurrenceDate')
+            ->setParameter('event', $event)
+            ->setParameter('occurrenceDate', $occurrenceDate)
+            ->orderBy('a.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /**
      * Distinct, non-cancelled attendees of an event, for emailing.
      *

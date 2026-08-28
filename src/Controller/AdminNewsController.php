@@ -14,7 +14,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\String\Slugger\AsciiSlugger;
 
 #[Route('/admin/news')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_TEAM')]
 class AdminNewsController extends AbstractController
 {
     #[Route('', name: 'app_admin_news')]

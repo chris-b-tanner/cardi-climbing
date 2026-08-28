@@ -5,7 +5,7 @@
 <div class="page-header">
   <h1>Compose email</h1>
   {% if eventAudience %}
-    <a href="{{ path('app_admin_event_edit', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
+    <a href="{{ path('app_admin_event_show', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
   {% else %}
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
   {% endif %}

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
   <h1>Edit event</h1>
-  <a href="{{ path('app_admin_events') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+  <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="btn btn--ghost btn--sm">← Cancel</a>
 </div>
 
 {% if error %}
@@ -145,86 +145,9 @@
 
   <div class="form-actions">
     <button type="submit" class="btn btn--teal">Save changes</button>
-    <a href="{{ path('app_admin_events') }}" class="btn btn--ghost">Cancel</a>
+    <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
-
-<div class="card" style="margin-top:1.5rem;">
-  <div class="page-header" style="margin-bottom:0.75rem;">
-    <div class="card__label" style="margin-bottom:0;">Attendees ({{ attendees|length }})</div>
-    <div class="btn-row">
-      {% if attendees is not empty %}
-        {% if event.isRecurring %}
-          <button type="button" class="btn btn--ghost btn--sm" id="email-attendees-toggle">✉ Email attendees</button>
-        {% else %}
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm">✉ Email attendees</a>
-        {% endif %}
-      {% endif %}
-      <a href="{{ path('app_admin_booking_new', {eventId: event.id}) }}" class="btn btn--teal btn--sm">+ Add attendee</a>
-    </div>
-  </div>
-
-  {% if event.isRecurring and attendees is not empty %}
-    <form method="get" action="{{ path('app_admin_email_compose') }}" id="email-attendees-form"
-          style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem;">
-      <input type="hidden" name="eventId" value="{{ event.id }}">
-      <div class="detail-grid">
-        <div class="form-group" style="margin-bottom:0;">
-          <label for="email-scope">Send to</label>
-          <select id="email-scope" name="scope" class="form-control">
-            <option value="date">Just this date</option>
-            <option value="series">All remaining dates in the series</option>
-          </select>
-        </div>
-        <div class="form-group" id="email-date-group" style="margin-bottom:0;">
-          <label for="email-occurrenceDate">Date</label>
-          <select id="email-occurrenceDate" name="occurrenceDate" class="form-control">
-            {% for date in bookedOccurrenceDates %}
-              <option value="{{ date|date('Y-m-d') }}">{{ date|date('d M Y') }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div style="margin-top:0.75rem;">
-        <button type="submit" class="btn btn--teal btn--sm">Continue →</button>
-      </div>
-    </form>
-  {% endif %}
-  {% if attendees is empty %}
-    <p class="tag-badge--none">No one booked yet.</p>
-  {% else %}
-    <div class="table-scroll">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th>Price</th>
-            <th>Paid</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for attendee in attendees %}
-            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
-            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
-            <tr>
-              <td>
-                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
-                  {{ displayName ?: attendee.user.email }}
-                </a>
-              </td>
-              <td class="admin-table__muted">{{ (attendee.occurrenceDate ?? event.date)|date('d M Y') }}</td>
-              <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
-              <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
-              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
-</div>
 
 <form method="post" action="{{ path('app_admin_event_delete', {id: event.id}) }}"
       onsubmit="return confirm('Delete this event? This cannot be undone.');" style="margin-top:1rem;">
@@ -244,24 +167,5 @@
 
   recurCheck.addEventListener('change', syncRecurringFields);
   syncRecurringFields();
-
-  const emailToggle = document.getElementById('email-attendees-toggle');
-  const emailForm    = document.getElementById('email-attendees-form');
-
-  if (emailToggle) {
-    emailToggle.addEventListener('click', () => {
-      emailForm.style.display = emailForm.style.display === 'none' ? 'block' : 'none';
-    });
-
-    const emailScope     = document.getElementById('email-scope');
-    const emailDateGroup = document.getElementById('email-date-group');
-
-    function syncEmailScope() {
-      emailDateGroup.style.display = emailScope.value === 'date' ? 'block' : 'none';
-    }
-
-    emailScope.addEventListener('change', syncEmailScope);
-    syncEmailScope();
-  }
 </script>
 {% endblock %}

@@ -20,7 +20,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Twig\Environment;
 
 #[Route('/admin/email')]
-#[IsGranted('ROLE_ADMIN')]
+#[IsGranted('ROLE_TEAM')]
 class BulkEmailController extends AbstractController
 {
     public function __construct(
