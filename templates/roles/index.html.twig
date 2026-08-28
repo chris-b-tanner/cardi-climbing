@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'roles_meta_title'|trans }}{% endblock %}
+{% block og_title %}{{ 'roles_h1'|trans }} — Y Wal{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <h1 class="page-hero__h1">{{ 'roles_h1'|trans }}</h1>
+    <p class="page-hero__sub">{{ 'roles_intro'|trans }}</p>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap">
+    <div class="involved__ways">
+      <div class="way">
+        <h3>{{ 'roles_smm_title'|trans }}</h3>
+        <p>{{ 'roles_smm_body'|trans }}</p>
+      </div>
+      <div class="way">
+        <h3>{{ 'roles_grants_title'|trans }}</h3>
+        <p>{{ 'roles_grants_body'|trans }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap adv__cta-block">
+    <p>{{ 'roles_cta'|trans }}</p>
+    <a href="mailto:cardiganclimbing@gmail.com" class="btn btn--teal">{{ 'adv_cta_btn'|trans }}</a>
+  </div>
+</section>
+{% endblock %}
