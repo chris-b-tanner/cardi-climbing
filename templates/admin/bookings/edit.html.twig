@@ -1,0 +1,82 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Edit booking{% endblock %}
+
+{% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit booking</h1>
+  <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_edit_' ~ attendee.id) }}">
+
+  <div class="card">
+    <div class="detail-grid">
+      <div>
+        <div class="card__label">Member</div>
+        <div class="card__value">{{ displayName ?: attendee.user.email }}</div>
+      </div>
+      <div>
+        <div class="card__label">Event</div>
+        <div class="card__value">{{ attendee.event.title }}</div>
+      </div>
+      <div>
+        <div class="card__label">Date</div>
+        <div class="card__value">{{ (attendee.occurrenceDate ?? attendee.event.date)|date('d M Y') }}</div>
+      </div>
+      <div>
+        <div class="card__label">Booked</div>
+        <div class="card__value">{{ attendee.createdAt|date('d M Y, H:i') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="confirmed" {{ attendee.status == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+          <option value="pending" {{ attendee.status == 'pending' ? 'selected' : '' }}>Pending</option>
+          <option value="cancelled" {{ attendee.status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="price">Price override (£)</label>
+        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
+               placeholder="Leave blank to use the event price" value="{{ attendee.price }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="paidAmount">Paid amount (£)</label>
+        <input type="number" id="paidAmount" name="paidAmount" class="form-control" min="0" step="0.01" value="{{ attendee.paidAmount }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
+  {% if attendee.paidAmount != '0.00' %}
+    <p style="font-size:0.85rem;color:var(--muted);">
+      This booking has £{{ attendee.paidAmount }} recorded as paid, so it can't be deleted. Set the paid amount to £0 above and save first.
+    </p>
+  {% else %}
+    <form method="post" action="{{ path('app_admin_booking_delete', {id: attendee.id}) }}"
+          onsubmit="return confirm('Permanently delete this booking? This cannot be undone.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_booking_' ~ attendee.id) }}">
+      <button type="submit" class="btn btn--danger btn--sm">Delete booking</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

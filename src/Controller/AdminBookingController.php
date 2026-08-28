@@ -152,6 +152,65 @@ class AdminBookingController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    {
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('admin_booking_edit_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+            }
+
+            $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
+            if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING, Attendee::STATUS_CANCELLED], true)) {
+                $error = 'Please choose a valid status.';
+            }
+
+            if (!$error) {
+                $priceRaw = trim($request->request->get('price', ''));
+                $paidRaw  = trim($request->request->get('paidAmount', ''));
+
+                $attendee->setStatus($status);
+                $attendee->setPrice($priceRaw !== '' ? number_format((float) $priceRaw, 2, '.', '') : null);
+                $attendee->setPaidAmount($paidRaw !== '' ? number_format((float) $paidRaw, 2, '.', '') : '0.00');
+
+                $em->flush();
+
+                $this->addFlash('success', 'Booking updated.');
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+            }
+        }
+
+        return $this->render('admin/bookings/edit.html.twig', [
+            'attendee' => $attendee,
+            'error'    => $error,
+        ]);
+    }
+
+    #[Route('/{id}/delete', name: 'app_admin_booking_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    {
+        $userId = $attendee->getUser()->getId();
+
+        if (!$this->isCsrfTokenValid('delete_booking_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $userId]);
+        }
+
+        if ($attendee->getPaidAmount() !== '0.00') {
+            $this->addFlash('error', 'Cannot delete a booking with a paid amount recorded. Set the paid amount to £0 first.');
+            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId()]);
+        }
+
+        $em->remove($attendee);
+        $em->flush();
+
+        $this->addFlash('success', 'Booking deleted.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $userId]);
+    }
+
     #[Route('/member-search', name: 'app_admin_booking_member_search')]
     public function memberSearch(Request $request, UserRepository $userRepository): JsonResponse
     {

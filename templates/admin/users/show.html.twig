@@ -175,6 +175,7 @@
             {{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}
             · {{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}
             {% if booking.paidAmount != '0.00' %} · Paid £{{ booking.paidAmount }}{% endif %}
+            · <a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
           </p>
         </div>
       {% endfor %}
