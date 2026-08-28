@@ -1,0 +1,49 @@
+{% extends 'admin/base.html.twig' %}
+
+{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% block title %}Add {{ certification.name }} — {{ displayName ?: user.email }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Add certification</h1>
+  <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Choose a different one</a>
+</div>
+
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Member</div>
+      <div class="card__value">{{ displayName ?: user.email }}</div>
+    </div>
+    <div>
+      <div class="card__label">Certification</div>
+      <div class="card__value">{{ certification.name }}</div>
+    </div>
+    {% if certification.description %}
+      <div style="grid-column:1 / -1;">
+        <div class="card__label">Description</div>
+        <div class="card__value">{{ certification.description }}</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{{ path('app_admin_user_certification_confirm', {id: user.id, certificationId: certification.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('add_certification_' ~ user.id ~ '_' ~ certification.id) }}">
+
+  <div class="card">
+    <p style="font-size:0.875rem;line-height:1.6;">
+      This will start an induction record for <strong>{{ certification.name }}</strong>, marked as in progress and
+      started today by you. It won't show as complete until it's signed off.
+    </p>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">
+      More options for this step (e.g. marking it complete straight away) will be added here later.
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Start certification</button>
+    <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

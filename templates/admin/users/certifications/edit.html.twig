@@ -1,0 +1,80 @@
+{% extends 'admin/base.html.twig' %}
+
+{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% block title %}{{ record.certification.name }} — {{ displayName ?: user.email }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ record.certification.name }}</h1>
+  <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Member</div>
+      <div class="card__value">{{ displayName ?: user.email }}</div>
+    </div>
+    <div>
+      <div class="card__label">Status</div>
+      <div class="card__value">
+        <span class="status-pill{{ record.complete ? ' status-pill--published' : '' }}">
+          {{ record.complete ? 'Complete' : 'In progress' }}
+        </span>
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Started by</div>
+      <div class="card__value">
+        {% if record.startedBy %}
+          {{ (record.startedBy.firstName ~ ' ' ~ record.startedBy.lastName)|trim ?: record.startedBy.email }}
+        {% else %}—{% endif %}
+      </div>
+    </div>
+    {% if record.complete %}
+      <div>
+        <div class="card__label">Completed</div>
+        <div class="card__value">
+          {{ record.completedAt|date('d M Y') }}
+          {% if record.completedBy %}
+            &middot; {{ (record.completedBy.firstName ~ ' ' ~ record.completedBy.lastName)|trim ?: record.completedBy.email }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('edit_certification_' ~ record.id) }}">
+  <div class="card">
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="startedAt">Started</label>
+      <input type="date" id="startedAt" name="startedAt" class="form-control"
+             value="{{ record.startedAt|date('Y-m-d') }}" required>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+{% if not record.complete %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Mark complete</div>
+    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
+      Sign this induction off as complete, dated today.
+    </p>
+    <form method="post" action="{{ path('app_admin_user_certification_complete', {id: user.id, recordId: record.id}) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
+      <button type="submit" class="btn btn--teal btn--sm">Mark complete</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}

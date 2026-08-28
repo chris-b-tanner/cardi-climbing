@@ -81,7 +81,12 @@
           <span class="agenda-event__status">{{ 'events_full'|trans }}</span>
         </div>
       {% elseif app.user is null %}
-        {% if accountConflict %}
+        {% if event.restrictions is not empty %}
+          <div class="agenda-event__actions event-show__actions">
+            <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
+            <a href="{{ path('app_login') }}" class="agenda-event__signin">{{ 'events_sign_in_to_book'|trans }}</a>
+          </div>
+        {% elseif accountConflict %}
           <div class="alert alert--error">
             {{ 'events_account_conflict'|trans }}
             <a href="{{ path('app_forgot_password_request') }}">{{ 'events_request_new_password'|trans }}</a>

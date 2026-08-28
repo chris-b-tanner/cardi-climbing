@@ -1,0 +1,48 @@
+<div class="result-count">{{ records|length }} {{ records|length == 1 ? 'certification' : 'certifications' }}</div>
+
+{% if records is empty %}
+  <div class="empty">
+    <strong>No certifications found</strong>
+    Try adjusting your search.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Certification</th>
+          <th>Status</th>
+          <th>Started</th>
+          <th>Completed</th>
+          {% if is_granted('ROLE_ADMIN') %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+          {% set displayName = (record.user.firstName ~ ' ' ~ record.user.lastName)|trim %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_user_show', {id: record.user.id}) }}" class="admin-table__link">
+                {{ displayName ?: record.user.email }}
+              </a>
+            </td>
+            <td>{{ record.certification.name }}</td>
+            <td>
+              <span class="status-pill{{ record.complete ? ' status-pill--published' : '' }}">
+                {{ record.complete ? 'Complete' : 'In progress' }}
+              </span>
+            </td>
+            <td class="admin-table__muted">{{ record.startedAt|date('d M Y') }}</td>
+            <td class="admin-table__muted">{{ record.complete ? record.completedAt|date('d M Y') : '—' }}</td>
+            {% if is_granted('ROLE_ADMIN') %}
+              <td>
+                <a href="{{ path('app_admin_user_certification_edit', {id: record.user.id, recordId: record.id}) }}" class="admin-table__link">Edit</a>
+              </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

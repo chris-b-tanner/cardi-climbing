@@ -1,0 +1,53 @@
+{% extends 'admin/base.html.twig' %}
+
+{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% block title %}Add certification — {{ displayName ?: user.email }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Add certification</h1>
+  <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+<p style="font-size:0.9rem;color:var(--muted);margin-bottom:1.25rem;">
+  Choose a certification to assign to <strong>{{ displayName ?: user.email }}</strong>.
+</p>
+
+{% if certifications is empty %}
+  <div class="empty">
+    <strong>Nothing to add</strong>
+    {{ displayName ?: user.email }} already holds every certification on record.
+  </div>
+{% else %}
+  <div class="cert-pick-grid">
+    {% for certification in certifications %}
+      <a href="{{ path('app_admin_user_certification_confirm', {id: user.id, certificationId: certification.id}) }}" class="card cert-pick-card">
+        <div class="cert-pick-card__name">{{ certification.name }}</div>
+        {% if certification.description %}
+          <p class="cert-pick-card__desc">{{ certification.description }}</p>
+        {% else %}
+          <p class="cert-pick-card__desc cert-pick-card__desc--none">No description on record.</p>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .cert-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .cert-pick-card {
+    display: block; text-decoration: none; color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .cert-pick-card:hover { border-color: var(--teal); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .cert-pick-card__name { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.4rem; }
+  .cert-pick-card__desc { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+  .cert-pick-card__desc--none { font-style: italic; }
+</style>
+{% endblock %}

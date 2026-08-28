@@ -186,7 +186,12 @@
 </div>
 
 <div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Certifications</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+    <div class="card__label" style="margin-bottom:0;">Certifications</div>
+    {% if is_granted('ROLE_ADMIN') %}
+      <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--teal btn--sm">+ Add certification</a>
+    {% endif %}
+  </div>
   {% if user.certifications is empty %}
     <p style="color:var(--muted);font-size:0.875rem;">No certifications on record.</p>
   {% else %}
@@ -202,6 +207,9 @@
           <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
             Started {{ record.startedAt|date('d M Y') }}
             {% if record.complete %} · Completed {{ record.completedAt|date('d M Y') }}{% endif %}
+            {% if is_granted('ROLE_ADMIN') %}
+              · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
+            {% endif %}
           </p>
         </div>
       {% endfor %}

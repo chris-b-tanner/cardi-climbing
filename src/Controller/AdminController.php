@@ -2,9 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\Certification;
 use App\Entity\Note;
 use App\Entity\User;
+use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
+use App\Repository\CertificationRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -323,5 +326,160 @@ class AdminController extends AbstractController
         }
 
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
+    /** Picklist of certification types not already held by this member. Admin only — see confirmCertification(). */
+    #[Route('/users/{id}/certifications/new', name: 'app_admin_user_certification_pick', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function pickCertification(User $user, CertificationRepository $certificationRepository): Response
+    {
+        $heldIds = array_map(
+            static fn(UserCertification $record) => $record->getCertification()->getId(),
+            $user->getCertifications()->toArray(),
+        );
+
+        $available = array_values(array_filter(
+            $certificationRepository->findBy([], ['name' => 'ASC']),
+            static fn(Certification $certification) => !in_array($certification->getId(), $heldIds, true),
+        ));
+
+        return $this->render('admin/users/certifications/pick.html.twig', [
+            'user'           => $user,
+            'certifications' => $available,
+        ]);
+    }
+
+    /** Confirm + assign a certification to a member. Admin only. */
+    #[Route('/users/{id}/certifications/{certificationId}/confirm', name: 'app_admin_user_certification_confirm', requirements: ['id' => '\d+', 'certificationId' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function confirmCertification(
+        Request $request,
+        User $user,
+        int $certificationId,
+        CertificationRepository $certificationRepository,
+        EntityManagerInterface $em,
+    ): Response {
+        $certification = $certificationRepository->find($certificationId);
+
+        if (!$certification) {
+            $this->addFlash('error', 'Certification not found.');
+            return $this->redirectToRoute('app_admin_user_certification_pick', ['id' => $user->getId()]);
+        }
+
+        $alreadyHeld = $em->getRepository(UserCertification::class)->findOneBy([
+            'user'          => $user,
+            'certification' => $certification,
+        ]);
+
+        if ($alreadyHeld) {
+            $this->addFlash('error', 'This member already has that certification on record.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('add_certification_' . $user->getId() . '_' . $certification->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+            }
+
+            /** @var User $admin */
+            $admin = $this->getUser();
+
+            $record = new UserCertification();
+            $record->setUser($user);
+            $record->setCertification($certification);
+            $record->setStartedBy($admin);
+
+            $em->persist($record);
+            $em->flush();
+
+            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail()) . '.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        return $this->render('admin/users/certifications/confirm.html.twig', [
+            'user'          => $user,
+            'certification' => $certification,
+        ]);
+    }
+
+    /** Edit a member's certification record (currently just the start date). Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/edit', name: 'app_admin_user_certification_edit', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function editCertification(Request $request, User $user, int $recordId, EntityManagerInterface $em): Response
+    {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('edit_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            try {
+                $startedAt = new \DateTimeImmutable($request->request->get('startedAt', ''));
+            } catch (\Exception) {
+                $error = 'Please enter a valid start date.';
+            }
+
+            if (!$error) {
+                $record->setStartedAt($startedAt);
+                $em->flush();
+
+                $this->addFlash('success', 'Certification updated.');
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+            }
+        }
+
+        return $this->render('admin/users/certifications/edit.html.twig', [
+            'user'   => $user,
+            'record' => $record,
+            'error'  => $error,
+        ]);
+    }
+
+    /** Mark a pending certification record as complete, dated today. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/complete', name: 'app_admin_user_certification_complete', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function completeCertification(Request $request, User $user, int $recordId, EntityManagerInterface $em): Response
+    {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('complete_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($record->isComplete()) {
+            $this->addFlash('error', 'That certification is already complete.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $record->setCompletedAt(new \DateTimeImmutable());
+        $record->setCompletedBy($admin);
+        $em->flush();
+
+        $this->addFlash('success', $record->getCertification()->getName() . ' marked complete.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
+    private function findCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification
+    {
+        $record = $em->getRepository(UserCertification::class)->find($recordId);
+
+        return ($record && $record->getUser() === $user) ? $record : null;
     }
 }

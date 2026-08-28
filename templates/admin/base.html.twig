@@ -311,6 +311,12 @@
         </a>
       </li>
       <li>
+        <a href="{{ path('app_admin_certifications') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_certifications' ? ' is-active' : '' }}">
+          Certs
+        </a>
+      </li>
+      <li>
         <a href="{{ path('app_admin_events') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
           Events
