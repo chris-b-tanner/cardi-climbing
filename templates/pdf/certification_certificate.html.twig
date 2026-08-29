@@ -70,8 +70,12 @@
       <td class="value">{{ record.startedAt|date('d M Y') }}</td>
     </tr>
     <tr>
-      <td class="label">Completed</td>
+      <td class="label">Submitted</td>
       <td class="value">{{ record.completedAt|date('d M Y \\a\\t H:i') }}</td>
+    </tr>
+    <tr>
+      <td class="label">Approved</td>
+      <td class="value">{{ record.approvedAt|date('d M Y \\a\\t H:i') }}</td>
     </tr>
   </table>
 
@@ -90,6 +94,7 @@
   {% endif %}
 
   <div class="section-title">Signature</div>
+  <p style="font-size:10px;color:#6a6864;line-height:1.5;margin:0 0 8px;">{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</p>
   <div class="signature-box">
     <img src="{{ record.signature }}" alt="Signature">
   </div>

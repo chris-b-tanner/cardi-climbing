@@ -242,19 +242,18 @@
         </div>
       {% else %}
         {% for record in user.certifications %}
+          {% set pillClass = record.status == 'completed' ? 'status-pill--confirmed' : (record.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
           <div class="item-card">
             <div class="item-card__top">
               <div class="item-card__title">{{ record.certification.name }}</div>
-              <span class="status-pill {{ record.isComplete ? 'status-pill--confirmed' : 'status-pill--pending' }}">
-                {{ record.isComplete ? 'Completed' : 'In progress' }}
-              </span>
+              <span class="status-pill {{ pillClass }}">{{ record.statusLabel }}</span>
             </div>
             <div class="item-card__meta">
               Started {{ record.startedAt|date('d M Y') }}
-              {% if record.isComplete %}&middot; Completed {{ record.completedAt|date('d M Y') }}{% endif %}
+              {% if record.submitted %}&middot; Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
             </div>
             <div class="item-card__actions">
-              {% if not record.isComplete %}
+              {% if record.status == 'in_progress' %}
                 <a href="{{ path('app_account_certification_complete', {recordId: record.id}) }}" class="btn btn--teal btn--sm">Complete now</a>
               {% else %}
                 <a href="{{ path('app_account_certification_view', {recordId: record.id}) }}" class="item-card__view-link">View details</a>

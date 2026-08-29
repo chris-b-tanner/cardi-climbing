@@ -11,6 +11,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: UserCertificationRepository::class)]
 class UserCertification
 {
+    public const STATUS_IN_PROGRESS     = 'in_progress';
+    public const STATUS_PENDING_APPROVAL = 'pending_approval';
+    public const STATUS_COMPLETED        = 'completed';
+    public const STATUS_CANCELLED        = 'cancelled';
+
+    /** Fixed e-signature consent shown above the signature box on every certification — not a stored Declaration. */
+    public const SIGNATURE_DECLARATION_TEXT = 'By applying my electronic signature below, I confirm that I have read, understood, and agree to be legally bound by the terms and conditions of this agreement. I acknowledge that my electronic signature constitutes the legal equivalent of my handwritten signature.';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -41,6 +49,22 @@ class UserCertification
     /** Base64 PNG data URI of the member's signature, captured at completion. */
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $signature = null;
+
+    /** Admin sign-off — the final step that turns a member-submitted record into a held certification. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $approvedAt = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $approvedBy = null;
+
+    /** Set to hide/void a record — e.g. a bad actor or an expired certification — without deleting its history. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $cancelledAt = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $cancelledBy = null;
 
     /** Snapshot of which of the certification's declarations the member agreed to. */
     #[ORM\ManyToMany(targetEntity: Declaration::class)]
@@ -125,9 +149,94 @@ class UserCertification
         return $this;
     }
 
-    public function isComplete(): bool
+    /** Whether the member has submitted their declarations and signature (may still be awaiting approval). */
+    public function isSubmitted(): bool
     {
         return $this->completedAt !== null;
+    }
+
+    public function getApprovedAt(): ?\DateTimeImmutable
+    {
+        return $this->approvedAt;
+    }
+
+    public function setApprovedAt(?\DateTimeImmutable $approvedAt): static
+    {
+        $this->approvedAt = $approvedAt;
+        return $this;
+    }
+
+    public function getApprovedBy(): ?User
+    {
+        return $this->approvedBy;
+    }
+
+    public function setApprovedBy(?User $approvedBy): static
+    {
+        $this->approvedBy = $approvedBy;
+        return $this;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->approvedAt !== null;
+    }
+
+    public function getCancelledAt(): ?\DateTimeImmutable
+    {
+        return $this->cancelledAt;
+    }
+
+    public function setCancelledAt(?\DateTimeImmutable $cancelledAt): static
+    {
+        $this->cancelledAt = $cancelledAt;
+        return $this;
+    }
+
+    public function getCancelledBy(): ?User
+    {
+        return $this->cancelledBy;
+    }
+
+    public function setCancelledBy(?User $cancelledBy): static
+    {
+        $this->cancelledBy = $cancelledBy;
+        return $this;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->cancelledAt !== null;
+    }
+
+    /** Whether this record currently counts as the member holding the certification. */
+    public function isHeld(): bool
+    {
+        return $this->approvedAt !== null && $this->cancelledAt === null;
+    }
+
+    public function getStatus(): string
+    {
+        if ($this->cancelledAt !== null) {
+            return self::STATUS_CANCELLED;
+        }
+        if ($this->approvedAt !== null) {
+            return self::STATUS_COMPLETED;
+        }
+        if ($this->completedAt !== null) {
+            return self::STATUS_PENDING_APPROVAL;
+        }
+        return self::STATUS_IN_PROGRESS;
+    }
+
+    public function getStatusLabel(): string
+    {
+        return match ($this->getStatus()) {
+            self::STATUS_IN_PROGRESS => 'In progress',
+            self::STATUS_PENDING_APPROVAL => 'Pending approval',
+            self::STATUS_COMPLETED => 'Completed',
+            self::STATUS_CANCELLED => 'Cancelled',
+        };
     }
 
     public function getSignature(): ?string

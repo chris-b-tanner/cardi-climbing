@@ -11,6 +11,7 @@ use App\Repository\CertificationRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
+use App\Service\CertificationPdfGenerator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -440,14 +441,101 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_home');
         }
 
-        if ($record->isComplete()) {
-            $this->addFlash('error', 'That certification is already complete.');
+        if ($record->isCancelled()) {
+            $this->addFlash('error', 'That certification has been cancelled.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        if ($record->isSubmitted()) {
+            $this->addFlash('error', 'That certification has already been submitted.');
             return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
         }
 
         $certificationMailer->sendInvitation($record);
 
         $this->addFlash('success', 'Invitation email re-sent.');
+        return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+    }
+
+    /** Final sign-off — approve a member-submitted record, turning it into a held certification. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/approve', name: 'app_admin_user_certification_approve', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function approveCertification(
+        Request $request,
+        User $user,
+        int $recordId,
+        EntityManagerInterface $em,
+        CertificationPdfGenerator $pdfGenerator,
+        CertificationMailer $certificationMailer,
+    ): Response {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('approve_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if (!$record->isSubmitted() || $record->isCancelled() || $record->isApproved()) {
+            $this->addFlash('error', 'That certification cannot be approved.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $record->setApprovedAt(new \DateTimeImmutable());
+        $record->setApprovedBy($admin);
+        $em->flush();
+
+        $message = 'Certification approved.';
+
+        try {
+            $pdf = $pdfGenerator->generate($record);
+            $certificationMailer->sendCompletion($record, $pdf);
+        } catch (\Throwable $e) {
+            // The record is already saved as approved at this point — a PDF/email failure
+            // shouldn't turn into a 500 and leave the admin thinking the approval didn't work.
+            error_log('Certification completion email failed for record ' . $record->getId() . ': ' . $e->getMessage());
+            $message = 'Certification approved. We had trouble emailing the member a copy; contact them if they need one.';
+        }
+
+        $this->addFlash('success', $message);
+        return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+    }
+
+    /** Hide/void a certification record — e.g. a bad actor or an expired certification. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/cancel', name: 'app_admin_user_certification_cancel', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function cancelCertification(Request $request, User $user, int $recordId, EntityManagerInterface $em): Response
+    {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('cancel_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($record->isCancelled()) {
+            $this->addFlash('error', 'That certification is already cancelled.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $record->setCancelledAt(new \DateTimeImmutable());
+        $record->setCancelledBy($admin);
+        $em->flush();
+
+        $this->addFlash('success', 'Certification cancelled.');
         return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
     }
 

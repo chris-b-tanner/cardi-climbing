@@ -25,6 +25,7 @@
   }
   .status-pill--confirmed { background: #dcfce7; color: #15803d; }
   .status-pill--pending   { background: #fef9c3; color: #854d0e; }
+  .status-pill--cancelled { background: #fee2e2; color: #dc2626; }
 
   .meta-row {
     display: flex; justify-content: space-between; gap: 1rem;
@@ -52,11 +53,10 @@
   <div class="account-wrap">
     <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" style="font-size:0.85rem;color:#6b7280;display:inline-block;margin-bottom:1rem;">&larr; Back to certifications</a>
 
+    {% set pillClass = record.status == 'completed' ? 'status-pill--confirmed' : (record.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
     <h1>{{ record.certification.name }}</h1>
     <p style="margin-bottom:1.5rem;">
-      <span class="status-pill {{ record.isComplete ? 'status-pill--confirmed' : 'status-pill--pending' }}">
-        {{ record.isComplete ? 'Completed' : 'In progress' }}
-      </span>
+      <span class="status-pill {{ pillClass }}">{{ record.statusLabel }}</span>
     </p>
 
     {% if record.certification.description %}
@@ -72,15 +72,21 @@
         <span class="meta-label">Started</span>
         <span class="meta-value">{{ record.startedAt|date('d M Y') }}</span>
       </div>
-      {% if record.isComplete %}
+      {% if record.submitted %}
         <div class="meta-row">
-          <span class="meta-label">Completed</span>
+          <span class="meta-label">Submitted</span>
           <span class="meta-value">{{ record.completedAt|date('d M Y') }}</span>
+        </div>
+      {% endif %}
+      {% if record.approved %}
+        <div class="meta-row">
+          <span class="meta-label">Approved</span>
+          <span class="meta-value">{{ record.approvedAt|date('d M Y') }}</span>
         </div>
       {% endif %}
     </div>
 
-    {% if record.isComplete %}
+    {% if record.submitted %}
       {% if record.agreedDeclarations|length > 0 %}
         <div class="account-card">
           <div class="account-card__title">Declarations agreed</div>
@@ -95,11 +101,36 @@
       {% if record.signature %}
         <div class="account-card">
           <div class="account-card__title">Signature</div>
+          <p style="font-size:0.82rem;color:#6b7280;line-height:1.5;margin:0 0 0.9rem;">{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</p>
           <div class="signature-box">
             <img src="{{ record.signature }}" alt="Your signature">
           </div>
         </div>
       {% endif %}
+
+      {% if record.status == 'pending_approval' %}
+        <div class="account-card">
+          <div class="account-card__title">Next step</div>
+          <p style="font-size:0.9rem;color:#374151;line-height:1.6;margin:0;">
+            Your declarations and signature have been received. This is now awaiting approval — we'll
+            email you a copy of your completion certificate once it's signed off.
+          </p>
+        </div>
+      {% elseif record.cancelled %}
+        <div class="account-card">
+          <div class="account-card__title">Cancelled</div>
+          <p style="font-size:0.9rem;color:#374151;line-height:1.6;margin:0;">
+            This certification record has been cancelled. Contact us if you think this is a mistake.
+          </p>
+        </div>
+      {% endif %}
+    {% elseif record.cancelled %}
+      <div class="account-card">
+        <div class="account-card__title">Cancelled</div>
+        <p style="font-size:0.9rem;color:#374151;line-height:1.6;margin:0;">
+          This certification record has been cancelled. Contact us if you think this is a mistake.
+        </p>
+      </div>
     {% else %}
       <div class="account-card">
         <div class="account-card__title">Next step</div>

@@ -21,6 +21,7 @@
       <tbody>
         {% for record in records %}
           {% set displayName = (record.user.firstName ~ ' ' ~ record.user.lastName)|trim %}
+          {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
           <tr>
             <td>
               <a href="{{ path('app_admin_user_show', {id: record.user.id}) }}" class="admin-table__link">
@@ -29,12 +30,10 @@
             </td>
             <td>{{ record.certification.name }}</td>
             <td>
-              <span class="status-pill{{ record.complete ? ' status-pill--published' : '' }}">
-                {{ record.complete ? 'Complete' : 'In progress' }}
-              </span>
+              <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
             </td>
             <td class="admin-table__muted">{{ record.startedAt|date('d M Y') }}</td>
-            <td class="admin-table__muted">{{ record.complete ? record.completedAt|date('d M Y') : '—' }}</td>
+            <td class="admin-table__muted">{{ record.submitted ? record.completedAt|date('d M Y') : '—' }}</td>
             {% if is_granted('ROLE_ADMIN') %}
               <td>
                 <a href="{{ path('app_admin_user_certification_edit', {id: record.user.id, recordId: record.id}) }}" class="admin-table__link">View</a>

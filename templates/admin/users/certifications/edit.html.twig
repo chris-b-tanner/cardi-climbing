@@ -9,6 +9,8 @@
   <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
 </div>
 
+{% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
+
 <div class="card">
   <div class="detail-grid">
     <div>
@@ -18,9 +20,7 @@
     <div>
       <div class="card__label">Status</div>
       <div class="card__value">
-        <span class="status-pill{{ record.complete ? ' status-pill--published' : '' }}">
-          {{ record.complete ? 'Complete' : 'In progress' }}
-        </span>
+        <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
       </div>
     </div>
     <div>
@@ -32,9 +32,9 @@
         {% endif %}
       </div>
     </div>
-    {% if record.complete %}
+    {% if record.submitted %}
       <div>
-        <div class="card__label">Completed</div>
+        <div class="card__label">Submitted</div>
         <div class="card__value">
           {{ record.completedAt|date('d M Y') }}
           {% if record.completedBy %}
@@ -43,10 +43,32 @@
         </div>
       </div>
     {% endif %}
+    {% if record.approved %}
+      <div>
+        <div class="card__label">Approved</div>
+        <div class="card__value">
+          {{ record.approvedAt|date('d M Y') }}
+          {% if record.approvedBy %}
+            &middot; {{ (record.approvedBy.firstName ~ ' ' ~ record.approvedBy.lastName)|trim ?: record.approvedBy.email }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+    {% if record.cancelled %}
+      <div>
+        <div class="card__label">Cancelled</div>
+        <div class="card__value">
+          {{ record.cancelledAt|date('d M Y') }}
+          {% if record.cancelledBy %}
+            &middot; {{ (record.cancelledBy.firstName ~ ' ' ~ record.cancelledBy.lastName)|trim ?: record.cancelledBy.email }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
   </div>
 </div>
 
-{% if record.complete %}
+{% if record.submitted %}
   {% if record.agreedDeclarations|length > 0 %}
     <div class="card">
       <div class="card__label" style="margin-bottom:0.6rem;">Declarations agreed</div>
@@ -60,12 +82,27 @@
   {% if record.signature %}
     <div class="card">
       <div class="card__label" style="margin-bottom:0.6rem;">Signature</div>
+      <p style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin:0 0 0.75rem;">{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</p>
       <img src="{{ record.signature }}" alt="Member signature" style="max-width:320px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;">
     </div>
   {% endif %}
 {% endif %}
 
-{% if not record.complete %}
+{% if record.status == 'pending_approval' %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Awaiting approval</div>
+    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
+      The member has submitted their declarations and signature above. Approving turns this into a held
+      certification and emails them a completion certificate.
+    </p>
+    <form method="post" action="{{ path('app_admin_user_certification_approve', {id: user.id, recordId: record.id}) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('approve_certification_' ~ record.id) }}">
+      <button type="submit" class="btn btn--teal btn--sm">Approve</button>
+    </form>
+  </div>
+{% endif %}
+
+{% if record.status == 'in_progress' %}
   <div class="card" style="margin-top:1.5rem;">
     <div class="card__label" style="margin-bottom:0.6rem;">Awaiting completion</div>
     <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
@@ -75,6 +112,19 @@
     <form method="post" action="{{ path('app_admin_user_certification_resend', {id: user.id, recordId: record.id}) }}">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('resend_certification_' ~ record.id) }}">
       <button type="submit" class="btn btn--ghost btn--sm">Re-send invitation email</button>
+    </form>
+  </div>
+{% endif %}
+
+{% if not record.cancelled %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Cancel</div>
+    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
+      Hides this record and revokes it if held — for a bad actor, or a certification that's expired.
+    </p>
+    <form method="post" action="{{ path('app_admin_user_certification_cancel', {id: user.id, recordId: record.id}) }}" onsubmit="return confirm('Cancel this certification record?');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('cancel_certification_' ~ record.id) }}">
+      <button type="submit" class="btn btn--ghost btn--sm">Cancel certification</button>
     </form>
   </div>
 {% endif %}

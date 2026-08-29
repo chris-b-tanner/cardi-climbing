@@ -78,6 +78,10 @@
 
       <div class="account-card">
         <div class="account-card__title">Signature</div>
+        <label class="declaration">
+          <input type="checkbox" name="signature_consent" value="1" required>
+          <span>{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</span>
+        </label>
         <div class="signature-field">
           <label for="signature-pad">Sign in the box below</label>
           <div class="signature-pad-wrap">

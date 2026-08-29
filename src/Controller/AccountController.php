@@ -6,8 +6,6 @@ use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
-use App\Service\CertificationMailer;
-use App\Service\CertificationPdfGenerator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -95,8 +93,6 @@ class AccountController extends AbstractController
         Request $request,
         int $recordId,
         EntityManagerInterface $em,
-        CertificationPdfGenerator $pdfGenerator,
-        CertificationMailer $certificationMailer,
     ): Response {
         /** @var User $user */
         $user   = $this->getUser();
@@ -107,7 +103,7 @@ class AccountController extends AbstractController
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
 
-        if ($record->isComplete()) {
+        if ($record->isSubmitted() || $record->isCancelled()) {
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
 
@@ -128,6 +124,10 @@ class AccountController extends AbstractController
                 }
             }
 
+            if (!$error && $request->request->get('signature_consent') !== '1') {
+                $error = 'Please agree to the electronic signature declaration.';
+            }
+
             $signature = trim($request->request->get('signature', ''));
             if (!$error && !str_starts_with($signature, 'data:image/png;base64,')) {
                 $error = 'Please sign before completing this.';
@@ -142,19 +142,7 @@ class AccountController extends AbstractController
                 $record->setCompletedBy($user);
                 $em->flush();
 
-                $message = $record->getCertification()->getName() . ' completed — thank you! A copy has been emailed to you.';
-
-                try {
-                    $pdf = $pdfGenerator->generate($record);
-                    $certificationMailer->sendCompletion($record, $pdf);
-                } catch (\Throwable $e) {
-                    // The record is already saved as complete at this point — a PDF/email failure
-                    // shouldn't turn into a 500 and leave the member thinking it didn't work.
-                    error_log('Certification completion email failed for record ' . $record->getId() . ': ' . $e->getMessage());
-                    $message = $record->getCertification()->getName() . ' completed — thank you! We had trouble emailing you a copy; contact us if you need one.';
-                }
-
-                $this->addFlash('success', $message);
+                $this->addFlash('success', $record->getCertification()->getName() . ' submitted — thank you! It\'s now awaiting approval, and you\'ll be emailed a copy once it\'s signed off.');
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
             }
         }

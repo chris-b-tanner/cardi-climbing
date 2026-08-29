@@ -197,16 +197,16 @@
   {% else %}
     <div style="display:flex;flex-direction:column;gap:0.6rem;">
       {% for record in user.certifications %}
+        {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
         <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
             <span style="font-size:0.9375rem;">{{ record.certification.name }}</span>
-            <span class="status-pill{{ record.complete ? ' status-pill--published' : '' }}">
-              {{ record.complete ? 'Complete' : 'In progress' }}
-            </span>
+            <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
           </div>
           <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
             Started {{ record.startedAt|date('d M Y') }}
-            {% if record.complete %} · Completed {{ record.completedAt|date('d M Y') }}{% endif %}
+            {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
+            {% if record.approved %} · Approved {{ record.approvedAt|date('d M Y') }}{% endif %}
             {% if is_granted('ROLE_ADMIN') %}
               · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
             {% endif %}

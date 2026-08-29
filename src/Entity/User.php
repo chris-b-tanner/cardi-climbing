@@ -212,11 +212,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->certifications;
     }
 
-    /** Whether this member has a completed (signed-off) induction for the given certification. */
+    /** Whether this member holds an approved (and not cancelled) induction for the given certification. */
     public function hasCertification(Certification $certification): bool
     {
         foreach ($this->certifications as $record) {
-            if ($record->getCertification() === $certification && $record->isComplete()) {
+            if ($record->getCertification() === $certification && $record->isHeld()) {
                 return true;
             }
         }
