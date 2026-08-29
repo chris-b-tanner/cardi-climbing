@@ -27,10 +27,15 @@ class Certification
     #[ORM\ManyToMany(targetEntity: Event::class, mappedBy: 'restrictions')]
     private Collection $events;
 
+    #[ORM\OneToMany(targetEntity: Declaration::class, mappedBy: 'certification')]
+    #[ORM\OrderBy(['sortOrder' => 'ASC'])]
+    private Collection $declarations;
+
     public function __construct()
     {
         $this->userCertifications = new ArrayCollection();
         $this->events             = new ArrayCollection();
+        $this->declarations       = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -68,5 +73,10 @@ class Certification
     public function getEvents(): Collection
     {
         return $this->events;
+    }
+
+    public function getDeclarations(): Collection
+    {
+        return $this->declarations;
     }
 }

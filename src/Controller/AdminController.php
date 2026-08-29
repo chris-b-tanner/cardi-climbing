@@ -403,77 +403,21 @@ class AdminController extends AbstractController
         ]);
     }
 
-    /** Edit a member's certification record (currently just the start date). Admin only. */
-    #[Route('/users/{id}/certifications/{recordId}/edit', name: 'app_admin_user_certification_edit', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['GET', 'POST'])]
+    /** View + complete a member's certification record. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/edit', name: 'app_admin_user_certification_edit', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['GET'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function editCertification(Request $request, User $user, int $recordId, EntityManagerInterface $em): Response
+    public function editCertification(User $user, int $recordId, EntityManagerInterface $em): Response
     {
         $record = $this->findCertificationRecord($em, $user, $recordId);
         if (!$record) {
             $this->addFlash('error', 'Certification record not found.');
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-        }
-
-        $error = null;
-
-        if ($request->isMethod('POST')) {
-            if (!$this->isCsrfTokenValid('edit_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
-                $this->addFlash('error', 'Access denied.');
-                return $this->redirectToRoute('app_home');
-            }
-
-            try {
-                $startedAt = new \DateTimeImmutable($request->request->get('startedAt', ''));
-            } catch (\Exception) {
-                $error = 'Please enter a valid start date.';
-            }
-
-            if (!$error) {
-                $record->setStartedAt($startedAt);
-                $em->flush();
-
-                $this->addFlash('success', 'Certification updated.');
-                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-            }
         }
 
         return $this->render('admin/users/certifications/edit.html.twig', [
             'user'   => $user,
             'record' => $record,
-            'error'  => $error,
         ]);
-    }
-
-    /** Mark a pending certification record as complete, dated today. Admin only. */
-    #[Route('/users/{id}/certifications/{recordId}/complete', name: 'app_admin_user_certification_complete', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['POST'])]
-    #[IsGranted('ROLE_ADMIN')]
-    public function completeCertification(Request $request, User $user, int $recordId, EntityManagerInterface $em): Response
-    {
-        $record = $this->findCertificationRecord($em, $user, $recordId);
-        if (!$record) {
-            $this->addFlash('error', 'Certification record not found.');
-            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-        }
-
-        if (!$this->isCsrfTokenValid('complete_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
-            $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_home');
-        }
-
-        if ($record->isComplete()) {
-            $this->addFlash('error', 'That certification is already complete.');
-            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
-        }
-
-        /** @var User $admin */
-        $admin = $this->getUser();
-
-        $record->setCompletedAt(new \DateTimeImmutable());
-        $record->setCompletedBy($admin);
-        $em->flush();
-
-        $this->addFlash('success', $record->getCertification()->getName() . ' marked complete.');
-        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
     private function findCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification

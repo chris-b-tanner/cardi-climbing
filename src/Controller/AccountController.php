@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -65,6 +66,66 @@ class AccountController extends AbstractController
             'error'     => $error,
             'attendees' => $attendeeRepository->findAllForUser($user),
             'today'     => new \DateTimeImmutable('today'),
+        ]);
+    }
+
+    /** Member self-service: work through declarations and sign to complete an in-progress certification. */
+    #[Route('/certifications/{recordId}/complete', name: 'app_account_certification_complete', requirements: ['recordId' => '\d+'], methods: ['GET', 'POST'])]
+    public function completeCertification(Request $request, int $recordId, EntityManagerInterface $em): Response
+    {
+        /** @var User $user */
+        $user   = $this->getUser();
+        $record = $em->getRepository(UserCertification::class)->find($recordId);
+
+        if (!$record || $record->getUser() !== $user) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        if ($record->isComplete()) {
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        $declarations = $record->getCertification()->getDeclarations();
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('complete_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+            }
+
+            $agreedIds = array_map('intval', $request->request->all('declarations'));
+            foreach ($declarations as $declaration) {
+                if (!in_array($declaration->getId(), $agreedIds, true)) {
+                    $error = 'Please agree to all of the declarations before completing this.';
+                    break;
+                }
+            }
+
+            $signature = trim($request->request->get('signature', ''));
+            if (!$error && !str_starts_with($signature, 'data:image/png;base64,')) {
+                $error = 'Please sign before completing this.';
+            }
+
+            if (!$error) {
+                foreach ($declarations as $declaration) {
+                    $record->addAgreedDeclaration($declaration);
+                }
+                $record->setSignature($signature);
+                $record->setCompletedAt(new \DateTimeImmutable());
+                $record->setCompletedBy($user);
+                $em->flush();
+
+                $this->addFlash('success', $record->getCertification()->getName() . ' completed — thank you!');
+                return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+            }
+        }
+
+        return $this->render('account/certification_complete.html.twig', [
+            'record'       => $record,
+            'declarations' => $declarations,
+            'error'        => $error,
         ]);
     }
 }

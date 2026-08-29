@@ -9,10 +9,6 @@
   <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
 </div>
 
-{% if error %}
-  <div class="flash flash--error">{{ error }}</div>
-{% endif %}
-
 <div class="card">
   <div class="detail-grid">
     <div>
@@ -28,11 +24,12 @@
       </div>
     </div>
     <div>
-      <div class="card__label">Started by</div>
+      <div class="card__label">Started</div>
       <div class="card__value">
+        {{ record.startedAt|date('d M Y') }}
         {% if record.startedBy %}
-          {{ (record.startedBy.firstName ~ ' ' ~ record.startedBy.lastName)|trim ?: record.startedBy.email }}
-        {% else %}—{% endif %}
+          &middot; {{ (record.startedBy.firstName ~ ' ' ~ record.startedBy.lastName)|trim ?: record.startedBy.email }}
+        {% endif %}
       </div>
     </div>
     {% if record.complete %}
@@ -49,32 +46,32 @@
   </div>
 </div>
 
-<form method="post" action="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" novalidate>
-  <input type="hidden" name="_csrf_token" value="{{ csrf_token('edit_certification_' ~ record.id) }}">
-  <div class="card">
-    <div class="form-group" style="margin-bottom:0;">
-      <label for="startedAt">Started</label>
-      <input type="date" id="startedAt" name="startedAt" class="form-control"
-             value="{{ record.startedAt|date('Y-m-d') }}" required>
+{% if record.complete %}
+  {% if record.certification.declarations|length > 0 %}
+    <div class="card">
+      <div class="card__label" style="margin-bottom:0.6rem;">Declarations agreed</div>
+      <ul style="margin:0;padding-left:1.2rem;font-size:0.875rem;line-height:1.7;">
+        {% for declaration in record.certification.declarations %}
+          <li>{{ declaration.text }}</li>
+        {% endfor %}
+      </ul>
     </div>
-  </div>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn--teal">Save changes</button>
-    <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
-  </div>
-</form>
+  {% endif %}
+  {% if record.signature %}
+    <div class="card">
+      <div class="card__label" style="margin-bottom:0.6rem;">Signature</div>
+      <img src="{{ record.signature }}" alt="Member signature" style="max-width:320px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;">
+    </div>
+  {% endif %}
+{% endif %}
 
 {% if not record.complete %}
   <div class="card" style="margin-top:1.5rem;">
-    <div class="card__label" style="margin-bottom:0.6rem;">Mark complete</div>
-    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
-      Sign this induction off as complete, dated today.
+    <div class="card__label" style="margin-bottom:0.6rem;">Awaiting completion</div>
+    <p style="font-size:0.875rem;color:var(--muted);">
+      This induction has been started. The member needs to log into their account and complete the
+      declarations and signature themselves from the Certifications tab.
     </p>
-    <form method="post" action="{{ path('app_admin_user_certification_complete', {id: user.id, recordId: record.id}) }}">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
-      <button type="submit" class="btn btn--teal btn--sm">Mark complete</button>
-    </form>
   </div>
 {% endif %}
 {% endblock %}

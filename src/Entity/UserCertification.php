@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\UserCertificationRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 /** A member's induction/certification record — tracks who started and signed it off, and when. */
@@ -36,9 +38,19 @@ class UserCertification
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $completedBy = null;
 
+    /** Base64 PNG data URI of the member's signature, captured at completion. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $signature = null;
+
+    /** Snapshot of which of the certification's declarations the member agreed to. */
+    #[ORM\ManyToMany(targetEntity: Declaration::class)]
+    #[ORM\JoinTable(name: 'user_certification_declaration')]
+    private Collection $agreedDeclarations;
+
     public function __construct()
     {
-        $this->startedAt = new \DateTimeImmutable();
+        $this->startedAt          = new \DateTimeImmutable();
+        $this->agreedDeclarations = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -115,5 +127,35 @@ class UserCertification
     public function isComplete(): bool
     {
         return $this->completedAt !== null;
+    }
+
+    public function getSignature(): ?string
+    {
+        return $this->signature;
+    }
+
+    public function setSignature(?string $signature): static
+    {
+        $this->signature = $signature;
+        return $this;
+    }
+
+    public function getAgreedDeclarations(): Collection
+    {
+        return $this->agreedDeclarations;
+    }
+
+    public function addAgreedDeclaration(Declaration $declaration): static
+    {
+        if (!$this->agreedDeclarations->contains($declaration)) {
+            $this->agreedDeclarations->add($declaration);
+        }
+        return $this;
+    }
+
+    public function removeAgreedDeclaration(Declaration $declaration): static
+    {
+        $this->agreedDeclarations->removeElement($declaration);
+        return $this;
     }
 }
