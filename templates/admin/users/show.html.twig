@@ -211,10 +211,10 @@
             {% endif %}
           </p>
           {% if payment.status in ['succeeded', 'partially_refunded'] %}
-            <a href="#" onclick="document.getElementById('refund-form-{{ payment.id }}').hidden = false; this.hidden = true; return false;"
+            <a href="#" onclick="document.getElementById('refund-form-{{ payment.id }}').style.display = 'flex'; this.hidden = true; return false;"
                style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">Refund this</a>
             <form id="refund-form-{{ payment.id }}" method="post" action="{{ path('app_admin_payment_refund', {id: payment.id}) }}"
-                  style="display:flex;gap:0.4rem;align-items:center;margin-top:0.5rem;" hidden
+                  style="display:none;gap:0.4rem;align-items:center;margin-top:0.5rem;"
                   onsubmit="return confirm('Issue this refund?');">
               <input type="hidden" name="_csrf_token" value="{{ csrf_token('refund_payment_' ~ payment.id) }}">
               <span style="font-size:0.8rem;color:var(--muted);">£</span>
