@@ -43,7 +43,7 @@
               </td>
               <td>
                 {% if not memberIsAdmin %}
-                  <form method="post" action="{{ path('app_admin_team_remove', {id: member.id}) }}"
+                  <form method="post" action="{{ path('app_admin_settings_team_remove', {id: member.id}) }}"
                         onsubmit="return confirm('Remove team access for {{ (displayName ?: member.email)|e('js') }}? They\'ll still be able to sign in as a member.');">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_team_remove_' ~ member.id) }}">
                     <button type="submit" class="btn btn--ghost btn--sm">Remove</button>

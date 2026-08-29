@@ -1,0 +1,30 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New tag — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New tag</h1>
+  <a href="{{ path('app_admin_settings_tags') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_tag_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_tag_new') }}">
+
+  <div class="card">
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ app.request.request.get('name') }}" autocomplete="off" required>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Create tag</button>
+    <a href="{{ path('app_admin_settings_tags') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

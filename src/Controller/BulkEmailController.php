@@ -2,11 +2,14 @@
 
 namespace App\Controller;
 
+use App\Entity\Certification;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
+use App\Repository\CertificationRepository;
 use App\Repository\EventRepository;
 use App\Repository\TagRepository;
+use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -35,6 +38,8 @@ class BulkEmailController extends AbstractController
         UserRepository $userRepository,
         EventRepository $eventRepository,
         AttendeeRepository $attendeeRepository,
+        CertificationRepository $certificationRepository,
+        UserCertificationRepository $userCertificationRepository,
     ): Response {
         $eventAudience = $this->resolveEventAudience(
             (int) $request->query->get('eventId', 0),
@@ -44,10 +49,17 @@ class BulkEmailController extends AbstractController
             $attendeeRepository,
         );
 
+        $certificationAudience = $eventAudience ? null : $this->resolveCertificationAudience(
+            (int) $request->query->get('certificationId', 0),
+            $certificationRepository,
+            $userCertificationRepository,
+        );
+
         return $this->render('admin/email/compose.html.twig', [
-            'tags'          => $tagRepository->findBy([], ['name' => 'ASC']),
-            'totalOptedIn'  => count($userRepository->findForBulkEmail()),
-            'eventAudience' => $eventAudience,
+            'tags'                   => $tagRepository->findBy([], ['name' => 'ASC']),
+            'totalOptedIn'           => count($userRepository->findForBulkEmail()),
+            'eventAudience'          => $eventAudience,
+            'certificationAudience'  => $certificationAudience,
         ]);
     }
 
@@ -77,15 +89,22 @@ class BulkEmailController extends AbstractController
         UserRepository $userRepository,
         EventRepository $eventRepository,
         AttendeeRepository $attendeeRepository,
+        CertificationRepository $certificationRepository,
+        UserCertificationRepository $userCertificationRepository,
         MailerInterface $mailer,
     ): Response {
-        $eventId          = (int) $request->request->get('eventId', 0);
-        $scope            = (string) $request->request->get('scope', 'date');
+        $eventId           = (int) $request->request->get('eventId', 0);
+        $scope             = (string) $request->request->get('scope', 'date');
         $occurrenceDateRaw = (string) $request->request->get('occurrenceDate', '');
+        $certificationId   = (int) $request->request->get('certificationId', 0);
 
-        $redirectParams = $eventId
-            ? array_filter(['eventId' => $eventId, 'scope' => $scope, 'occurrenceDate' => $occurrenceDateRaw])
-            : [];
+        if ($eventId) {
+            $redirectParams = array_filter(['eventId' => $eventId, 'scope' => $scope, 'occurrenceDate' => $occurrenceDateRaw]);
+        } elseif ($certificationId) {
+            $redirectParams = ['certificationId' => $certificationId];
+        } else {
+            $redirectParams = [];
+        }
 
         if (!$this->isCsrfTokenValid('bulk_email', $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -101,16 +120,22 @@ class BulkEmailController extends AbstractController
         }
 
         $eventAudience = $this->resolveEventAudience($eventId, $scope, $occurrenceDateRaw, $eventRepository, $attendeeRepository);
+        $certificationAudience = $eventAudience ? null : $this->resolveCertificationAudience($certificationId, $certificationRepository, $userCertificationRepository);
 
         if ($eventAudience) {
             $recipients = $eventAudience['recipients'];
+        } elseif ($certificationAudience) {
+            $recipients = $certificationAudience['recipients'];
         } else {
             $tagIds     = array_map('intval', array_filter($request->request->all('tagIds')));
             $recipients = $userRepository->findForBulkEmail($tagIds);
         }
 
         if (!$recipients) {
-            $this->addFlash('error', $eventAudience ? 'No members are booked onto that event/date.' : 'No opted-in members matched that audience.');
+            $message = $eventAudience
+                ? 'No members are booked onto that event/date.'
+                : ($certificationAudience ? 'No members hold that certification.' : 'No opted-in members matched that audience.');
+            $this->addFlash('error', $message);
             return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
         }
 
@@ -123,9 +148,9 @@ class BulkEmailController extends AbstractController
                 'user'    => $user,
             ];
 
-            // Event-attendee emails aren't a newsletter — no unsubscribe footer (omitting
-            // recipientEmail suppresses it, same as the booking confirmation email).
-            if (!$eventAudience) {
+            // Event-attendee and certification-holder emails aren't a newsletter — no unsubscribe
+            // footer (omitting recipientEmail suppresses it, same as the booking confirmation email).
+            if (!$eventAudience && !$certificationAudience) {
                 $context['recipientEmail'] = $user->getEmail();
             }
 
@@ -183,6 +208,32 @@ class BulkEmailController extends AbstractController
             'upcomingOnly'   => $upcomingOnly,
             'occurrenceDate' => $occurrenceDate,
             'recipients'     => $attendeeRepository->findAttendeeUsersForEvent($event, $occurrenceDate, $upcomingOnly),
+        ];
+    }
+
+    /**
+     * Resolves the "email certification holders" audience from request params, or null when
+     * this isn't a certification-scoped send.
+     *
+     * @return array{certification: Certification, recipients: User[]}|null
+     */
+    private function resolveCertificationAudience(
+        int $certificationId,
+        CertificationRepository $certificationRepository,
+        UserCertificationRepository $userCertificationRepository,
+    ): ?array {
+        if (!$certificationId) {
+            return null;
+        }
+
+        $certification = $certificationRepository->find($certificationId);
+        if (!$certification) {
+            return null;
+        }
+
+        return [
+            'certification' => $certification,
+            'recipients'    => $userCertificationRepository->findHoldersForCertification($certification),
         ];
     }
 }

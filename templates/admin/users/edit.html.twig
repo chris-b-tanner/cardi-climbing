@@ -98,7 +98,7 @@
   <div class="card">
     <div class="card__label" style="margin-bottom:0.75rem;">Tags</div>
     {% if allTags is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;">No tags exist yet — add rows directly to the <code>tag</code> table.</p>
+      <p style="color:var(--muted);font-size:0.875rem;">No tags exist yet — <a href="{{ path('app_admin_settings_tag_new') }}">create one</a> to start categorising members.</p>
     {% else %}
       <div class="tag-grid">
         {% for tag in allTags %}

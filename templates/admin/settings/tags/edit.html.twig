@@ -1,0 +1,42 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Edit {{ tag.name }} — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit tag</h1>
+  <a href="{{ path('app_admin_settings_tags') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_tag_edit_' ~ tag.id) }}">
+
+  <div class="card">
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ tag.name }}" autocomplete="off" required>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_settings_tags') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
+  <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
+    Deleting this tag removes it from {{ tag.users|length }} member(s). This cannot be undone.
+  </p>
+  <form method="post" action="{{ path('app_admin_settings_tag_delete', {id: tag.id}) }}"
+        onsubmit="return confirm('Delete the tag &quot;{{ tag.name|e('js') }}&quot;? It will be removed from {{ tag.users|length }} member(s). This cannot be undone.');">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_tag_' ~ tag.id) }}">
+    <button type="submit" class="btn btn--danger btn--sm">Delete tag</button>
+  </form>
+</div>
+{% endblock %}

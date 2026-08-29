@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\Certification;
+use App\Entity\User;
 use App\Entity\UserCertification;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -30,5 +32,26 @@ class UserCertificationRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Distinct members who hold (i.e. have completed) the given certification.
+     *
+     * Rooted at User (rather than the usual UserCertification root) since Doctrine won't let a
+     * DQL query select an entity that isn't the root/from alias.
+     *
+     * @return User[]
+     */
+    public function findHoldersForCertification(Certification $certification): array
+    {
+        return $this->getEntityManager()->createQueryBuilder()
+            ->select('DISTINCT u')
+            ->from(User::class, 'u')
+            ->innerJoin(UserCertification::class, 'uc', 'WITH', 'uc.user = u')
+            ->where('uc.certification = :certification')
+            ->andWhere('uc.completedAt IS NOT NULL')
+            ->setParameter('certification', $certification)
+            ->getQuery()
+            ->getResult();
     }
 }

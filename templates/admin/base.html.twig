@@ -96,6 +96,18 @@
     }
     .admin-topbar__link:hover { border-color: #9ca3af; color: var(--black); }
 
+    .admin-subnav {
+      display: flex; gap: 1.5rem; padding: 0 1.5rem;
+      border-bottom: 1px solid var(--border); background: var(--white);
+    }
+    .admin-subnav__link {
+      display: inline-block; padding: 0.75rem 0.1rem;
+      font-size: 0.85rem; font-weight: 500; color: var(--muted);
+      text-decoration: none; border-bottom: 2px solid transparent;
+    }
+    .admin-subnav__link:hover { color: var(--black); }
+    .admin-subnav__link.is-active { color: var(--black); border-bottom-color: var(--teal); }
+
     .admin-wrap { margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
 
     @media (max-width: 860px) {
@@ -336,9 +348,9 @@
       </li>
       {% if is_granted('ROLE_ADMIN') %}
         <li>
-          <a href="{{ path('app_admin_team') }}"
-             class="admin-nav__link{{ currentRoute starts with 'app_admin_team' ? ' is-active' : '' }}">
-            Team
+          <a href="{{ path('app_admin_settings_team') }}"
+             class="admin-nav__link{{ currentRoute starts with 'app_admin_settings' ? ' is-active' : '' }}">
+            Settings
           </a>
         </li>
       {% endif %}
@@ -353,6 +365,23 @@
       {% endif %}
       <a href="{{ path('app_logout') }}" class="admin-topbar__link">Sign out</a>
     </div>
+
+    {% if currentRoute starts with 'app_admin_settings' %}
+      <div class="admin-subnav">
+        <a href="{{ path('app_admin_settings_team') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_team' ? ' is-active' : '' }}">
+          Team
+        </a>
+        <a href="{{ path('app_admin_settings_certifications') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_certification' ? ' is-active' : '' }}">
+          Certifications
+        </a>
+        <a href="{{ path('app_admin_settings_tags') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_tag' ? ' is-active' : '' }}">
+          Tags
+        </a>
+      </div>
+    {% endif %}
 
     <div class="admin-wrap">
       {% for msg in app.flashes('success') %}

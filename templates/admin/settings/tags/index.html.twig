@@ -1,0 +1,43 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Tags — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Tags</h1>
+  <a href="{{ path('app_admin_settings_tag_new') }}" class="btn btn--teal btn--sm">+ New tag</a>
+</div>
+
+{% if tags is empty %}
+  <div class="empty">
+    <strong>No tags yet</strong>
+    Create one to start categorising members.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Used by</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tag in tags %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">
+                {{ tag.name }}
+              </a>
+            </td>
+            <td class="admin-table__muted">{{ tag.users|length }}</td>
+            <td class="btn-row" style="flex-wrap:nowrap;">
+              <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

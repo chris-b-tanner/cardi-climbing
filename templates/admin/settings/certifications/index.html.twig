@@ -1,0 +1,46 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Certifications — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Certifications</h1>
+  <a href="{{ path('app_admin_settings_certification_new') }}" class="btn btn--teal btn--sm">+ New certification</a>
+</div>
+
+{% if certifications is empty %}
+  <div class="empty">
+    <strong>No certification types yet</strong>
+    Create one to start assigning it to members.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Held by</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for certification in certifications %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_certification_edit', {id: certification.id}) }}" class="admin-table__link">
+                {{ certification.name }}
+              </a>
+            </td>
+            <td class="admin-table__muted">{{ certification.description ?: '—' }}</td>
+            <td class="admin-table__muted">{{ certification.userCertifications|length }}</td>
+            <td class="btn-row" style="flex-wrap:nowrap;">
+              <a href="{{ path('app_admin_settings_certification_edit', {id: certification.id}) }}" class="admin-table__link">Edit</a>
+              <a href="{{ path('app_admin_email_compose', {certificationId: certification.id}) }}" class="admin-table__link">Email</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

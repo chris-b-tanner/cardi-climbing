@@ -13,10 +13,9 @@ class AdminPlaceholderController extends AbstractController
 {
     private const SECTION_TITLES = [
         'calendar' => 'Calendar',
-        'settings' => 'Settings',
     ];
 
-    #[Route('/{section}', name: 'app_admin_placeholder', requirements: ['section' => 'calendar|settings'])]
+    #[Route('/{section}', name: 'app_admin_placeholder', requirements: ['section' => 'calendar'])]
     public function show(string $section): Response
     {
         return $this->render('admin/placeholder.html.twig', [

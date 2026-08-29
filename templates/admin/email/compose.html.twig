@@ -6,6 +6,8 @@
   <h1>Compose email</h1>
   {% if eventAudience %}
     <a href="{{ path('app_admin_event_show', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
+  {% elseif certificationAudience %}
+    <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost btn--sm">← {{ certificationAudience.certification.name }}</a>
   {% else %}
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
   {% endif %}
@@ -31,6 +33,15 @@
           </p>
           <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
             {{ eventAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about an event they're booked onto.
+          </p>
+          <a href="{{ path('app_admin_email_compose') }}" style="display:inline-block;margin-top:0.6rem;font-size:0.8rem;color:var(--teal-dk);font-weight:600;">Switch to a general audience instead</a>
+        {% elseif certificationAudience %}
+          <input type="hidden" name="certificationId" value="{{ certificationAudience.certification.id }}">
+          <p style="font-size:0.9rem;">
+            Holders of <strong>{{ certificationAudience.certification.name }}</strong> certification.
+          </p>
+          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
+            {{ certificationAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about a certification they hold.
           </p>
           <a href="{{ path('app_admin_email_compose') }}" style="display:inline-block;margin-top:0.6rem;font-size:0.8rem;color:var(--teal-dk);font-weight:600;">Switch to a general audience instead</a>
         {% else %}
@@ -80,7 +91,7 @@
 
       <div class="form-actions">
         <button type="submit" class="btn btn--teal" id="send-btn">Send email</button>
-        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% endif %}</span>
+        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% elseif certificationAudience %}{{ certificationAudience.recipients|length }} recipient(s){% endif %}</span>
       </div>
     </form>
   </div>
@@ -158,8 +169,8 @@
   bodyEl.addEventListener('input',    schedulePreview);
 
   // ── Audience / recipient count ─────────────────────────────
-  {% if eventAudience %}
-  // Fixed audience (event attendees) — recipient count is already rendered server-side.
+  {% if eventAudience or certificationAudience %}
+  // Fixed audience (event attendees / certification holders) — recipient count is already rendered server-side.
   {% else %}
   function getSelectedTagIds() {
     return [...bulkTags].filter(c => c.checked).map(c => c.value);
