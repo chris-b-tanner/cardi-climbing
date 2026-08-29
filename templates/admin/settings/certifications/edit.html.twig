@@ -33,4 +33,44 @@
     <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.3rem;">Declarations</div>
+  <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem;">
+    Shown as required checkboxes when a member completes this certification, in the order below.
+  </p>
+
+  {% if certification.declarations is empty %}
+    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:1rem;">No declarations yet.</p>
+  {% else %}
+    {% for declaration in certification.declarations %}
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem;">
+        <form method="post" action="{{ path('app_admin_settings_certification_declaration_edit', {id: certification.id, declarationId: declaration.id}) }}"
+              style="display:flex;gap:0.6rem;align-items:flex-start;">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_declaration_edit_' ~ declaration.id) }}">
+          <textarea name="text" class="form-control" rows="2" required
+                    style="flex:1;resize:vertical;font-family:inherit;background:#fff;">{{ declaration.text }}</textarea>
+          <button type="submit" class="btn btn--ghost btn--sm">Save</button>
+        </form>
+        <form method="post" action="{{ path('app_admin_settings_certification_declaration_delete', {id: certification.id, declarationId: declaration.id}) }}"
+              onsubmit="return confirm('Remove this declaration?');" style="margin-top:0.6rem;">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_declaration_delete_' ~ declaration.id) }}">
+          <button type="submit" class="btn btn--danger btn--sm">Remove</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" action="{{ path('app_admin_settings_certification_declaration_new', {id: certification.id}) }}"
+        style="border-top:1px solid var(--border);padding-top:1rem;">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_declaration_new_' ~ certification.id) }}">
+    <div class="form-group" style="margin-bottom:0.6rem;">
+      <label for="new-declaration-text">Add a declaration</label>
+      <textarea id="new-declaration-text" name="text" class="form-control" rows="2" required
+                placeholder="e.g. I understand climbing carries an inherent risk of injury…"
+                style="resize:vertical;font-family:inherit;"></textarea>
+    </div>
+    <button type="submit" class="btn btn--teal btn--sm">Add declaration</button>
+  </form>
+</div>
 {% endblock %}

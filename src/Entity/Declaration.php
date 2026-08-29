@@ -5,7 +5,11 @@ namespace App\Entity;
 use App\Repository\DeclarationRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/** A checkbox statement a member must agree to as part of completing a certification form. Belongs to exactly one certification. */
+/**
+ * A checkbox statement a member must agree to as part of completing a certification form.
+ * Belongs to at most one certification — null once "removed" from a certification it has
+ * already been used on, so historical UserCertification.agreedDeclarations rows keep their text.
+ */
 #[ORM\Entity(repositoryClass: DeclarationRepository::class)]
 class Declaration
 {
@@ -15,8 +19,8 @@ class Declaration
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Certification::class, inversedBy: 'declarations')]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private Certification $certification;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Certification $certification = null;
 
     #[ORM\Column(type: 'text')]
     private string $text;
@@ -29,12 +33,12 @@ class Declaration
         return $this->id;
     }
 
-    public function getCertification(): Certification
+    public function getCertification(): ?Certification
     {
         return $this->certification;
     }
 
-    public function setCertification(Certification $certification): static
+    public function setCertification(?Certification $certification): static
     {
         $this->certification = $certification;
         return $this;

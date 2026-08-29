@@ -37,7 +37,7 @@
             <td class="admin-table__muted">{{ record.complete ? record.completedAt|date('d M Y') : '—' }}</td>
             {% if is_granted('ROLE_ADMIN') %}
               <td>
-                <a href="{{ path('app_admin_user_certification_edit', {id: record.user.id, recordId: record.id}) }}" class="admin-table__link">Edit</a>
+                <a href="{{ path('app_admin_user_certification_edit', {id: record.user.id, recordId: record.id}) }}" class="admin-table__link">View</a>
               </td>
             {% endif %}
           </tr>
