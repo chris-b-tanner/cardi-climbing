@@ -9,20 +9,31 @@ use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[Route('/account/donate')]
 #[IsGranted('ROLE_USER')]
 class PaymentController extends AbstractController
 {
     public function __construct(
         private readonly StripeClient $stripe,
         private readonly string $stripeTerminalReaderId,
+        private readonly string $stripePublishableKey,
     ) {}
 
+    /** Standalone payment page — currently donations only, but its own page/routes so a future booking
+     *  flow can link here with event/attendee context rather than being wedged into the account tabs. */
+    #[Route('/donate', name: 'app_donate', methods: ['GET'])]
+    public function donate(): Response
+    {
+        return $this->render('payment/donate.html.twig', [
+            'stripePublishableKey' => $this->stripePublishableKey,
+        ]);
+    }
+
     /** Creates a Payment + Stripe PaymentIntent for an online card donation, returns the client secret for Stripe.js. */
-    #[Route('/intent', name: 'app_donate_intent', methods: ['POST'])]
+    #[Route('/donate/intent', name: 'app_donate_intent', methods: ['POST'])]
     public function createIntent(Request $request, EntityManagerInterface $em): JsonResponse
     {
         if (!$this->isCsrfTokenValid('donate', $request->request->get('_csrf_token'))) {
@@ -43,11 +54,12 @@ class PaymentController extends AbstractController
         $payment->setMethod(Payment::METHOD_ONLINE);
 
         $intent = $this->stripe->paymentIntents->create([
-            'amount'   => $this->toMinorUnits($amount),
-            'currency' => $payment->getCurrency(),
-            'metadata' => ['user_id' => (string) $user->getId()],
-            'receipt_email' => $user->getEmail(),
-            'automatic_payment_methods' => ['enabled' => true],
+            'amount'               => $this->toMinorUnits($amount),
+            'currency'             => $payment->getCurrency(),
+            'payment_method_types' => ['card'],
+            'description'          => 'Y Wal donation',
+            'metadata'             => ['user_id' => (string) $user->getId()],
+            'receipt_email'        => $user->getEmail(),
         ]);
 
         $payment->setStripePaymentIntentId($intent->id);
@@ -62,7 +74,7 @@ class PaymentController extends AbstractController
     }
 
     /** Creates a Payment + Stripe PaymentIntent and sends it to the club's S700 for the member to tap. */
-    #[Route('/terminal', name: 'app_donate_terminal', methods: ['POST'])]
+    #[Route('/donate/terminal', name: 'app_donate_terminal', methods: ['POST'])]
     public function sendToTerminal(Request $request, EntityManagerInterface $em): JsonResponse
     {
         if (!$this->isCsrfTokenValid('donate', $request->request->get('_csrf_token'))) {
@@ -91,6 +103,7 @@ class PaymentController extends AbstractController
             'currency'              => $payment->getCurrency(),
             'payment_method_types'  => ['card_present'],
             'capture_method'        => 'automatic',
+            'description'           => 'Y Wal donation',
             'metadata'              => ['user_id' => (string) $user->getId()],
             'receipt_email'         => $user->getEmail(),
         ]);
@@ -107,12 +120,27 @@ class PaymentController extends AbstractController
         return new JsonResponse(['paymentId' => $payment->getId()]);
     }
 
-    /** Polled by the account page while waiting for a terminal (or redirect-based online) payment to settle. */
-    #[Route('/{id}/status', name: 'app_donate_status', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function status(Payment $payment): JsonResponse
+    /** Polled by the donate page while waiting for a terminal (or card) payment to settle. */
+    #[Route('/donate/{id}/status', name: 'app_donate_status', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function status(Payment $payment, EntityManagerInterface $em): JsonResponse
     {
         if ($payment->getUser() !== $this->getUser()) {
             return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        // The webhook is the normal way this gets set, but it can be delayed (or, locally, not
+        // configured at all via `stripe listen`) — so fall back to asking Stripe directly.
+        if ($payment->getSucceededAt() === null && $payment->getFailedAt() === null && $payment->getStripePaymentIntentId()) {
+            $intent = $this->stripe->paymentIntents->retrieve($payment->getStripePaymentIntentId());
+
+            if ($intent->status === 'succeeded') {
+                $payment->setSucceededAt(new \DateTimeImmutable());
+                $em->flush();
+            } elseif ($intent->status === 'canceled' || $intent->last_payment_error) {
+                $payment->setFailedAt(new \DateTimeImmutable());
+                $payment->setFailureReason($intent->last_payment_error->message ?? null);
+                $em->flush();
+            }
         }
 
         return new JsonResponse(['status' => $payment->getStatus()]);

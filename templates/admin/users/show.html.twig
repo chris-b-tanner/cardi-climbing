@@ -187,11 +187,12 @@
 
 <div class="card">
   <div class="card__label" style="margin-bottom:0.75rem;">Payments</div>
-  {% if user.payments is empty %}
+  {% set payments = user.payments|filter(p => p.status != 'pending') %}
+  {% if payments is empty %}
     <p style="color:var(--muted);font-size:0.875rem;">No payments yet.</p>
   {% else %}
     <div style="display:flex;flex-direction:column;gap:0.6rem;">
-      {% for payment in user.payments %}
+      {% for payment in payments %}
         {% set pillClass = payment.status == 'succeeded' ? ' status-pill--published' : (payment.status in ['failed'] ? ' status-pill--cancelled' : (payment.status in ['refunded', 'partially_refunded'] ? ' status-pill--pending' : '')) %}
         <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
@@ -210,8 +211,10 @@
             {% endif %}
           </p>
           {% if payment.status in ['succeeded', 'partially_refunded'] %}
-            <form method="post" action="{{ path('app_admin_payment_refund', {id: payment.id}) }}"
-                  style="display:flex;gap:0.4rem;align-items:center;margin-top:0.5rem;"
+            <a href="#" onclick="document.getElementById('refund-form-{{ payment.id }}').hidden = false; this.hidden = true; return false;"
+               style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">Refund this</a>
+            <form id="refund-form-{{ payment.id }}" method="post" action="{{ path('app_admin_payment_refund', {id: payment.id}) }}"
+                  style="display:flex;gap:0.4rem;align-items:center;margin-top:0.5rem;" hidden
                   onsubmit="return confirm('Issue this refund?');">
               <input type="hidden" name="_csrf_token" value="{{ csrf_token('refund_payment_' ~ payment.id) }}">
               <span style="font-size:0.8rem;color:var(--muted);">£</span>

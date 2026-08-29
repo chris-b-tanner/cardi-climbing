@@ -17,10 +17,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class AccountController extends AbstractController
 {
-    public function __construct(
-        private readonly string $stripePublishableKey,
-    ) {}
-
     #[Route('', name: 'app_account', methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
@@ -66,11 +62,10 @@ class AccountController extends AbstractController
         }
 
         return $this->render('account/edit.html.twig', [
-            'user'                  => $user,
-            'error'                 => $error,
-            'attendees'             => $attendeeRepository->findAllForUser($user),
-            'today'                 => new \DateTimeImmutable('today'),
-            'stripePublishableKey'  => $this->stripePublishableKey,
+            'user'      => $user,
+            'error'     => $error,
+            'attendees' => $attendeeRepository->findAllForUser($user),
+            'today'     => new \DateTimeImmutable('today'),
         ]);
     }
 
