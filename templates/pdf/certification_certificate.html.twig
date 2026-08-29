@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 12px;
+    margin: 0;
+  }
+  .header {
+    border-bottom: 3px solid #b0bd80;
+    padding-bottom: 14px;
+    margin-bottom: 24px;
+  }
+  .header .brand {
+    font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .header .brand span { color: #b0bd80; }
+  h1 {
+    font-size: 22px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: -0.01em; margin: 18px 0 4px;
+  }
+  .subtitle {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #b0bd80; margin: 0 0 20px;
+  }
+  table.meta { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+  table.meta td {
+    padding: 8px 10px; border-bottom: 1px solid #e4e2dc; font-size: 12px;
+  }
+  table.meta td.label { color: #9a9895; width: 140px; }
+  table.meta td.value { color: #141414; font-weight: 600; }
+  .section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #9a9895; margin: 24px 0 10px;
+  }
+  ul.declarations { margin: 0; padding-left: 18px; }
+  ul.declarations li { margin-bottom: 8px; line-height: 1.5; color: #333; }
+  .signature-box {
+    border: 1px solid #e4e2dc; padding: 10px; margin-top: 6px; background: #fff;
+  }
+  .signature-box img { max-width: 260px; max-height: 110px; }
+  .footer {
+    margin-top: 36px; padding-top: 14px; border-top: 1px solid #e4e2dc;
+    font-size: 10px; color: #9a9895;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">Y <span>WAL</span></div>
+  </div>
+
+  <h1>{{ record.certification.name }}</h1>
+  <div class="subtitle">Certification record</div>
+
+  <table class="meta">
+    <tr>
+      <td class="label">Member</td>
+      <td class="value">{{ ((record.user.firstName ~ ' ' ~ record.user.lastName)|trim) ?: record.user.email }}</td>
+    </tr>
+    <tr>
+      <td class="label">Email</td>
+      <td class="value">{{ record.user.email }}</td>
+    </tr>
+    <tr>
+      <td class="label">Started</td>
+      <td class="value">{{ record.startedAt|date('d M Y') }}</td>
+    </tr>
+    <tr>
+      <td class="label">Completed</td>
+      <td class="value">{{ record.completedAt|date('d M Y \\a\\t H:i') }}</td>
+    </tr>
+  </table>
+
+  {% if record.certification.description %}
+    <div class="section-title">About this certification</div>
+    <p>{{ record.certification.description }}</p>
+  {% endif %}
+
+  {% if record.agreedDeclarations|length > 0 %}
+    <div class="section-title">Declarations agreed</div>
+    <ul class="declarations">
+      {% for declaration in record.agreedDeclarations %}
+        <li>{{ declaration.text }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <div class="section-title">Signature</div>
+  <div class="signature-box">
+    <img src="{{ record.signature }}" alt="Signature">
+  </div>
+
+  <div class="footer">
+    This document is a snapshot of the certification record completed via the Y Wal members area, generated on {{ "now"|date('d M Y \\a\\t H:i') }}.
+  </div>
+</body>
+</html>

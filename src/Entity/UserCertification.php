@@ -45,6 +45,7 @@ class UserCertification
     /** Snapshot of which of the certification's declarations the member agreed to. */
     #[ORM\ManyToMany(targetEntity: Declaration::class)]
     #[ORM\JoinTable(name: 'user_certification_declaration')]
+    #[ORM\OrderBy(['sortOrder' => 'ASC'])]
     private Collection $agreedDeclarations;
 
     public function __construct()

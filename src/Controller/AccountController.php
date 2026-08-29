@@ -6,6 +6,8 @@ use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
+use App\Service\CertificationMailer;
+use App\Service\CertificationPdfGenerator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -69,15 +71,38 @@ class AccountController extends AbstractController
         ]);
     }
 
-    /** Member self-service: work through declarations and sign to complete an in-progress certification. */
-    #[Route('/certifications/{recordId}/complete', name: 'app_account_certification_complete', requirements: ['recordId' => '\d+'], methods: ['GET', 'POST'])]
-    public function completeCertification(Request $request, int $recordId, EntityManagerInterface $em): Response
+    /** A member's own certification record — full detail, including agreed declarations and signature once complete. */
+    #[Route('/certifications/{recordId}', name: 'app_account_certification_view', requirements: ['recordId' => '\d+'], methods: ['GET'])]
+    public function viewCertification(int $recordId, EntityManagerInterface $em): Response
     {
         /** @var User $user */
         $user   = $this->getUser();
-        $record = $em->getRepository(UserCertification::class)->find($recordId);
+        $record = $this->findOwnCertificationRecord($em, $user, $recordId);
 
-        if (!$record || $record->getUser() !== $user) {
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        return $this->render('account/certification_view.html.twig', [
+            'record' => $record,
+        ]);
+    }
+
+    /** Member self-service: work through declarations and sign to complete an in-progress certification. */
+    #[Route('/certifications/{recordId}/complete', name: 'app_account_certification_complete', requirements: ['recordId' => '\d+'], methods: ['GET', 'POST'])]
+    public function completeCertification(
+        Request $request,
+        int $recordId,
+        EntityManagerInterface $em,
+        CertificationPdfGenerator $pdfGenerator,
+        CertificationMailer $certificationMailer,
+    ): Response {
+        /** @var User $user */
+        $user   = $this->getUser();
+        $record = $this->findOwnCertificationRecord($em, $user, $recordId);
+
+        if (!$record) {
             $this->addFlash('error', 'Certification record not found.');
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
@@ -117,7 +142,10 @@ class AccountController extends AbstractController
                 $record->setCompletedBy($user);
                 $em->flush();
 
-                $this->addFlash('success', $record->getCertification()->getName() . ' completed — thank you!');
+                $pdf = $pdfGenerator->generate($record);
+                $certificationMailer->sendCompletion($record, $pdf);
+
+                $this->addFlash('success', $record->getCertification()->getName() . ' completed — thank you! A copy has been emailed to you.');
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
             }
         }
@@ -127,5 +155,12 @@ class AccountController extends AbstractController
             'declarations' => $declarations,
             'error'        => $error,
         ]);
+    }
+
+    private function findOwnCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification
+    {
+        $record = $em->getRepository(UserCertification::class)->find($recordId);
+
+        return ($record && $record->getUser() === $user) ? $record : null;
     }
 }

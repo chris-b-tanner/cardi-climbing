@@ -10,6 +10,7 @@ use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
+use App\Service\CertificationMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -358,6 +359,7 @@ class AdminController extends AbstractController
         int $certificationId,
         CertificationRepository $certificationRepository,
         EntityManagerInterface $em,
+        CertificationMailer $certificationMailer,
     ): Response {
         $certification = $certificationRepository->find($certificationId);
 
@@ -393,7 +395,9 @@ class AdminController extends AbstractController
             $em->persist($record);
             $em->flush();
 
-            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail()) . '.');
+            $certificationMailer->sendInvitation($record);
+
+            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail()) . ' — they\'ve been emailed a link to complete it.');
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
@@ -418,6 +422,33 @@ class AdminController extends AbstractController
             'user'   => $user,
             'record' => $record,
         ]);
+    }
+
+    /** Re-send the "complete your certification" email for a pending record. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/resend', name: 'app_admin_user_certification_resend', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function resendCertificationInvite(Request $request, User $user, int $recordId, EntityManagerInterface $em, CertificationMailer $certificationMailer): Response
+    {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('resend_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($record->isComplete()) {
+            $this->addFlash('error', 'That certification is already complete.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        $certificationMailer->sendInvitation($record);
+
+        $this->addFlash('success', 'Invitation email re-sent.');
+        return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
     }
 
     private function findCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification

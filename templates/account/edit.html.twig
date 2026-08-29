@@ -108,6 +108,10 @@
     text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
   }
   .item-card__cancel-btn:hover { color: #dc2626; }
+  .item-card__view-link {
+    font-size: 0.8rem; font-weight: 600; color: #2a9d8f; text-decoration: none;
+  }
+  .item-card__view-link:hover { text-decoration: underline; }
 </style>
 {% endblock %}
 
@@ -249,11 +253,13 @@
               Started {{ record.startedAt|date('d M Y') }}
               {% if record.isComplete %}&middot; Completed {{ record.completedAt|date('d M Y') }}{% endif %}
             </div>
-            {% if not record.isComplete %}
-              <div class="item-card__actions">
+            <div class="item-card__actions">
+              {% if not record.isComplete %}
                 <a href="{{ path('app_account_certification_complete', {recordId: record.id}) }}" class="btn btn--teal btn--sm">Complete now</a>
-              </div>
-            {% endif %}
+              {% else %}
+                <a href="{{ path('app_account_certification_view', {recordId: record.id}) }}" class="item-card__view-link">View details</a>
+              {% endif %}
+            </div>
           </div>
         {% endfor %}
       {% endif %}

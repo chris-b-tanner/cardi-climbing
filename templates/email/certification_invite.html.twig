@@ -1,0 +1,44 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}Complete your {{ record.certification.name }} certification — Y Wal{% endblock %}
+
+{% block emailBody %}
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 8px;">
+    Almost there!
+  </h1>
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 28px;">
+    Y Wal &mdash; Members area
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification has been started.
+    To finish it off, please read through the declarations and sign electronically using the link below.
+  </p>
+
+  <!-- CTA button -->
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:32px 0;">
+    <tr>
+      <td style="background-color:#1e4f41;">
+        <a href="{{ completeUrl }}"
+           style="display:inline-block;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ffffff;text-decoration:none;padding:14px 32px;border:2px solid #1e4f41;">
+          Complete {{ record.certification.name }}
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#9a9895;line-height:1.7;margin:0 0 24px;">
+    You'll need to log into your Y Wal account to complete this &mdash; if you're not already signed in, we'll ask you to first.
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;margin:0;">
+    If the button above doesn&rsquo;t work, copy and paste this link into your browser:<br>
+    <a href="{{ completeUrl }}" style="color:#1e4f41;word-break:break-all;">{{ completeUrl }}</a>
+  </p>
+{% endblock %}

@@ -47,11 +47,11 @@
 </div>
 
 {% if record.complete %}
-  {% if record.certification.declarations|length > 0 %}
+  {% if record.agreedDeclarations|length > 0 %}
     <div class="card">
       <div class="card__label" style="margin-bottom:0.6rem;">Declarations agreed</div>
       <ul style="margin:0;padding-left:1.2rem;font-size:0.875rem;line-height:1.7;">
-        {% for declaration in record.certification.declarations %}
+        {% for declaration in record.agreedDeclarations %}
           <li>{{ declaration.text }}</li>
         {% endfor %}
       </ul>
@@ -68,10 +68,14 @@
 {% if not record.complete %}
   <div class="card" style="margin-top:1.5rem;">
     <div class="card__label" style="margin-bottom:0.6rem;">Awaiting completion</div>
-    <p style="font-size:0.875rem;color:var(--muted);">
-      This induction has been started. The member needs to log into their account and complete the
-      declarations and signature themselves from the Certifications tab.
+    <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
+      This induction has been started. The member has been emailed a link to log into their account and
+      complete the declarations and signature themselves from the Certifications tab.
     </p>
+    <form method="post" action="{{ path('app_admin_user_certification_resend', {id: user.id, recordId: record.id}) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('resend_certification_' ~ record.id) }}">
+      <button type="submit" class="btn btn--ghost btn--sm">Re-send invitation email</button>
+    </form>
   </div>
 {% endif %}
 {% endblock %}

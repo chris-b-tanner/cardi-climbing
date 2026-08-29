@@ -1,0 +1,28 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}{{ record.certification.name }} completed — Y Wal{% endblock %}
+
+{% block emailBody %}
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 8px;">
+    All done!
+  </h1>
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 28px;">
+    Y Wal &mdash; Members area
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification is now complete.
+    We've attached a PDF copy of your signed record for your files.
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;line-height:1.6;margin:0;">
+    You can view your certifications any time from the
+    <a href="https://www.cardiganclimbing.org/account#certifications" style="color:#1e4f41;text-decoration:none;">certifications tab in your account</a>.
+  </p>
+{% endblock %}
