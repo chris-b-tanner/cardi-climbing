@@ -10,6 +10,9 @@ services:
             string $mailerFrom: '%env(MAILER_FROM)%'
             string $mailerFromName: '%env(MAILER_FROM_NAME)%'
             string $webhookSecret: '%env(WEBHOOK_SECRET)%'
+            string $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+            string $stripePublishableKey: '%env(STRIPE_PUBLISHABLE_KEY)%'
+            string $stripeTerminalReaderId: '%env(STRIPE_TERMINAL_READER_ID)%'
 
     App\:
         resource: '../src/'
@@ -17,3 +20,6 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+
+    Stripe\StripeClient:
+        arguments: ['%env(STRIPE_SECRET_KEY)%']

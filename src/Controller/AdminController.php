@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Certification;
 use App\Entity\Note;
+use App\Entity\Payment;
+use App\Entity\Refund;
 use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
@@ -13,6 +15,7 @@ use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
 use Doctrine\ORM\EntityManagerInterface;
+use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -544,5 +547,50 @@ class AdminController extends AbstractController
         $record = $em->getRepository(UserCertification::class)->find($recordId);
 
         return ($record && $record->getUser() === $user) ? $record : null;
+    }
+
+    /** Issue a (possibly partial) refund against a succeeded payment. Admin only. */
+    #[Route('/payments/{id}/refund', name: 'app_admin_payment_refund', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function refundPayment(Request $request, Payment $payment, EntityManagerInterface $em, StripeClient $stripe): Response
+    {
+        if (!$this->isCsrfTokenValid('refund_payment_' . $payment->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $redirect = $this->redirectToRoute('app_admin_user_show', ['id' => $payment->getUser()->getId()], Response::HTTP_SEE_OTHER);
+
+        $remaining = (float) $payment->getRemainingRefundable();
+        $amount    = (float) $request->request->get('amount', '');
+
+        if ($amount <= 0 || $amount > $remaining) {
+            $this->addFlash('error', sprintf('Enter a refund amount between £0.01 and £%.2f.', $remaining));
+            return $redirect;
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $stripeRefund = $stripe->refunds->create([
+            'payment_intent' => $payment->getStripePaymentIntentId(),
+            'amount'         => (int) round($amount * 100),
+        ]);
+
+        $refund = new Refund();
+        $refund->setPayment($payment);
+        $refund->setAmount(number_format($amount, 2, '.', ''));
+        $refund->setReason(trim($request->request->get('reason', '')) ?: null);
+        $refund->setCreatedBy($admin);
+        $refund->setStripeRefundId($stripeRefund->id);
+        if ($stripeRefund->status === 'succeeded') {
+            $refund->setSucceededAt(new \DateTimeImmutable());
+        }
+
+        $em->persist($refund);
+        $em->flush();
+
+        $this->addFlash('success', 'Refund of £' . number_format($amount, 2) . ' issued.');
+        return $redirect;
     }
 }

@@ -82,6 +82,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $notes;
 
+    /** This member's payments — donations and (in future) booking payments. */
+    #[ORM\OneToMany(targetEntity: Payment::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    private Collection $payments;
+
     public function __construct()
     {
         $this->createdAt      = new \DateTimeImmutable();
@@ -89,6 +94,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->tags           = new ArrayCollection();
         $this->certifications = new ArrayCollection();
         $this->notes          = new ArrayCollection();
+        $this->payments       = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -256,4 +262,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     public function getNotes(): Collection { return $this->notes; }
+
+    /** This member's payments, most recent first. */
+    public function getPayments(): Collection { return $this->payments; }
 }
