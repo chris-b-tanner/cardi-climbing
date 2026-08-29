@@ -18,8 +18,13 @@ class UserCertificationRepository extends ServiceEntityRepository
         parent::__construct($registry, UserCertification::class);
     }
 
-    /** @return UserCertification[] */
-    public function search(string $query = ''): array
+    /**
+     * @param string $status One of UserCertification::STATUS_* or '' for all statuses. Status isn't
+     *                       a stored column (see UserCertification::getStatus()) so it's translated
+     *                       into the equivalent timestamp conditions here.
+     * @return UserCertification[]
+     */
+    public function search(string $query = '', string $status = ''): array
     {
         $qb = $this->createQueryBuilder('uc')
             ->innerJoin('uc.user', 'u')->addSelect('u')
@@ -30,6 +35,14 @@ class UserCertificationRepository extends ServiceEntityRepository
             $qb->andWhere('u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.email LIKE :q OR c.name LIKE :q')
                ->setParameter('q', '%' . $query . '%');
         }
+
+        match ($status) {
+            UserCertification::STATUS_IN_PROGRESS => $qb->andWhere('uc.cancelledAt IS NULL AND uc.approvedAt IS NULL AND uc.completedAt IS NULL'),
+            UserCertification::STATUS_PENDING_APPROVAL => $qb->andWhere('uc.cancelledAt IS NULL AND uc.approvedAt IS NULL AND uc.completedAt IS NOT NULL'),
+            UserCertification::STATUS_COMPLETED => $qb->andWhere('uc.cancelledAt IS NULL AND uc.approvedAt IS NOT NULL'),
+            UserCertification::STATUS_CANCELLED => $qb->andWhere('uc.cancelledAt IS NOT NULL'),
+            default => null,
+        };
 
         return $qb->getQuery()->getResult();
     }

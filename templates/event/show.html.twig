@@ -6,7 +6,10 @@
 <section class="section page-hero">
   <div class="wrap">
     <a href="{{ path('app_events') }}" class="event-show__back">&larr; {{ 'events_back_to_calendar'|trans }}</a>
-    <h1 class="page-hero__h1">{{ event.title }}</h1>
+    <h1 class="page-hero__h1">
+      {{ event.title }}
+      {% if not event.isPublished %}<span class="agenda-event__status">Draft</span>{% endif %}
+    </h1>
   </div>
 </section>
 
@@ -143,6 +146,17 @@
           <form method="post" action="{{ path('app_event_book', {id: event.id}) }}" class="agenda-event__form">
             <input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
+            {% if eligibleStaffingRequirements is not empty %}
+              <div class="form-group">
+                <label for="staffingRequirementId">{{ 'events_volunteer_label'|trans }}</label>
+                <select id="staffingRequirementId" name="staffingRequirementId" class="form-control">
+                  <option value="">{{ 'events_volunteer_none'|trans }}</option>
+                  {% for requirement in eligibleStaffingRequirements %}
+                    <option value="{{ requirement.id }}">{{ requirement.certification.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
             <button type="submit" class="btn btn--teal">{{ 'events_book'|trans }}</button>
           </form>
         </div>

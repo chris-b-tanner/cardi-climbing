@@ -29,7 +29,8 @@
   }
   .field input[type="text"],
   .field input[type="email"],
-  .field input[type="tel"] {
+  .field input[type="tel"],
+  .field input[type="date"] {
     width: 100%; padding: 0.6rem 0.75rem;
     border: 1px solid #e5e7eb; border-radius: 6px;
     font-size: 0.9375rem; font-family: inherit; color: #1a1a1a;
@@ -166,11 +167,30 @@
             <input type="tel" id="phone" name="phone"
                    value="{{ user.phone }}" autocomplete="tel">
           </div>
+          <div class="field">
+            <label for="dateOfBirth">Date of birth</label>
+            <input type="date" id="dateOfBirth" name="dateOfBirth"
+                   value="{{ user.dateOfBirth ? user.dateOfBirth|date('Y-m-d') : '' }}" autocomplete="bday">
+          </div>
           <div class="field" style="margin-bottom:0;">
             <label class="optin-label">
               <input type="checkbox" name="optIn" value="1"{% if user.optIn %} checked{% endif %}>
               Keep me updated about Y Wal news
             </label>
+          </div>
+        </div>
+
+        <div class="account-card">
+          <div class="account-card__title">Emergency contact</div>
+          <div class="field">
+            <label for="emergencyContactName">Contact name</label>
+            <input type="text" id="emergencyContactName" name="emergencyContactName"
+                   value="{{ user.emergencyContactName }}" autocomplete="off">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="emergencyContactPhone">Contact phone number</label>
+            <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone"
+                   value="{{ user.emergencyContactPhone }}" autocomplete="off">
           </div>
         </div>
 
@@ -225,6 +245,9 @@
             <div class="item-card__meta">
               {{ effectiveDate|date('D j M Y') }} &middot; {{ event.timeFrom }}&ndash;{{ event.timeTo }}<br>
               {{ event.location }}
+              {% if attendee.isStaffing %}
+                <br>Staffing ({{ attendee.staffingRequirement.certification.name }}): {{ attendee.staffingStatusLabel }}
+              {% endif %}
             </div>
             {% if attendee.status != 'cancelled' and effectiveDate >= today %}
               <form method="post" action="{{ path('app_event_cancel', {id: event.id}) }}" class="item-card__actions">

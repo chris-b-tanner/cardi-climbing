@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Attendee;
 use App\Entity\Event;
+use App\Entity\EventStaffingRequirement;
 use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -37,7 +38,7 @@ class EventController extends AbstractController
         $gridStart = $monthStart->modify('monday this week');
         $gridEnd   = $monthEnd->modify('sunday this week');
 
-        $events = $eventRepository->findPublishedOverlapping($gridStart, $gridEnd);
+        $events = $eventRepository->findPublishedOverlapping($gridStart, $gridEnd, $this->isGranted('ROLE_TEAM'));
 
         /** @var User|null $user */
         $user  = $this->getUser();
@@ -65,6 +66,12 @@ class EventController extends AbstractController
         foreach ($period as $day) {
             $dayOccurrences = [];
             foreach ($events as $event) {
+                // Drafts are only shown to team/admin as a preview of what's coming — a past draft
+                // occurrence never happened for real, so it's just noise on the calendar.
+                if (!$event->isPublished() && $day < $today) {
+                    continue;
+                }
+
                 if ($event->isValidForDate($day)) {
                     $stats = $occurrenceStats[$this->occurrenceKey($event, $day)] ?? ['count' => 0, 'bookedByUser' => false];
                     $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $today, $stats);
@@ -95,7 +102,7 @@ class EventController extends AbstractController
     #[Route('/events/{id}', name: 'app_event_show', requirements: ['id' => '\d+'])]
     public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
     {
-        if (!$event->isPublished()) {
+        if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
             throw $this->createNotFoundException('Event not found.');
         }
 
@@ -117,6 +124,15 @@ class EventController extends AbstractController
 
         $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats);
         $view['accountConflict'] = (bool) $request->query->get('accountConflict');
+
+        // Which of this event's staffing requirements the member is qualified to volunteer for —
+        // shown as a "help staff this" option alongside the normal booking form.
+        $view['eligibleStaffingRequirements'] = $user
+            ? array_values(array_filter(
+                $event->getStaffingRequirements()->toArray(),
+                static fn (EventStaffingRequirement $r) => $user->hasCertification($r->getCertification()),
+            ))
+            : [];
 
         return $this->render('event/show.html.twig', $view);
     }
@@ -141,6 +157,7 @@ class EventController extends AbstractController
         [$occurrenceDate, $redirectParams, $error] = $this->validateBookableOccurrence(
             $event,
             $request->request->get('occurrenceDate', ''),
+            $this->isGranted('ROLE_TEAM'),
         );
 
         if ($error) {
@@ -148,7 +165,9 @@ class EventController extends AbstractController
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em);
+        $staffingRequirement = $this->resolveStaffingRequirement($event, $user, $request->request->get('staffingRequirementId', ''), $em);
+
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $staffingRequirement);
 
         if (is_string($result)) {
             $this->addFlash('error', $result);
@@ -310,7 +329,7 @@ class EventController extends AbstractController
      *
      * @return array{0: ?\DateTimeImmutable, 1: array, 2: ?string}
      */
-    private function validateBookableOccurrence(Event $event, string $rawDate): array
+    private function validateBookableOccurrence(Event $event, string $rawDate, bool $allowDraft = false): array
     {
         $occurrenceDate = $this->parseDate($rawDate);
         $redirectParams = ['id' => $event->getId()];
@@ -318,7 +337,7 @@ class EventController extends AbstractController
             $redirectParams['date'] = $occurrenceDate->format('Y-m-d');
         }
 
-        if (!$event->isPublished() || $occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
+        if ((!$event->isPublished() && !$allowDraft) || $occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
             return [null, $redirectParams, 'That event is no longer available.'];
         }
 
@@ -329,6 +348,22 @@ class EventController extends AbstractController
         return [$occurrenceDate, $redirectParams, null];
     }
 
+    /** The submitted staffing requirement, if any — only honoured when it belongs to this event and the member holds its certification. */
+    private function resolveStaffingRequirement(Event $event, User $user, string $rawId, EntityManagerInterface $em): ?EventStaffingRequirement
+    {
+        if ($rawId === '') {
+            return null;
+        }
+
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $rawId);
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$user->hasCertification($requirement->getCertification())) {
+            return null;
+        }
+
+        return $requirement;
+    }
+
     /** Validates and creates the booking, returning the new Attendee or an error message. */
     private function tryCreateBooking(
         Event $event,
@@ -336,6 +371,7 @@ class EventController extends AbstractController
         \DateTimeImmutable $occurrenceDate,
         AttendeeRepository $attendeeRepository,
         EntityManagerInterface $em,
+        ?EventStaffingRequirement $staffingRequirement = null,
     ): Attendee|string {
         if (!$event->allowsUser($user)) {
             return 'You do not hold the certification required to book this event.';
@@ -359,6 +395,11 @@ class EventController extends AbstractController
         $attendee->setOccurrenceDate($storedOccurrenceDate);
         $attendee->setStatus(Attendee::STATUS_CONFIRMED);
 
+        if ($staffingRequirement) {
+            $attendee->setStaffingRequirement($staffingRequirement);
+            $attendee->setStaffingStatus(Attendee::STAFFING_PENDING);
+        }
+
         $em->persist($attendee);
         $em->flush();
 
@@ -381,6 +422,11 @@ class EventController extends AbstractController
         $isBooked     = $user ? $stats['bookedByUser'] : false;
         $isRestricted = $user ? !$event->allowsUser($user) : false;
 
+        // A draft is only ever reachable here as a published event, or as a team/admin preview
+        // (show()/index() already gate that) — so team/admin can book onto it like any other
+        // event, e.g. to put themselves on duty and build out the rota before publishing.
+        $canBookUnpublished = !$event->isPublished() && $this->isGranted('ROLE_TEAM');
+
         return [
             'event'        => $event,
             'date'         => $date,
@@ -389,7 +435,8 @@ class EventController extends AbstractController
             'spotsLeft'    => $spotsLeft,
             'isBooked'     => $isBooked,
             'isRestricted' => $isRestricted,
-            'canBook'      => $user !== null && !$isPast && !$isBooked && !$isFull && !$isRestricted,
+            'isDraft'      => !$event->isPublished(),
+            'canBook'      => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted,
         ];
     }
 

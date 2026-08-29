@@ -60,6 +60,12 @@
       <div class="alert--error">{{ error }}</div>
     {% endif %}
 
+    {% if missingEmergencyContact %}
+      <div class="account-card">
+        <p style="margin-bottom:1rem;">You'll need to add this before you can complete the declarations below.</p>
+        <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Add emergency contact details</a>
+      </div>
+    {% else %}
     <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
       <input type="hidden" name="signature" id="signature-input">
@@ -98,6 +104,7 @@
         <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" class="btn btn--outline">Cancel</a>
       </div>
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -107,6 +114,7 @@
 <script>
   (function () {
     var canvas = document.getElementById('signature-pad');
+    if (!canvas) return;
     var ctx = canvas.getContext('2d');
     var clearBtn = document.getElementById('signature-clear');
     var signatureInput = document.getElementById('signature-input');

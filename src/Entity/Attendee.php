@@ -14,6 +14,10 @@ class Attendee
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const STAFFING_PENDING  = 'pending';
+    public const STAFFING_APPROVED = 'approved';
+    public const STAFFING_DECLINED = 'declined';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -44,6 +48,15 @@ class Attendee
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $addedBy = null;
+
+    /** Set when this booking also serves as a rota slot — which staffing requirement it's fulfilling. Null = a plain booking. */
+    #[ORM\ManyToOne(targetEntity: EventStaffingRequirement::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?EventStaffingRequirement $staffingRequirement = null;
+
+    /** pending (self-signed-up, awaiting review) / approved (on duty) / declined. Null when not staffing. */
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $staffingStatus = null;
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
@@ -149,5 +162,53 @@ class Attendee
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getStaffingRequirement(): ?EventStaffingRequirement
+    {
+        return $this->staffingRequirement;
+    }
+
+    public function setStaffingRequirement(?EventStaffingRequirement $staffingRequirement): static
+    {
+        $this->staffingRequirement = $staffingRequirement;
+        return $this;
+    }
+
+    public function getStaffingStatus(): ?string
+    {
+        return $this->staffingStatus;
+    }
+
+    public function setStaffingStatus(?string $staffingStatus): static
+    {
+        $this->staffingStatus = $staffingStatus;
+        return $this;
+    }
+
+    /** Whether this booking also marks the member as staffing (in any status) rather than just attending. */
+    public function isStaffing(): bool
+    {
+        return $this->staffingRequirement !== null;
+    }
+
+    public function isStaffingApproved(): bool
+    {
+        return $this->staffingStatus === self::STAFFING_APPROVED;
+    }
+
+    public function isStaffingPending(): bool
+    {
+        return $this->staffingStatus === self::STAFFING_PENDING;
+    }
+
+    public function getStaffingStatusLabel(): ?string
+    {
+        return match ($this->staffingStatus) {
+            self::STAFFING_PENDING => 'Pending review',
+            self::STAFFING_APPROVED => 'On duty',
+            self::STAFFING_DECLINED => 'Declined',
+            default => null,
+        };
     }
 }

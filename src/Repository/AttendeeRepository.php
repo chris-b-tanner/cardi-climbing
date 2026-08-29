@@ -78,6 +78,52 @@ class AttendeeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** Non-cancelled staffing bookings (any staffing status) for one occurrence, for the admin rota view. */
+    public function findStaffingForOccurrence(Event $event, ?\DateTimeImmutable $occurrenceDate): array
+    {
+        $qb = $this->createQueryBuilder('a')
+            ->innerJoin('a.user', 'u')->addSelect('u')
+            ->innerJoin('a.staffingRequirement', 'r')->addSelect('r')
+            ->innerJoin('r.certification', 'c')->addSelect('c')
+            ->where('a.event = :event')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('event', $event)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->orderBy('c.name', 'ASC')
+            ->addOrderBy('a.createdAt', 'ASC');
+
+        $this->whereOccurrence($qb, $occurrenceDate);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Non-cancelled staffing bookings for the given events whose occurrence falls within the
+     * given range, for batch-computing rota coverage across a calendar grid in one query.
+     *
+     * @param int[] $eventIds
+     * @return Attendee[]
+     */
+    public function findStaffingForEventsInRange(array $eventIds, \DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
+    {
+        if (!$eventIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
+            ->innerJoin('a.staffingRequirement', 'r')->addSelect('r')
+            ->where('a.event IN (:eventIds)')
+            ->andWhere('a.status != :cancelled')
+            ->andWhere('(a.occurrenceDate BETWEEN :start AND :end) OR (a.occurrenceDate IS NULL AND e.date BETWEEN :start AND :end)')
+            ->setParameter('eventIds', $eventIds)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->setParameter('start', $rangeStart)
+            ->setParameter('end', $rangeEnd)
+            ->getQuery()
+            ->getResult();
+    }
+
     /** Every booking (any status) for the given event, earliest occurrence first. */
     public function findForEvent(Event $event): array
     {

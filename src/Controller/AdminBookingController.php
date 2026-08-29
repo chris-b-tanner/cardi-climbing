@@ -193,6 +193,63 @@ class AdminBookingController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/staffing/approve', name: 'app_admin_booking_staffing_approve', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function approveStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    {
+        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_APPROVED, 'Member approved as on duty.');
+    }
+
+    #[Route('/{id}/staffing/decline', name: 'app_admin_booking_staffing_decline', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function declineStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    {
+        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_DECLINED, 'Staffing request declined.');
+    }
+
+    /** Clears the staffing designation entirely — the booking itself is left untouched. */
+    #[Route('/{id}/staffing/remove', name: 'app_admin_booking_staffing_remove', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function removeStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_booking_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $attendee->setStaffingRequirement(null);
+        $attendee->setStaffingStatus(null);
+        $em->flush();
+
+        $this->addFlash('success', 'Staffing designation removed.');
+        return $this->redirectToEventShow($attendee);
+    }
+
+    private function setStaffingStatus(Request $request, Attendee $attendee, EntityManagerInterface $em, string $status, string $successMessage): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_booking_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if (!$attendee->isStaffing()) {
+            $this->addFlash('error', 'This booking is not a staffing request.');
+            return $this->redirectToEventShow($attendee);
+        }
+
+        $attendee->setStaffingStatus($status);
+        $em->flush();
+
+        $this->addFlash('success', $successMessage);
+        return $this->redirectToEventShow($attendee);
+    }
+
+    private function redirectToEventShow(Attendee $attendee): Response
+    {
+        $showParams = ['id' => $attendee->getEvent()->getId()];
+        if ($attendee->getOccurrenceDate()) {
+            $showParams['date'] = $attendee->getOccurrenceDate()->format('Y-m-d');
+        }
+        return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
     #[Route('/{id}/delete', name: 'app_admin_booking_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
     {

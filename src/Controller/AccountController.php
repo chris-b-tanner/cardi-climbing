@@ -54,6 +54,12 @@ class AccountController extends AbstractController
                 $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
                 $user->setOptIn($request->request->has('optIn'));
 
+                $dob = trim($request->request->get('dateOfBirth', ''));
+                $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
+
+                $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
+                $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
+
                 $em->flush();
 
                 $this->addFlash('success', 'Your details have been updated.');
@@ -107,6 +113,11 @@ class AccountController extends AbstractController
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
 
+        $missingEmergencyContact = !$user->getEmergencyContactName() || !$user->getEmergencyContactPhone();
+        if ($missingEmergencyContact) {
+            $this->addFlash('error', 'Please add an emergency contact name and phone number to your account before completing this certification.');
+        }
+
         $declarations = $record->getCertification()->getDeclarations();
         $error = null;
 
@@ -114,6 +125,10 @@ class AccountController extends AbstractController
             if (!$this->isCsrfTokenValid('complete_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
                 $this->addFlash('error', 'Access denied.');
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+            }
+
+            if ($missingEmergencyContact) {
+                return $this->redirectToRoute('app_account_certification_complete', ['recordId' => $record->getId()]);
             }
 
             $agreedIds = array_map('intval', $request->request->all('declarations'));
@@ -148,9 +163,10 @@ class AccountController extends AbstractController
         }
 
         return $this->render('account/certification_complete.html.twig', [
-            'record'       => $record,
-            'declarations' => $declarations,
-            'error'        => $error,
+            'record'                  => $record,
+            'declarations'            => $declarations,
+            'error'                   => $error,
+            'missingEmergencyContact' => $missingEmergencyContact,
         ]);
     }
 

@@ -82,6 +82,10 @@ class Event
     #[ORM\OneToMany(targetEntity: Attendee::class, mappedBy: 'event', cascade: ['remove'], orphanRemoval: true)]
     private Collection $attendees;
 
+    /** Minimum on-duty staffing needed per certification — e.g. "at least 1 Supervisor". */
+    #[ORM\OneToMany(targetEntity: EventStaffingRequirement::class, mappedBy: 'event', cascade: ['remove'], orphanRemoval: true)]
+    private Collection $staffingRequirements;
+
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $author = null;
@@ -91,9 +95,10 @@ class Event
 
     public function __construct()
     {
-        $this->createdAt    = new \DateTimeImmutable();
-        $this->restrictions = new ArrayCollection();
-        $this->attendees    = new ArrayCollection();
+        $this->createdAt            = new \DateTimeImmutable();
+        $this->restrictions         = new ArrayCollection();
+        $this->attendees            = new ArrayCollection();
+        $this->staffingRequirements = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -335,6 +340,21 @@ class Event
     public function getAttendees(): Collection
     {
         return $this->attendees;
+    }
+
+    public function getStaffingRequirements(): Collection
+    {
+        return $this->staffingRequirements;
+    }
+
+    public function getStaffingRequirementFor(Certification $certification): ?EventStaffingRequirement
+    {
+        foreach ($this->staffingRequirements as $requirement) {
+            if ($requirement->getCertification() === $certification) {
+                return $requirement;
+            }
+        }
+        return null;
     }
 
     public function getAuthor(): ?User

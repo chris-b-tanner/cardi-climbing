@@ -1,0 +1,66 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Staffing rota{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Staffing rota</h1>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+    <a href="{{ path('app_admin_rota', {year: prevYear, month: prevMonth}) }}" class="btn btn--ghost btn--sm">&lsaquo; Previous</a>
+    <strong>{{ monthStart|date('F Y') }}</strong>
+    <a href="{{ path('app_admin_rota', {year: nextYear, month: nextMonth}) }}" class="btn btn--ghost btn--sm">Next &rsaquo;</a>
+  </div>
+</div>
+
+{% set anyOccurrences = false %}
+{% for dateKey, dayOccurrences in occurrencesByDay %}
+  {% if dayOccurrences is not empty %}{% set anyOccurrences = true %}{% endif %}
+{% endfor %}
+
+{% if not anyOccurrences %}
+  <p class="tag-badge--none">No events with staffing requirements this month.</p>
+{% else %}
+  {% for dateKey, dayOccurrences in occurrencesByDay %}
+    {% if dayOccurrences is not empty %}
+      <div class="card">
+        <div class="card__label" style="margin-bottom:0.75rem;">
+          {{ dateKey|date('D j M Y') }}{{ dateKey == today|date('Y-m-d') ? ' (today)' : '' }}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          {% for occ in dayOccurrences %}
+            {% set eventShowUrl = path('app_admin_event_show', occ.event.isRecurring ? {id: occ.event.id, date: occ.date|date('Y-m-d')} : {id: occ.event.id}) %}
+            {% set borderColor = occ.shortfalls is not empty ? 'var(--red)' : (occ.pendingCount > 0 ? '#eab308' : 'var(--green)') %}
+            <div style="border-left:3px solid {{ borderColor }};padding:0.4rem 0.75rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+                <span style="display:flex;align-items:center;gap:0.5rem;">
+                  <a href="{{ eventShowUrl }}" class="admin-table__link" style="font-size:0.9375rem;">
+                    {{ occ.event.title }}
+                  </a>
+                  {% if not occ.event.isPublished %}<span class="status-pill">Draft</span>{% endif %}
+                </span>
+                <span style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                  {% if occ.pendingCount > 0 %}
+                    <a href="{{ eventShowUrl }}" class="status-pill status-pill--pending" style="text-decoration:none;">
+                      {{ occ.pendingCount }} pending review
+                    </a>
+                  {% endif %}
+                  {% for c in occ.coverage %}
+                    <span class="status-pill{{ c.have < c.requirement.minCount ? ' status-pill--cancelled' : ' status-pill--published' }}">
+                      {{ c.have }}/{{ c.requirement.minCount }} {{ c.requirement.certification.name }}
+                    </span>
+                  {% endfor %}
+                </span>
+              </div>
+              <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
+                {{ occ.event.timeFrom }}&ndash;{{ occ.event.timeTo }} &middot; {{ occ.event.location }}
+              </p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% endblock %}

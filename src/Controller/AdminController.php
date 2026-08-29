@@ -15,6 +15,7 @@ use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
 use Doctrine\ORM\EntityManagerInterface;
+use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -145,6 +146,12 @@ class AdminController extends AbstractController
             $user->setMemo(trim($request->request->get('memo', '')) ?: null);
             $user->setOptIn($request->request->has('optIn'));
             $user->setPhone(trim($request->request->get('phone', '')) ?: null);
+
+            $dob = trim($request->request->get('dateOfBirth', ''));
+            $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
+
+            $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
+            $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
             $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
             $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
             $user->setTown(trim($request->request->get('town', '')) ?: null);
@@ -572,10 +579,17 @@ class AdminController extends AbstractController
         /** @var User $admin */
         $admin = $this->getUser();
 
-        $stripeRefund = $stripe->refunds->create([
-            'payment_intent' => $payment->getStripePaymentIntentId(),
-            'amount'         => (int) round($amount * 100),
-        ]);
+        try {
+            $stripeRefund = $stripe->refunds->create([
+                'payment_intent' => $payment->getStripePaymentIntentId(),
+                'amount'         => (int) round($amount * 100),
+            ]);
+        } catch (ApiErrorException $e) {
+            // Guards against a race between two concurrent refund requests both passing the
+            // check above before either is saved — Stripe's own ledger is the final backstop.
+            $this->addFlash('error', 'Stripe rejected this refund: ' . $e->getMessage());
+            return $redirect;
+        }
 
         $refund = new Refund();
         $refund->setPayment($payment);

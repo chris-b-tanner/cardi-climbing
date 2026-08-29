@@ -86,6 +86,10 @@
       <div class="card__label">Joined</div>
       <div class="card__value">{{ user.createdAt|date('j M Y') }}</div>
     </div>
+    <div>
+      <div class="card__label">Date of birth</div>
+      <div class="card__value">{{ user.dateOfBirth ? user.dateOfBirth|date('j M Y') : '—' }}</div>
+    </div>
   </div>
 </div>
 
@@ -97,6 +101,16 @@
     {% if user.addressLine2 %}<span>{{ user.addressLine2 }}</span><br>{% endif %}
     {% if user.town %}<span>{{ user.town }}</span><br>{% endif %}
     {% if user.postcode %}<span>{{ user.postcode }}</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if user.emergencyContactName or user.emergencyContactPhone %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Emergency contact</div>
+  <div class="card__value" style="line-height:1.8;">
+    {% if user.emergencyContactName %}<span>{{ user.emergencyContactName }}</span><br>{% endif %}
+    {% if user.emergencyContactPhone %}<a href="tel:{{ user.emergencyContactPhone }}" style="color:var(--teal);">{{ user.emergencyContactPhone }}</a>{% endif %}
   </div>
 </div>
 {% endif %}

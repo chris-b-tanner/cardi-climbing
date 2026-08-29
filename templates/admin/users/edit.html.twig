@@ -45,6 +45,11 @@
       <input type="tel" id="phone" name="phone" class="form-control"
              value="{{ user.phone }}" autocomplete="tel">
     </div>
+    <div class="form-group">
+      <label for="dateOfBirth">Date of birth</label>
+      <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control"
+             value="{{ user.dateOfBirth ? user.dateOfBirth|date('Y-m-d') : '' }}" autocomplete="bday">
+    </div>
     <div class="form-group"{% if not is_granted('ROLE_ADMIN') %} style="margin-bottom:0;"{% endif %}>
       <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
         <input type="checkbox" name="optIn" value="1"{% if user.optIn %} checked{% endif %}
@@ -91,6 +96,22 @@
         <label for="postcode">Postcode</label>
         <input type="text" id="postcode" name="postcode" class="form-control"
                value="{{ user.postcode }}" autocomplete="postal-code">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.75rem;">Emergency contact</div>
+    <div class="detail-grid">
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="emergencyContactName">Name</label>
+        <input type="text" id="emergencyContactName" name="emergencyContactName" class="form-control"
+               value="{{ user.emergencyContactName }}" autocomplete="off">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="emergencyContactPhone">Phone</label>
+        <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone" class="form-control"
+               value="{{ user.emergencyContactPhone }}" autocomplete="off">
       </div>
     </div>
   </div>

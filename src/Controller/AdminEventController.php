@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\Attendee;
 use App\Entity\Event;
+use App\Entity\EventStaffingRequirement;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
@@ -51,6 +53,7 @@ class AdminEventController extends AbstractController
 
             if (!$error) {
                 $em->persist($event);
+                $this->applyStaffingRequirements($request, $event, $allCertifications, $em);
                 $em->flush();
 
                 $this->addFlash('success', 'Event created.');
@@ -95,13 +98,154 @@ class AdminEventController extends AbstractController
             $attendees = $attendeeRepository->findForEvent($event);
         }
 
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+        $staffing             = $attendeeRepository->findStaffingForOccurrence($event, $storedOccurrenceDate);
+
         return $this->render('admin/events/show.html.twig', [
             'event'          => $event,
             'attendees'      => $attendees,
             'occurrenceDate' => $occurrenceDate,
             'prevDate'       => $prevDate,
             'nextDate'       => $nextDate,
+            'staffing'       => $staffing,
         ]);
+    }
+
+    /** Admin picks an already-subscribed, cert-holding attendee to put on duty for a requirement — approved immediately. */
+    #[Route('/{id}/staffing/assign', name: 'app_admin_event_staffing_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function assignStaffing(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        AttendeeRepository $attendeeRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $showParams = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->request->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->request->get('requirementId'));
+        $attendee    = $attendeeRepository->find((int) $request->request->get('attendeeId'));
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$attendee || $attendee->getEvent() !== $event) {
+            $this->addFlash('error', 'Could not find that member on this occurrence.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        if (!$attendee->getUser()->hasCertification($requirement->getCertification())) {
+            $this->addFlash('error', 'That member does not hold the required certification.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        $attendee->setStaffingRequirement($requirement);
+        $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+        $em->flush();
+
+        $this->addFlash('success', 'Member put on duty.');
+        return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    /**
+     * A month-grid calendar of every occurrence with a staffing requirement, flagging those that
+     * are short of their minimum on-duty coverage. Reuses the same in-memory occurrence-expansion
+     * and batch-attendee-loading approach as the public events calendar.
+     */
+    #[Route('/rota/calendar', name: 'app_admin_rota')]
+    public function rota(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
+    {
+        $year  = (int) $request->query->get('year', (int) date('Y'));
+        $month = (int) $request->query->get('month', (int) date('n'));
+
+        $year  += intdiv($month - 1, 12);
+        $month = (($month - 1) % 12 + 12) % 12 + 1;
+
+        $monthStart = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+        $monthEnd   = $monthStart->modify('last day of this month');
+
+        $gridStart = $monthStart->modify('monday this week');
+        $gridEnd   = $monthEnd->modify('sunday this week');
+
+        $today = new \DateTimeImmutable('today');
+
+        $events = $eventRepository->findWithStaffingRequirementsOverlapping($gridStart, $gridEnd);
+
+        $eventIds = array_map(static fn (Event $e) => $e->getId(), $events);
+        $staffing = $attendeeRepository->findStaffingForEventsInRange($eventIds, $gridStart, $gridEnd);
+
+        $coverageByOccurrence = [];
+        $pendingCountByOccurrence = [];
+        foreach ($staffing as $attendee) {
+            $key = $this->occurrenceKey($attendee->getEvent(), $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate());
+
+            if ($attendee->isStaffingApproved()) {
+                $requirementId = $attendee->getStaffingRequirement()->getId();
+                $coverageByOccurrence[$key][$requirementId] ??= 0;
+                $coverageByOccurrence[$key][$requirementId]++;
+            } elseif ($attendee->isStaffingPending()) {
+                $pendingCountByOccurrence[$key] ??= 0;
+                $pendingCountByOccurrence[$key]++;
+            }
+        }
+
+        $occurrencesByDay = [];
+        $period = new \DatePeriod($gridStart, new \DateInterval('P1D'), $gridEnd->modify('+1 day'));
+        foreach ($period as $day) {
+            $dayOccurrences = [];
+
+            if ($day < $today) {
+                $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
+                continue;
+            }
+
+            foreach ($events as $event) {
+                if (!$event->isValidForDate($day)) {
+                    continue;
+                }
+
+                $key = $this->occurrenceKey($event, $day);
+                $coverage   = [];
+                $shortfalls = [];
+                foreach ($event->getStaffingRequirements() as $requirement) {
+                    $have = $coverageByOccurrence[$key][$requirement->getId()] ?? 0;
+                    $coverage[] = ['requirement' => $requirement, 'have' => $have];
+                    if ($have < $requirement->getMinCount()) {
+                        $shortfalls[] = $requirement;
+                    }
+                }
+
+                $dayOccurrences[] = [
+                    'event'        => $event,
+                    'date'         => $day,
+                    'coverage'     => $coverage,
+                    'shortfalls'   => $shortfalls,
+                    'pendingCount' => $pendingCountByOccurrence[$key] ?? 0,
+                ];
+            }
+            $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
+        }
+
+        return $this->render('admin/rota/index.html.twig', [
+            'monthStart'       => $monthStart,
+            'gridStart'        => $gridStart,
+            'gridEnd'          => $gridEnd,
+            'occurrencesByDay' => $occurrencesByDay,
+            'prevYear'         => $monthStart->modify('-1 month')->format('Y'),
+            'prevMonth'        => $monthStart->modify('-1 month')->format('n'),
+            'nextYear'         => $monthStart->modify('+1 month')->format('Y'),
+            'nextMonth'        => $monthStart->modify('+1 month')->format('n'),
+            'today'            => $today,
+        ]);
+    }
+
+    private function occurrenceKey(Event $event, \DateTimeImmutable $date): string
+    {
+        return $event->getId() . ':' . $date->format('Y-m-d');
     }
 
     #[Route('/{id}/edit', name: 'app_admin_event_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
@@ -124,6 +268,7 @@ class AdminEventController extends AbstractController
             $error = $this->applyRequestToEvent($request, $event, $allCertifications);
 
             if (!$error) {
+                $this->applyStaffingRequirements($request, $event, $allCertifications, $em);
                 $em->flush();
 
                 $this->addFlash('success', 'Event updated.');
@@ -226,6 +371,36 @@ class AdminEventController extends AbstractController
         }
 
         return null;
+    }
+
+    /**
+     * Syncs the event's staffing requirements from submitted "staffing_<certificationId>" min-count
+     * fields — 0 or blank removes the requirement, a positive number creates or updates it.
+     *
+     * @param \App\Entity\Certification[] $allCertifications
+     */
+    private function applyStaffingRequirements(Request $request, Event $event, array $allCertifications, EntityManagerInterface $em): void
+    {
+        foreach ($allCertifications as $certification) {
+            $minCountRaw = trim($request->request->get('staffing_' . $certification->getId(), ''));
+            $minCount    = $minCountRaw !== '' ? max(0, (int) $minCountRaw) : 0;
+
+            $requirement = $event->getStaffingRequirementFor($certification);
+
+            if ($minCount > 0) {
+                if (!$requirement) {
+                    $requirement = new EventStaffingRequirement();
+                    $requirement->setEvent($event);
+                    $requirement->setCertification($certification);
+                    $event->getStaffingRequirements()->add($requirement);
+                    $em->persist($requirement);
+                }
+                $requirement->setMinCount($minCount);
+            } elseif ($requirement) {
+                $event->getStaffingRequirements()->removeElement($requirement);
+                $em->remove($requirement);
+            }
+        }
     }
 
     /**

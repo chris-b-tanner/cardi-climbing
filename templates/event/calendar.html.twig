@@ -69,7 +69,10 @@
                   <div class="agenda-event">
                     <div class="agenda-event__time">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
                     <div class="agenda-event__body">
-                      <h3 class="agenda-event__title">{{ event.title }}</h3>
+                      <h3 class="agenda-event__title">
+                        {{ event.title }}
+                        {% if occ.isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
+                      </h3>
                       <div class="agenda-event__meta">
                         <span>{{ event.location }}</span>
                         <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>

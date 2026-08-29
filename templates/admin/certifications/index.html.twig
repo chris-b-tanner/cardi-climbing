@@ -9,6 +9,13 @@
 <div class="filter-form">
   <input type="search" id="search-q" placeholder="Search member, email, or certification…"
          value="{{ currentQuery }}" aria-label="Search certifications" autocomplete="off">
+  <select id="search-status" aria-label="Filter by status">
+    <option value="">All statuses</option>
+    <option value="in_progress"{% if currentStatus == 'in_progress' %} selected{% endif %}>In progress</option>
+    <option value="pending_approval"{% if currentStatus == 'pending_approval' %} selected{% endif %}>Pending approval</option>
+    <option value="completed"{% if currentStatus == 'completed' %} selected{% endif %}>Completed</option>
+    <option value="cancelled"{% if currentStatus == 'cancelled' %} selected{% endif %}>Cancelled</option>
+  </select>
 </div>
 
 <div id="results">
@@ -18,14 +25,16 @@
 
 {% block scripts %}
 <script>
-  const searchInput = document.getElementById('search-q');
+  const searchInput  = document.getElementById('search-q');
+  const statusSelect = document.getElementById('search-status');
   const results      = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_certifications') }}';
   let debounce;
 
   function fetchResults() {
     const params = new URLSearchParams();
-    if (searchInput.value) params.set('q', searchInput.value);
+    if (searchInput.value)  params.set('q', searchInput.value);
+    if (statusSelect.value) params.set('status', statusSelect.value);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -41,5 +50,6 @@
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
   });
+  statusSelect.addEventListener('change', fetchResults);
 </script>
 {% endblock %}

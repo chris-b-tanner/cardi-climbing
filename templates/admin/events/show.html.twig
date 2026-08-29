@@ -3,7 +3,12 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ event.title }}</h1>
+  <h1>
+    {{ event.title }} - {{ event.date|date('d M Y') }}
+    <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
+          {{ event.isPublished ? 'Published' : 'Draft' }}
+        </span>
+  </h1>
   <div class="btn-row">
     <a href="{{ path('app_admin_events') }}" class="btn btn--ghost btn--sm">← Events</a>
     {% if is_granted('ROLE_ADMIN') %}
@@ -17,25 +22,6 @@
 
 <div class="card">
   <div class="detail-grid">
-    <div>
-      <div class="card__label">Status</div>
-      <div class="card__value">
-        <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
-          {{ event.isPublished ? 'Published' : 'Draft' }}
-        </span>
-      </div>
-    </div>
-    <div>
-      <div class="card__label">Date</div>
-      <div class="card__value">
-        {{ event.date|date('d M Y') }}
-        {% if event.isRecurring %}
-          <span style="color:var(--muted);font-size:0.85rem;">
-            (recurring{% if event.recurUntil %} until {{ event.recurUntil|date('d M Y') }}{% endif %})
-          </span>
-        {% endif %}
-      </div>
-    </div>
     <div>
       <div class="card__label">Time</div>
       <div class="card__value">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
@@ -59,6 +45,11 @@
           <a href="{{ event.externalUrl }}" target="_blank" rel="noopener" style="color:var(--teal-dk);">{{ event.externalUrl }}</a>
         </div>
       </div>
+    {% endif %}
+    {% if event.isRecurring %}
+      <div style="color:var(--muted);font-size:0.85rem;">
+            (recurring{% if event.recurUntil %} until {{ event.recurUntil|date('d M Y') }}{% endif %})
+          </div>
     {% endif %}
   </div>
 </div>
@@ -115,6 +106,97 @@
 </div>
 <div class="member-col-right">
 
+{% if event.staffingRequirements is not empty %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.75rem;">
+    Staffing{% if event.isRecurring %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}
+  </div>
+
+  {% for requirement in event.staffingRequirements %}
+    {% set approvedForReq = staffing|filter(a => a.staffingRequirement == requirement and a.staffingStatus == 'approved') %}
+    {% set pendingForReq  = staffing|filter(a => a.staffingRequirement == requirement and a.staffingStatus == 'pending') %}
+    {% set declinedForReq = staffing|filter(a => a.staffingRequirement == requirement and a.staffingStatus == 'declined') %}
+    {% set short = approvedForReq|length < requirement.minCount %}
+
+    <div style="border-left:3px solid {{ short ? 'var(--red)' : 'var(--border)' }};padding:0.5rem 0.75rem;margin-bottom:0.85rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <span style="font-weight:600;font-size:0.9375rem;">{{ requirement.certification.name }}</span>
+        <span class="status-pill{{ short ? ' status-pill--cancelled' : ' status-pill--published' }}">
+          {{ approvedForReq|length }} / {{ requirement.minCount }} on duty
+        </span>
+      </div>
+      {% if short %}
+        <a href="{{ path('app_admin_email_compose', {certificationId: requirement.certification.id}) }}" style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">
+          ✉ Email {{ requirement.certification.name }}s
+        </a>
+      {% endif %}
+
+      {% if approvedForReq is not empty %}
+        <div style="margin-top:0.5rem;display:flex;flex-direction:column;gap:0.3rem;">
+          {% for a in approvedForReq %}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+              <a href="{{ path('app_admin_user_show', {id: a.user.id}) }}" class="admin-table__link" style="font-size:0.85rem;">
+                {{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}
+              </a>
+              <form method="post" action="{{ path('app_admin_booking_staffing_remove', {id: a.id}) }}"
+                    onsubmit="return confirm('Take this member off duty?');">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_staffing_' ~ a.id) }}">
+                <button type="submit" style="background:none;border:none;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:0.78rem;">Remove</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if pendingForReq is not empty %}
+        <div style="margin-top:0.6rem;">
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.3rem;">Awaiting review:</p>
+          {% for a in pendingForReq %}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.3rem;">
+              <a href="{{ path('app_admin_user_show', {id: a.user.id}) }}" class="admin-table__link" style="font-size:0.85rem;">
+                {{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}
+              </a>
+              <div class="btn-row">
+                <form method="post" action="{{ path('app_admin_booking_staffing_approve', {id: a.id}) }}">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_staffing_' ~ a.id) }}">
+                  <button type="submit" class="btn btn--teal btn--sm">Approve</button>
+                </form>
+                <form method="post" action="{{ path('app_admin_booking_staffing_decline', {id: a.id}) }}">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_staffing_' ~ a.id) }}">
+                  <button type="submit" class="btn btn--ghost btn--sm">Decline</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if declinedForReq is not empty %}
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+          Declined: {% for a in declinedForReq %}{{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}{% if not loop.last %}, {% endif %}{% endfor %}
+        </p>
+      {% endif %}
+
+      {% set eligible = attendees|filter(a => a.status != 'cancelled' and not a.isStaffing and a.user.hasCertification(requirement.certification)) %}
+      {% if eligible is not empty %}
+        <form method="post" action="{{ path('app_admin_event_staffing_assign', {id: event.id}) }}"
+              style="display:flex;gap:0.5rem;align-items:center;margin-top:0.6rem;flex-wrap:wrap;">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_staffing_' ~ event.id) }}">
+          <input type="hidden" name="requirementId" value="{{ requirement.id }}">
+          {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
+          <select name="attendeeId" class="form-control" style="max-width:220px;">
+            {% for a in eligible %}
+              <option value="{{ a.id }}">{{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn--ghost btn--sm">Put on duty</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="card">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
     <div class="card__label" style="margin-bottom:0;">
@@ -155,6 +237,9 @@
                 <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
                   {{ displayName ?: attendee.user.email }}
                 </a>
+                {% if attendee.isStaffing %}
+                  <br><span style="font-size:0.72rem;color:var(--muted);">{{ attendee.staffingRequirement.certification.name }} &middot; {{ attendee.staffingStatusLabel }}</span>
+                {% endif %}
               </td>
               <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
               <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
