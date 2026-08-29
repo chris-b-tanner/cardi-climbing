@@ -142,10 +142,19 @@ class AccountController extends AbstractController
                 $record->setCompletedBy($user);
                 $em->flush();
 
-                $pdf = $pdfGenerator->generate($record);
-                $certificationMailer->sendCompletion($record, $pdf);
+                $message = $record->getCertification()->getName() . ' completed — thank you! A copy has been emailed to you.';
 
-                $this->addFlash('success', $record->getCertification()->getName() . ' completed — thank you! A copy has been emailed to you.');
+                try {
+                    $pdf = $pdfGenerator->generate($record);
+                    $certificationMailer->sendCompletion($record, $pdf);
+                } catch (\Throwable $e) {
+                    // The record is already saved as complete at this point — a PDF/email failure
+                    // shouldn't turn into a 500 and leave the member thinking it didn't work.
+                    error_log('Certification completion email failed for record ' . $record->getId() . ': ' . $e->getMessage());
+                    $message = $record->getCertification()->getName() . ' completed — thank you! We had trouble emailing you a copy; contact us if you need one.';
+                }
+
+                $this->addFlash('success', $message);
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
             }
         }
