@@ -347,7 +347,10 @@ class AdminController extends AbstractController
     {
         $heldIds = array_map(
             static fn(UserCertification $record) => $record->getCertification()->getId(),
-            $user->getCertifications()->toArray(),
+            array_filter(
+                $user->getCertifications()->toArray(),
+                static fn(UserCertification $record) => !$record->isCancelled(),
+            ),
         );
 
         $available = array_values(array_filter(
@@ -379,10 +382,13 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_certification_pick', ['id' => $user->getId()]);
         }
 
-        $alreadyHeld = $em->getRepository(UserCertification::class)->findOneBy([
-            'user'          => $user,
-            'certification' => $certification,
-        ]);
+        $alreadyHeld = null;
+        foreach ($user->getCertifications() as $record) {
+            if ($record->getCertification() === $certification && !$record->isCancelled()) {
+                $alreadyHeld = $record;
+                break;
+            }
+        }
 
         if ($alreadyHeld) {
             $this->addFlash('error', 'This member already has that certification on record.');

@@ -45,18 +45,28 @@
   {% else %}
     {% for declaration in certification.declarations %}
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem;">
-        <form method="post" action="{{ path('app_admin_settings_certification_declaration_edit', {id: certification.id, declarationId: declaration.id}) }}"
-              style="display:flex;gap:0.6rem;align-items:flex-start;">
+        <form id="declaration-edit-{{ declaration.id }}" method="post"
+              action="{{ path('app_admin_settings_certification_declaration_edit', {id: certification.id, declarationId: declaration.id}) }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_declaration_edit_' ~ declaration.id) }}">
-          <textarea name="text" class="form-control" rows="2" required
-                    style="flex:1;resize:vertical;font-family:inherit;background:#fff;">{{ declaration.text }}</textarea>
-          <button type="submit" class="btn btn--ghost btn--sm">Save</button>
+          <div style="display:flex;gap:0.6rem;align-items:flex-start;">
+            <textarea name="text" class="form-control" rows="2" required
+                      style="flex:1;resize:vertical;font-family:inherit;background:#fff;">{{ declaration.text }}</textarea>
+            <div class="form-group" style="margin-bottom:0;width:5rem;">
+              <label for="sortOrder-{{ declaration.id }}" style="font-size:0.68rem;">Order</label>
+              <input type="number" id="sortOrder-{{ declaration.id }}" name="sortOrder" class="form-control"
+                     value="{{ declaration.sortOrder }}" style="background:#fff;">
+            </div>
+          </div>
         </form>
-        <form method="post" action="{{ path('app_admin_settings_certification_declaration_delete', {id: certification.id, declarationId: declaration.id}) }}"
-              onsubmit="return confirm('Remove this declaration?');" style="margin-top:0.6rem;">
+        <form id="declaration-delete-{{ declaration.id }}" method="post"
+              action="{{ path('app_admin_settings_certification_declaration_delete', {id: certification.id, declarationId: declaration.id}) }}"
+              onsubmit="return confirm('Remove this declaration?');">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_declaration_delete_' ~ declaration.id) }}">
-          <button type="submit" class="btn btn--danger btn--sm">Remove</button>
         </form>
+        <div style="display:flex;gap:0.5rem;margin-top:0.6rem;">
+          <button type="submit" form="declaration-edit-{{ declaration.id }}" class="btn btn--ghost btn--sm">Save</button>
+          <button type="submit" form="declaration-delete-{{ declaration.id }}" class="btn btn--danger btn--sm">Remove</button>
+        </div>
       </div>
     {% endfor %}
   {% endif %}

@@ -29,7 +29,7 @@
               </a>
             </td>
             <td>
-              <a href="{{ path('app_admin_event_show', {id: attendee.event.id}) }}" class="admin-table__link">
+              <a href="{{ path('app_admin_event_show', attendee.event.isRecurring ? {id: attendee.event.id, date: (attendee.occurrenceDate ?? attendee.event.date)|date('Y-m-d')} : {id: attendee.event.id}) }}" class="admin-table__link">
                 {{ attendee.event.title }}
               </a>
             </td>

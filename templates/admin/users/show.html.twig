@@ -182,7 +182,7 @@
         {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
         <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <a href="{{ path('app_admin_event_show', {id: booking.event.id}) }}" class="admin-table__link" style="font-size:0.9375rem;">
+            <a href="{{ path('app_admin_event_show', booking.event.isRecurring ? {id: booking.event.id, date: (booking.occurrenceDate ?? booking.event.date)|date('Y-m-d')} : {id: booking.event.id}) }}" class="admin-table__link" style="font-size:0.9375rem;">
               {{ booking.event.title }}
             </a>
             <span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span>

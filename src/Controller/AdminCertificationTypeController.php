@@ -150,6 +150,7 @@ class AdminCertificationTypeController extends AbstractController
         }
 
         $declaration->setText($text);
+        $declaration->setSortOrder((int) $request->request->get('sortOrder', $declaration->getSortOrder()));
         $em->flush();
 
         $this->addFlash('success', 'Declaration updated.');

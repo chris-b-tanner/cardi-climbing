@@ -22,45 +22,95 @@
 {% if not anyOccurrences %}
   <p class="tag-badge--none">No events with staffing requirements this month.</p>
 {% else %}
-  {% for dateKey, dayOccurrences in occurrencesByDay %}
-    {% if dayOccurrences is not empty %}
-      <div class="card">
-        <div class="card__label" style="margin-bottom:0.75rem;">
-          {{ dateKey|date('D j M Y') }}{{ dateKey == today|date('Y-m-d') ? ' (today)' : '' }}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:0.6rem;">
-          {% for occ in dayOccurrences %}
-            {% set eventShowUrl = path('app_admin_event_show', occ.event.isRecurring ? {id: occ.event.id, date: occ.date|date('Y-m-d')} : {id: occ.event.id}) %}
-            {% set borderColor = occ.shortfalls is not empty ? 'var(--red)' : (occ.pendingCount > 0 ? '#eab308' : 'var(--green)') %}
-            <div style="border-left:3px solid {{ borderColor }};padding:0.4rem 0.75rem;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
-                <span style="display:flex;align-items:center;gap:0.5rem;">
-                  <a href="{{ eventShowUrl }}" class="admin-table__link" style="font-size:0.9375rem;">
-                    {{ occ.event.title }}
-                  </a>
-                  {% if not occ.event.isPublished %}<span class="status-pill">Draft</span>{% endif %}
+  <div class="rota-calendar">
+    {% for weekday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+      <div class="rota-calendar__weekday">{{ weekday }}</div>
+    {% endfor %}
+
+    {% for dateKey, dayOccurrences in occurrencesByDay %}
+      {% set inMonth = (dateKey|date('Y-m')) == monthStart|date('Y-m') %}
+      {% set isToday = dateKey == today|date('Y-m-d') %}
+      <div class="rota-day{{ inMonth ? '' : ' rota-day--outside' }}{{ isToday ? ' rota-day--today' : '' }}">
+        <div class="rota-day__num"><span class="rota-day__weekday">{{ dateKey|date('D') }}</span> {{ dateKey|date('j') }}</div>
+
+        {% for occ in dayOccurrences %}
+          {% set eventShowUrl = path('app_admin_event_show', occ.event.isRecurring ? {id: occ.event.id, date: occ.date|date('Y-m-d')} : {id: occ.event.id}) %}
+          <a href="{{ eventShowUrl }}" class="rota-card">
+            <span class="rota-card__title{{ occ.event.isPublished ? '' : ' rota-card__title--draft' }}">{{ occ.event.title }}</span>
+            <span class="rota-card__time">{{ occ.event.timeFrom }}</span>
+            <span class="rota-card__pills">
+              {% if occ.pendingCount > 0 %}
+                <span class="status-pill status-pill--pending">{{ occ.pendingCount }} pending</span>
+              {% endif %}
+              {% for c in occ.coverage %}
+                <span class="status-pill{{ c.have < c.requirement.minCount ? ' status-pill--cancelled' : ' status-pill--published' }}">
+                  {{ c.have }}/{{ c.requirement.minCount }} {{ c.requirement.certification.name }}
                 </span>
-                <span style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
-                  {% if occ.pendingCount > 0 %}
-                    <a href="{{ eventShowUrl }}" class="status-pill status-pill--pending" style="text-decoration:none;">
-                      {{ occ.pendingCount }} pending review
-                    </a>
-                  {% endif %}
-                  {% for c in occ.coverage %}
-                    <span class="status-pill{{ c.have < c.requirement.minCount ? ' status-pill--cancelled' : ' status-pill--published' }}">
-                      {{ c.have }}/{{ c.requirement.minCount }} {{ c.requirement.certification.name }}
-                    </span>
-                  {% endfor %}
-                </span>
-              </div>
-              <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-                {{ occ.event.timeFrom }}&ndash;{{ occ.event.timeTo }} &middot; {{ occ.event.location }}
-              </p>
-            </div>
-          {% endfor %}
-        </div>
+              {% endfor %}
+            </span>
+          </a>
+        {% endfor %}
       </div>
-    {% endif %}
-  {% endfor %}
+    {% endfor %}
+  </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .rota-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .rota-calendar__weekday {
+    background: var(--bg);
+    padding: 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-align: center;
+  }
+  .rota-day {
+    background: var(--white);
+    min-height: 100px;
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .rota-day--outside { background: var(--bg); }
+  .rota-day--outside .rota-day__num { color: var(--muted); }
+  .rota-day--today { box-shadow: inset 0 0 0 2px var(--teal); }
+  .rota-day__num { font-size: 0.75rem; font-weight: 600; color: var(--black); }
+  .rota-day__weekday { display: none; }
+
+  .rota-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 0.3rem 0.4rem;
+    text-decoration: none;
+  }
+  .rota-card__title { font-size: 0.75rem; font-weight: 600; color: var(--black); line-height: 1.3; }
+  .rota-card__title--draft { color: var(--muted); font-weight: 500; }
+  .rota-card__time { font-size: 0.68rem; color: var(--muted); }
+  .rota-card__pills { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.1rem; }
+  .rota-card__pills .status-pill { font-size: 0.6rem; padding: 0.12rem 0.4rem; }
+
+  @media (max-width: 720px) {
+    .rota-calendar { grid-template-columns: 1fr; }
+    .rota-calendar__weekday { display: none; }
+    .rota-day { min-height: 0; }
+    .rota-day__weekday { display: inline; }
+  }
+</style>
 {% endblock %}

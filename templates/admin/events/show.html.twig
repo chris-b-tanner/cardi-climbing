@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
   <h1>
-    {{ event.title }} - {{ event.date|date('d M Y') }}
+    {{ event.title }} - {{ (event.isRecurring ? occurrenceDate : event.date)|date('d M Y') }}
     <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
           {{ event.isPublished ? 'Published' : 'Draft' }}
         </span>

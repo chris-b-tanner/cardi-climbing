@@ -397,7 +397,9 @@ class EventController extends AbstractController
 
         if ($staffingRequirement) {
             $attendee->setStaffingRequirement($staffingRequirement);
-            $attendee->setStaffingStatus(Attendee::STAFFING_PENDING);
+            // Skipping the pending-approval step for now — self-signups go straight to approved.
+            // The approve/decline flow (AdminBookingController) is left in place to switch back to easily.
+            $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
         }
 
         $em->persist($attendee);
