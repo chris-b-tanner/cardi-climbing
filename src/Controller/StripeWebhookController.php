@@ -6,6 +6,7 @@ use App\Entity\Payment;
 use App\Entity\Refund;
 use App\Repository\PaymentRepository;
 use App\Repository\RefundRepository;
+use App\Service\PaymentMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Event;
 use Stripe\Webhook;
@@ -30,6 +31,7 @@ class StripeWebhookController extends AbstractController
         PaymentRepository $paymentRepository,
         RefundRepository $refundRepository,
         EntityManagerInterface $em,
+        PaymentMailer $paymentMailer,
     ): JsonResponse {
         try {
             $event = Webhook::constructEvent(
@@ -42,7 +44,7 @@ class StripeWebhookController extends AbstractController
         }
 
         match ($event->type) {
-            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $em),
+            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $em, $paymentMailer),
             'payment_intent.payment_failed' => $this->onPaymentFailed($event, $paymentRepository, $em),
             'charge.refunded' => $this->onChargeRefunded($event, $paymentRepository, $refundRepository, $em),
             default => null,
@@ -51,7 +53,7 @@ class StripeWebhookController extends AbstractController
         return new JsonResponse(['status' => 'ok']);
     }
 
-    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em): void
+    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em, PaymentMailer $paymentMailer): void
     {
         $intent  = $event->data->object;
         $payment = $paymentRepository->findOneBy(['stripePaymentIntentId' => $intent->id]);
@@ -68,6 +70,14 @@ class StripeWebhookController extends AbstractController
         }
 
         $em->flush();
+
+        try {
+            $paymentMailer->sendReceipt($payment);
+        } catch (\Throwable $e) {
+            // The payment is already saved as succeeded at this point — an email failure here
+            // shouldn't turn into a webhook error and risk Stripe endlessly retrying the event.
+            error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
+        }
     }
 
     private function onPaymentFailed(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em): void

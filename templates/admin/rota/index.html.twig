@@ -37,7 +37,7 @@
           {% set eventShowUrl = path('app_admin_event_show', occ.event.isRecurring ? {id: occ.event.id, date: occ.date|date('Y-m-d')} : {id: occ.event.id}) %}
           <a href="{{ eventShowUrl }}" class="rota-card">
             <span class="rota-card__title{{ occ.event.isPublished ? '' : ' rota-card__title--draft' }}">{{ occ.event.title }}</span>
-            <span class="rota-card__time">{{ occ.event.timeFrom }}</span>
+            <span class="rota-card__time">{{ occ.event.timeFrom }}&ndash;{{ occ.event.timeTo }}</span>
             <span class="rota-card__pills">
               {% if occ.pendingCount > 0 %}
                 <span class="status-pill status-pill--pending">{{ occ.pendingCount }} pending</span>

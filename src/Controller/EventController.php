@@ -68,6 +68,9 @@ class EventController extends AbstractController
                     $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $today, $stats);
                 }
             }
+
+            usort($dayOccurrences, static fn(array $a, array $b) => $a['event']->getTimeFrom() <=> $b['event']->getTimeFrom());
+
             $days[] = ['date' => $day, 'events' => $dayOccurrences];
         }
 

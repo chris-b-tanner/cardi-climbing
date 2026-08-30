@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Payment;
 use App\Entity\User;
+use App\Service\PaymentMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -122,7 +123,7 @@ class PaymentController extends AbstractController
 
     /** Polled by the donate page while waiting for a terminal (or card) payment to settle. */
     #[Route('/donate/{id}/status', name: 'app_donate_status', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function status(Payment $payment, EntityManagerInterface $em): JsonResponse
+    public function status(Payment $payment, EntityManagerInterface $em, PaymentMailer $paymentMailer): JsonResponse
     {
         if ($payment->getUser() !== $this->getUser()) {
             return new JsonResponse(['error' => 'Not found.'], 404);
@@ -136,6 +137,14 @@ class PaymentController extends AbstractController
             if ($intent->status === 'succeeded') {
                 $payment->setSucceededAt(new \DateTimeImmutable());
                 $em->flush();
+
+                try {
+                    $paymentMailer->sendReceipt($payment);
+                } catch (\Throwable $e) {
+                    // The payment is already saved as succeeded at this point — an email failure
+                    // here shouldn't turn into a 500 and leave the donor thinking it didn't work.
+                    error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
+                }
             } elseif ($intent->status === 'canceled' || $intent->last_payment_error) {
                 $payment->setFailedAt(new \DateTimeImmutable());
                 $payment->setFailureReason($intent->last_payment_error->message ?? null);

@@ -639,6 +639,7 @@ p + p { margin-top: 1rem; }
 }
 .alert--error   { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
 .alert--success { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.alert--warning { background: #fefce8; border-color: #fde047; color: #854d0e; }
 .alert--dev     { background: #fefce8; border-color: #fde047; color: #854d0e; font-family: monospace; word-break: break-all; }
 .alert a { text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
 .login-footer {

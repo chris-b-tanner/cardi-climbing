@@ -85,9 +85,9 @@
         </div>
       {% elseif app.user is null %}
         {% if event.restrictions is not empty %}
-          <div class="agenda-event__actions event-show__actions">
-            <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
-            <a href="{{ path('app_login') }}" class="agenda-event__signin">{{ 'events_sign_in_to_book'|trans }}</a>
+          <div class="alert alert--warning event-show__actions">
+            {{ 'events_not_eligible'|trans }}
+            <a href="{{ path('app_login') }}">{{ 'events_sign_in_to_book'|trans }}</a>
           </div>
         {% elseif accountConflict %}
           <div class="alert alert--error">
@@ -138,8 +138,8 @@
           </div>
         {% endif %}
       {% elseif isRestricted %}
-        <div class="agenda-event__actions event-show__actions">
-          <span class="agenda-event__status">{{ 'events_not_eligible'|trans }}</span>
+        <div class="alert alert--warning event-show__actions">
+          {{ 'events_not_eligible'|trans }}
         </div>
       {% elseif canBook %}
         <div class="agenda-event__actions event-show__actions">

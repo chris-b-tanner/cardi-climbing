@@ -1,0 +1,21 @@
+Y WAL — Payment receipt
+========================
+
+Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+
+{% if payment.isDonation %}
+We've received your donation — thank you for supporting Y Wal! Here's your receipt:
+{% else %}
+We've received your payment for {{ payment.attendee.event.title }}. Here's your receipt:
+{% endif %}
+
+Date:            {{ payment.succeededAt|date('l j F Y') }}
+Description:     {{ payment.isDonation ? 'Donation' : payment.attendee.event.title }}
+Payment method:  {{ payment.method == 'terminal' ? 'Card (in person)' : 'Card (online)' }}
+Amount:          £{{ payment.amount }}
+
+Please keep this email as your receipt for this payment.
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+cardiganclimbing@gmail.com | https://www.cardiganclimbing.org

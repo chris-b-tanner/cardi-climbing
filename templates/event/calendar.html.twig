@@ -54,7 +54,6 @@
                       {{ event.title }}
                     </h3>
                     <div class="agenda-event__meta">
-                      <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>
                       {% if occ.spotsLeft is not null %}
                         <span>
                           {% if occ.spotsLeft > 0 %}
