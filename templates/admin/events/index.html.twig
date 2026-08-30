@@ -7,43 +7,40 @@
   <a href="{{ path('app_admin_event_new') }}" class="btn btn--teal btn--sm">+ New event</a>
 </div>
 
-{% if events is empty %}
-  <div class="empty">
-    <strong>No events yet</strong>
-    Create your first bookable event.
-  </div>
-{% else %}
-  <div class="table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Date</th>
-          <th>Time</th>
-          <th>Location</th>
-          <th>Recurring</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for event in events %}
-          <tr>
-            <td>
-              <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
-            </td>
-            <td class="admin-table__muted">{{ event.date|date('d M Y') }}</td>
-            <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>
-            <td class="admin-table__muted">{{ event.location }}</td>
-            <td class="admin-table__muted">{{ event.isRecurring ? 'Yes' : '—' }}</td>
-            <td>
-              <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
-                {{ event.isPublished ? 'Published' : 'Draft' }}
-              </span>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% endif %}
+<div class="filter-form">
+  <input type="search" id="search-q" placeholder="Search title or location…"
+         value="{{ currentQuery }}" aria-label="Search events" autocomplete="off">
+</div>
+
+<div id="results">
+  {% include 'admin/events/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput = document.getElementById('search-q');
+  const results      = document.getElementById('results');
+  const endpoint      = '{{ path('app_admin_events') }}';
+  let debounce;
+
+  function fetchResults() {
+    const params = new URLSearchParams();
+    if (searchInput.value) params.set('q', searchInput.value);
+
+    const qs = params.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+    fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+</script>
 {% endblock %}

@@ -127,7 +127,7 @@
       </div>
       {% if short %}
         <a href="{{ path('app_admin_email_compose', {certificationId: requirement.certification.id}) }}" style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">
-          ✉ Email {{ requirement.certification.name }}s
+          <i class="bi bi-envelope-fill"></i> Email {{ requirement.certification.name }}s
         </a>
       {% endif %}
 
@@ -205,10 +205,10 @@
     <div class="btn-row">
       {% if attendees is not empty %}
         {% if event.isRecurring %}
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm">✉ Email this date</a>
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm">✉ Email series</a>
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email this date</a>
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email series</a>
         {% else %}
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm">✉ Email attendees</a>
+          <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email attendees</a>
         {% endif %}
       {% endif %}
       <a href="{{ path('app_admin_booking_new', event.isRecurring ? {eventId: event.id, occurrenceDate: occurrenceDate|date('Y-m-d')} : {eventId: event.id}) }}" class="btn btn--teal btn--sm">+ Add attendee</a>

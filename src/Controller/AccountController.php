@@ -113,9 +113,22 @@ class AccountController extends AbstractController
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
 
-        $missingEmergencyContact = !$user->getEmergencyContactName() || !$user->getEmergencyContactPhone();
-        if ($missingEmergencyContact) {
-            $this->addFlash('error', 'Please add an emergency contact name and phone number to your account before completing this certification.');
+        $missingProfileFields = [];
+        if (!$user->getEmergencyContactName() || !$user->getEmergencyContactPhone()) {
+            $missingProfileFields[] = 'emergency contact name and phone number';
+        }
+        if (!$user->getDateOfBirth()) {
+            $missingProfileFields[] = 'date of birth';
+        }
+        if (!$user->getPhone()) {
+            $missingProfileFields[] = 'phone number';
+        }
+        if (!$user->getAddressLine1() || !$user->getTown() || !$user->getPostcode()) {
+            $missingProfileFields[] = 'address';
+        }
+
+        if ($missingProfileFields) {
+            $this->addFlash('error', 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.');
         }
 
         $declarations = $record->getCertification()->getDeclarations();
@@ -127,7 +140,7 @@ class AccountController extends AbstractController
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
             }
 
-            if ($missingEmergencyContact) {
+            if ($missingProfileFields) {
                 return $this->redirectToRoute('app_account_certification_complete', ['recordId' => $record->getId()]);
             }
 
@@ -163,10 +176,10 @@ class AccountController extends AbstractController
         }
 
         return $this->render('account/certification_complete.html.twig', [
-            'record'                  => $record,
-            'declarations'            => $declarations,
-            'error'                   => $error,
-            'missingEmergencyContact' => $missingEmergencyContact,
+            'record'               => $record,
+            'declarations'         => $declarations,
+            'error'                => $error,
+            'missingProfileFields' => $missingProfileFields,
         ]);
     }
 

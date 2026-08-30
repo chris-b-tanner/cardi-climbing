@@ -21,10 +21,20 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AdminEventController extends AbstractController
 {
     #[Route('', name: 'app_admin_events')]
-    public function index(EventRepository $eventRepository): Response
+    public function index(Request $request, EventRepository $eventRepository): Response
     {
+        $query  = trim($request->query->get('q', ''));
+        $events = $eventRepository->search($query);
+
+        if ($request->isXmlHttpRequest()) {
+            return $this->render('admin/events/_list.html.twig', [
+                'events' => $events,
+            ]);
+        }
+
         return $this->render('admin/events/index.html.twig', [
-            'events' => $eventRepository->findAllOrdered(),
+            'events'       => $events,
+            'currentQuery' => $query,
         ]);
     }
 

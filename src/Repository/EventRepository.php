@@ -25,6 +25,20 @@ class EventRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** @return Event[] */
+    public function search(string $query = ''): array
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->orderBy('e.date', 'ASC');
+
+        if ($query !== '') {
+            $qb->andWhere('e.title LIKE :q OR e.location LIKE :q')
+               ->setParameter('q', '%' . $query . '%');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     /**
      * Events whose date (or, for recurring events, whose recurrence window) overlaps the given
      * range. Callers expand recurring rows into occurrences themselves via Event::isValidForDate().

@@ -1,0 +1,41 @@
+<div class="result-count">{{ events|length }} {{ events|length == 1 ? 'event' : 'events' }}</div>
+
+{% if events is empty %}
+  <div class="empty">
+    <strong>No events found</strong>
+    Try adjusting your search.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Location</th>
+          <th>Recurring</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
+            </td>
+            <td class="admin-table__muted">{{ event.date|date('d M Y') }}</td>
+            <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>
+            <td class="admin-table__muted">{{ event.location }}</td>
+            <td class="admin-table__muted">{{ event.isRecurring ? 'Yes' : '—' }}</td>
+            <td>
+              <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
+                {{ event.isPublished ? 'Published' : 'Draft' }}
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

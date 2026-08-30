@@ -60,10 +60,13 @@
       <div class="alert--error">{{ error }}</div>
     {% endif %}
 
-    {% if missingEmergencyContact %}
+    {% if missingProfileFields is not empty %}
       <div class="account-card">
-        <p style="margin-bottom:1rem;">You'll need to add this before you can complete the declarations below.</p>
-        <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Add emergency contact details</a>
+        <p style="margin-bottom:1rem;">
+          Please add the following to your account before you can complete the declarations below:
+          {{ missingProfileFields|join(', ') }}.
+        </p>
+        <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Update your details</a>
       </div>
     {% else %}
     <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate>
