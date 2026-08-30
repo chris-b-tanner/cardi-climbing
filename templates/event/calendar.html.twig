@@ -11,102 +11,105 @@
 
 <section class="section section--off">
   <div class="wrap">
-    <nav class="calendar-nav" aria-label="Month">
-      <a href="{{ path('app_events', {year: prevYear, month: prevMonth}) }}" class="calendar-nav__link" aria-label="{{ 'events_prev_month'|trans }}">&lsaquo;</a>
-      <h2 class="calendar-nav__title">{{ monthStart|date('F Y') }}</h2>
-      <a href="{{ path('app_events', {year: nextYear, month: nextMonth}) }}" class="calendar-nav__link" aria-label="{{ 'events_next_month'|trans }}">&rsaquo;</a>
+    <nav class="calendar-nav" aria-label="Week">
+      <a href="{{ path('app_events', {date: prevWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_prev_week'|trans }}">&lsaquo;</a>
+      <h2 class="calendar-nav__title">
+        <span class="calendar-nav__title-full">{{ weekStart|date('j M') }}&ndash;{{ weekEnd|date('j M Y') }}</span>
+        <span class="calendar-nav__title-short">{{ weekStart|date('j M') }}&ndash;{{ weekEnd|date('j M') }}</span>
+      </h2>
+      <a href="{{ path('app_events', {date: nextWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_next_week'|trans }}">&rsaquo;</a>
+      <input type="date" id="week-date-picker" class="calendar-nav__datepicker"
+             value="{{ weekStart|date('Y-m-d') }}" aria-label="{{ 'events_jump_to_date'|trans }}">
     </nav>
 
-    <div class="calendar-grid">
-      {% for weekday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-        <div class="calendar-grid__weekday">{{ weekday }}</div>
+    <div class="week-day-tabs" id="week-day-tabs" role="tablist" aria-label="{{ 'events_h1'|trans }}">
+      {% for day in days %}
+        <button type="button" class="week-day-tab" data-day="{{ day.date|date('Y-m-d') }}" role="tab">
+          <span class="week-day-tab__weekday">{{ day.date|date('D') }}</span>
+          <span class="week-day-tab__daynum">{{ day.date|date('j') }}</span>
+        </button>
       {% endfor %}
+    </div>
 
-      {% for dateKey, dayEvents in occurrencesByDay %}
-        {% set inMonth = (dateKey|date('Y-m')) == monthStart|date('Y-m') %}
+    <div class="week-view" id="week-view">
+      {% for day in days %}
+        {% set dateKey = day.date|date('Y-m-d') %}
         {% set isToday = dateKey == today|date('Y-m-d') %}
-        {% set cellClass = 'calendar-cell' ~ (inMonth ? '' : ' calendar-cell--outside') ~ (isToday ? ' calendar-cell--today' : '') %}
-        {% if dayEvents is not empty %}
-          <a href="#day-{{ dateKey }}" class="{{ cellClass }} calendar-cell--has-events">
-            <span class="calendar-cell__num">{{ dateKey|date('j') }}</span>
-            <span class="calendar-cell__dot" aria-hidden="true"></span>
-            <span class="calendar-cell__count">{{ dayEvents|length }} event{{ dayEvents|length == 1 ? '' : 's' }}</span>
-          </a>
-        {% else %}
-          <div class="{{ cellClass }}">
-            <span class="calendar-cell__num">{{ dateKey|date('j') }}</span>
+        <div class="week-day{{ isToday ? ' week-day--today' : '' }}" data-day="{{ dateKey }}">
+          <div class="week-day__header">
+            <span class="week-day__weekday">{{ day.date|date('D') }}</span>
+            <span class="week-day__daynum">{{ day.date|date('j') }}</span>
+            <span class="week-day__month">{{ day.date|date('M') }}</span>
           </div>
-        {% endif %}
+          <div class="week-day__events">
+            {% if day.events is empty %}
+              <p class="week-day__empty">{{ 'events_empty'|trans }}</p>
+            {% else %}
+              {% for occ in day.events %}
+                {% set event = occ.event %}
+                <div class="agenda-event">
+                  <div class="agenda-event__time">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
+                  <div class="agenda-event__body">
+                    <h3 class="agenda-event__title{{ occ.isDraft ? ' agenda-event__title--draft' : '' }}">
+                      {{ event.title }}
+                    </h3>
+                    <div class="agenda-event__meta">
+                      <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>
+                      {% if occ.spotsLeft is not null %}
+                        <span>
+                          {% if occ.spotsLeft > 0 %}
+                            {{ occ.spotsLeft }} {{ occ.spotsLeft == 1 ? 'events_place_left'|trans : 'events_places_left'|trans }}
+                          {% else %}
+                            {{ 'events_full'|trans }}
+                          {% endif %}
+                        </span>
+                      {% endif %}
+                      {% if occ.isBooked %}
+                        <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
+                      {% endif %}
+                      {% if event.restrictions is not empty %}
+                        <span class="agenda-event__restricted">
+                          {%- for restriction in event.restrictions %}{{ restriction.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </span>
+                      {% endif %}
+                    </div>
+                    <a href="{{ path('app_event_show', {id: event.id, date: occ.date|date('Y-m-d')}) }}" class="btn btn--outline btn--sm agenda-event__cta">
+                      {{ 'events_view'|trans }}
+                    </a>
+                  </div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
       {% endfor %}
     </div>
   </div>
 </section>
+{% endblock %}
 
-<section class="section">
-  <div class="wrap">
-    <h2 class="agenda-section__title">{{ monthStart|date('F Y') }}</h2>
+{% block scripts %}
+{{ parent() }}
+<script>
+  document.getElementById('week-date-picker').addEventListener('change', function () {
+    if (this.value) window.location.href = '{{ path('app_events') }}?date=' + this.value;
+  });
 
-    {% set anyEvents = false %}
-    {% for dateKey, dayEvents in occurrencesByDay %}
-      {% if dayEvents is not empty %}{% set anyEvents = true %}{% endif %}
-    {% endfor %}
+  // Mobile: the week is still rendered in full, but only one day column is shown at a time,
+  // switched via the tabs above it — avoids a second request just to look at another day.
+  const dayTabs  = document.querySelectorAll('.week-day-tab');
+  const weekDays = document.querySelectorAll('.week-day');
 
-    {% if not anyEvents %}
-      <p>{{ 'events_empty'|trans }}</p>
-    {% else %}
-      <div class="agenda-list">
-        {% for dateKey, dayEvents in occurrencesByDay %}
-          {% if dayEvents is not empty %}
-            <div class="agenda-day" id="day-{{ dateKey }}">
-              <div class="agenda-day__date">
-                <span class="agenda-day__weekday">{{ dateKey|date('D') }}</span>
-                <span class="agenda-day__daynum">{{ dateKey|date('j') }}</span>
-                <span class="agenda-day__month">{{ dateKey|date('M') }}</span>
-              </div>
-              <div class="agenda-day__events">
-                {% for occ in dayEvents %}
-                  {% set event = occ.event %}
-                  <div class="agenda-event">
-                    <div class="agenda-event__time">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
-                    <div class="agenda-event__body">
-                      <h3 class="agenda-event__title">
-                        {{ event.title }}
-                        {% if occ.isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
-                      </h3>
-                      <div class="agenda-event__meta">
-                        <span>{{ event.location }}</span>
-                        <span>{{ event.price ? '£' ~ event.price : 'Free' }}</span>
-                        {% if occ.spotsLeft is not null %}
-                          <span>
-                            {% if occ.spotsLeft > 0 %}
-                              {{ occ.spotsLeft }} {{ occ.spotsLeft == 1 ? 'events_place_left'|trans : 'events_places_left'|trans }}
-                            {% else %}
-                              {{ 'events_full'|trans }}
-                            {% endif %}
-                          </span>
-                        {% endif %}
-                        {% if occ.isBooked %}
-                          <span class="agenda-event__status agenda-event__status--booked">{{ 'events_booked'|trans }}</span>
-                        {% endif %}
-                        {% if event.restrictions is not empty %}
-                          <span class="agenda-event__restricted">
-                            {{ 'events_restricted_to'|trans }}
-                            {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor %}
-                          </span>
-                        {% endif %}
-                      </div>
-                      <a href="{{ path('app_event_show', {id: event.id, date: occ.date|date('Y-m-d')}) }}" class="btn btn--outline btn--sm agenda-event__cta">
-                        {{ 'events_view_event'|trans }}
-                      </a>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-    {% endif %}
-  </div>
-</section>
+  function showDay(dateKey) {
+    weekDays.forEach(el => el.classList.toggle('is-active-mobile', el.dataset.day === dateKey));
+    dayTabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.day === dateKey));
+  }
+
+  dayTabs.forEach(tab => tab.addEventListener('click', () => showDay(tab.dataset.day)));
+
+  const todayKey   = {{ today|date('Y-m-d')|json_encode|raw }};
+  const dayKeys    = [...dayTabs].map(tab => tab.dataset.day);
+  const initialDay = dayKeys.includes(todayKey) ? todayKey : dayKeys[0];
+  if (initialDay) showDay(initialDay);
+</script>
 {% endblock %}

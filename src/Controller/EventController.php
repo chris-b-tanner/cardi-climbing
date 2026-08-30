@@ -25,30 +25,21 @@ class EventController extends AbstractController
     #[Route('/events', name: 'app_events')]
     public function index(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
     {
-        $year  = (int) $request->query->get('year', (int) date('Y'));
-        $month = (int) $request->query->get('month', (int) date('n'));
+        $anchor    = $this->parseDate($request->query->get('date', '')) ?? new \DateTimeImmutable('today');
+        $weekStart = $anchor->modify('monday this week');
+        $weekEnd   = $weekStart->modify('+6 days');
 
-        // Normalise any out-of-range month (e.g. from prev/next navigation) into its year.
-        $year  += intdiv($month - 1, 12);
-        $month = (($month - 1) % 12 + 12) % 12 + 1;
-
-        $monthStart = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
-        $monthEnd   = $monthStart->modify('last day of this month');
-
-        $gridStart = $monthStart->modify('monday this week');
-        $gridEnd   = $monthEnd->modify('sunday this week');
-
-        $events = $eventRepository->findPublishedOverlapping($gridStart, $gridEnd, $this->isGranted('ROLE_TEAM'));
+        $events = $eventRepository->findPublishedOverlapping($weekStart, $weekEnd, $this->isGranted('ROLE_TEAM'));
 
         /** @var User|null $user */
         $user  = $this->getUser();
         $today = new \DateTimeImmutable('today');
 
-        // Fetch every booking for these events across the whole grid in one query, then
+        // Fetch every booking for these events across the whole week in one query, then
         // derive per-occurrence counts/booked-state from it in memory — avoids running a
         // count + booking-lookup query for every single occurrence shown on the calendar.
         $eventIds        = array_map(static fn (Event $e) => $e->getId(), $events);
-        $activeAttendees = $attendeeRepository->findActiveForEventsInRange($eventIds, $gridStart, $gridEnd);
+        $activeAttendees = $attendeeRepository->findActiveForEventsInRange($eventIds, $weekStart, $weekEnd);
 
         $occurrenceStats = [];
         foreach ($activeAttendees as $attendee) {
@@ -61,8 +52,8 @@ class EventController extends AbstractController
             }
         }
 
-        $occurrencesByDay = [];
-        $period = new \DatePeriod($gridStart, new \DateInterval('P1D'), $gridEnd->modify('+1 day'));
+        $days = [];
+        $period = new \DatePeriod($weekStart, new \DateInterval('P1D'), $weekEnd->modify('+1 day'));
         foreach ($period as $day) {
             $dayOccurrences = [];
             foreach ($events as $event) {
@@ -77,19 +68,16 @@ class EventController extends AbstractController
                     $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $today, $stats);
                 }
             }
-            $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
+            $days[] = ['date' => $day, 'events' => $dayOccurrences];
         }
 
         return $this->render('event/calendar.html.twig', [
-            'monthStart'       => $monthStart,
-            'gridStart'        => $gridStart,
-            'gridEnd'          => $gridEnd,
-            'occurrencesByDay' => $occurrencesByDay,
-            'prevYear'         => $monthStart->modify('-1 month')->format('Y'),
-            'prevMonth'        => $monthStart->modify('-1 month')->format('n'),
-            'nextYear'         => $monthStart->modify('+1 month')->format('Y'),
-            'nextMonth'        => $monthStart->modify('+1 month')->format('n'),
-            'today'            => $today,
+            'weekStart' => $weekStart,
+            'weekEnd'   => $weekEnd,
+            'days'      => $days,
+            'prevWeek'  => $weekStart->modify('-7 days')->format('Y-m-d'),
+            'nextWeek'  => $weekStart->modify('+7 days')->format('Y-m-d'),
+            'today'     => $today,
         ]);
     }
 
