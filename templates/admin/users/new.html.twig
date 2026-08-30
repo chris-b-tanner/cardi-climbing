@@ -28,27 +28,16 @@
       </div>
     </div>
     <div class="form-group" style="margin-top:1rem;">
-      <label for="email">Email <span style="color:var(--red);">*</span></label>
+      <label for="email">Email</label>
       <input type="email" id="email" name="email" class="form-control"
-             autocomplete="off" required>
+             autocomplete="off">
     </div>
-    {% if is_granted('ROLE_ADMIN') %}
-      <div class="form-group">
-        <label for="role">Role</label>
-        <select id="role" name="role" class="form-control">
-          <option value="ROLE_MEMBER">Member</option>
-          <option value="ROLE_TEAM">Team</option>
-          <option value="ROLE_ADMIN">Admin</option>
-        </select>
-      </div>
-    {% endif %}
     <div class="form-group" style="margin-bottom:0;">
-      <label for="password">Initial password <span style="color:var(--red);">*</span></label>
-      <input type="password" id="password" name="password" class="form-control"
-             autocomplete="new-password" required minlength="8">
-      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
-        Minimum 8 characters. The member can change it via forgot password.
-      </p>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
+        <input type="checkbox" name="optIn" value="1" checked
+               style="width:1rem;height:1rem;accent-color:var(--teal);">
+        Opted in to mailing list
+      </label>
     </div>
   </div>
 

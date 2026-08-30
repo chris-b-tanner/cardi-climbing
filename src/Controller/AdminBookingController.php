@@ -126,7 +126,7 @@ class AdminBookingController extends AbstractController
                 $em->persist($attendee);
                 $em->flush();
 
-                if ($request->request->has('sendEmail')) {
+                if ($request->request->has('sendEmail') && $user->getEmail()) {
                     $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
                 }
 
@@ -285,10 +285,11 @@ class AdminBookingController extends AbstractController
 
         return $this->json(array_map(static function (User $user) {
             $displayName = trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? ''));
+            $name        = $displayName ?: ($user->getEmail() ?: 'Member #' . $user->getId());
 
             return [
                 'id'    => $user->getId(),
-                'label' => ($displayName ?: $user->getEmail()) . ' — ' . $user->getEmail(),
+                'label' => $user->getEmail() ? $name . ' — ' . $user->getEmail() : $name,
             ];
         }, $members));
     }

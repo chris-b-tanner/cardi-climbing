@@ -28,7 +28,7 @@
     <div class="form-group" style="margin-top:1rem;">
       <label for="email">Email</label>
       <input type="email" id="email" name="email" class="form-control"
-             value="{{ user.email }}" autocomplete="email" required>
+             value="{{ user.email }}" autocomplete="email">
     </div>
     <div class="form-group">
       <label for="email2">Alternate email 2</label>
@@ -133,6 +133,38 @@
   </div>
 
   <div class="card">
+    <div class="card__label" style="margin-bottom:0.75rem;">Dependents</div>
+    {% if user.parent %}
+      <p style="color:var(--muted);font-size:0.875rem;">
+        {{ displayName ?: user.email }} is a dependent of
+        <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal-dk);font-weight:600;">{{ (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email }}</a>,
+        so can't have dependents of their own.
+      </p>
+    {% elseif not user.email %}
+      <p style="color:var(--muted);font-size:0.875rem;">
+        {{ displayName ?: 'This member' }} has no email address on file, so can't have dependents — add an email first.
+      </p>
+    {% else %}
+      <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0.6rem;">Search for the members who are dependents of {{ displayName ?: user.email }}. A member can only be the dependent of one parent.</p>
+      <div id="dependent-chips" style="display:flex;flex-wrap:wrap;gap:0.4rem;{% if user.dependents is not empty %}margin-bottom:0.75rem;{% endif %}">
+        {% for dependent in user.dependents %}
+          {% set dependentName = (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email %}
+          <span class="tag-badge dependent-chip" data-id="{{ dependent.id }}" style="display:inline-flex;align-items:center;gap:0.35rem;">
+            <input type="hidden" name="dependents[]" value="{{ dependent.id }}">
+            {{ dependentName }}
+            <button type="button" class="dependent-chip__remove" aria-label="Remove {{ dependentName }}"
+                    style="border:none;background:none;color:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0;">&times;</button>
+          </span>
+        {% endfor %}
+      </div>
+      <div class="form-group" style="margin-bottom:0;position:relative;">
+        <input type="text" id="dependentSearch" class="form-control" placeholder="Search by name or email…" autocomplete="off">
+        <div id="dependent-results" class="member-search-results"></div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
     <div class="form-group" style="margin-bottom:0;">
       <label for="memo">Memo</label>
       <textarea id="memo" name="memo" class="form-control" rows="5"
@@ -145,4 +177,88 @@
     <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{% if canHaveDependents %}
+<script>
+  // ── Dependent search ────────────────────────────────────────
+  const dependentChips   = document.getElementById('dependent-chips');
+  const dependentSearch  = document.getElementById('dependentSearch');
+  const dependentResults = document.getElementById('dependent-results');
+  const dependentSearchUrl = '{{ path('app_admin_user_dependent_search', {id: user.id}) }}';
+  let dependentDebounce;
+
+  function selectedDependentIds() {
+    return [...dependentChips.querySelectorAll('.dependent-chip')].map(chip => chip.dataset.id);
+  }
+
+  function closeDependentResults() {
+    dependentResults.classList.remove('is-open');
+    dependentResults.innerHTML = '';
+  }
+
+  function addDependentChip(id, label) {
+    if (selectedDependentIds().includes(String(id))) return;
+
+    const chip = document.createElement('span');
+    chip.className = 'tag-badge dependent-chip';
+    chip.dataset.id = id;
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.35rem;';
+    chip.innerHTML = `
+      <input type="hidden" name="dependents[]" value="${id}">
+      ${label.replace(/ — .*$/, '')}
+      <button type="button" class="dependent-chip__remove" aria-label="Remove"
+              style="border:none;background:none;color:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0;">&times;</button>
+    `;
+    dependentChips.appendChild(chip);
+    dependentChips.style.marginBottom = '0.75rem';
+  }
+
+  dependentSearch.addEventListener('input', () => {
+    clearTimeout(dependentDebounce);
+
+    const q = dependentSearch.value.trim();
+    if (q.length < 2) {
+      closeDependentResults();
+      return;
+    }
+
+    dependentDebounce = setTimeout(() => {
+      fetch(`${dependentSearchUrl}?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(members => {
+          const available = members.filter(m => !selectedDependentIds().includes(String(m.id)));
+          if (!available.length) {
+            dependentResults.innerHTML = '<div class="member-search-empty">No members found</div>';
+            dependentResults.classList.add('is-open');
+            return;
+          }
+          dependentResults.innerHTML = available.map(m => `
+            <button type="button" class="member-search-item" data-id="${m.id}" data-label="${m.label.replace(/"/g, '&quot;')}">${m.label}</button>
+          `).join('');
+          dependentResults.classList.add('is-open');
+        });
+    }, 250);
+  });
+
+  dependentResults.addEventListener('click', (e) => {
+    const btn = e.target.closest('.member-search-item');
+    if (!btn) return;
+    addDependentChip(btn.dataset.id, btn.dataset.label);
+    dependentSearch.value = '';
+    closeDependentResults();
+  });
+
+  dependentSearch.addEventListener('blur', () => {
+    setTimeout(closeDependentResults, 150);
+  });
+
+  dependentChips.addEventListener('click', (e) => {
+    const btn = e.target.closest('.dependent-chip__remove');
+    if (!btn) return;
+    btn.closest('.dependent-chip').remove();
+  });
+</script>
+{% endif %}
 {% endblock %}

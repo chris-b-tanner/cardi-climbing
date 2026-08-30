@@ -33,8 +33,15 @@
               <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">
                 {{ displayName ?: '—' }}
               </a>
+              {% if user.parent %}
+                <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}#family" class="family-icon"
+                   title="Dependent of {{ (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email }}"><i class="bi bi-people-fill"></i></a>
+              {% elseif user.id in parentIds %}
+                <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
+                   title="Has dependents"><i class="bi bi-people-fill"></i></a>
+              {% endif %}
             </td>
-            <td class="admin-table__muted">{{ user.email }}</td>
+            <td class="admin-table__muted">{{ user.email ?: '—' }}</td>
             <td>
               {% for tag in user.tags %}
                 <span class="tag-badge">{{ tag.name }}</span>

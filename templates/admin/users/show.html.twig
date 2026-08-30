@@ -11,21 +11,48 @@
   <div class="btn-row">
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
     <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
-    {% if is_granted('ROLE_ADMIN') %}
-      <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
-            style="display:inline;"
-            onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
-        <button type="submit" class="btn btn--danger btn--sm">Delete</button>
-      </form>
+    {% if is_granted('ROLE_ADMIN') and not user.deletedAt %}
+      {% if user.hasDependents %}
+        <span class="btn btn--ghost btn--sm" style="opacity:0.5;cursor:not-allowed;" title="Remove this member's dependents before deleting or archiving them.">Delete</span>
+      {% elseif bookings is not empty or user.payments is not empty %}
+        <form method="post" action="{{ path('app_admin_user_archive', {id: user.id}) }}"
+              style="display:inline;"
+              onsubmit="return (function(f){
+                var reason = window.prompt('Why are you archiving {{ (displayName ?: user.email)|e('js') }}? This removes their personal details but keeps their booking/payment history.');
+                if (!reason || !reason.trim()) return false;
+                f.reason.value = reason;
+                return true;
+              })(this);">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('archive_user_' ~ user.id) }}">
+          <input type="hidden" name="reason">
+          <button type="submit" class="btn btn--danger btn--sm">Archive</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
+              style="display:inline;"
+              onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
+          <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+        </form>
+      {% endif %}
     {% endif %}
   </div>
 </div>
 
+{% if user.deletedAt %}
+  <div class="duplicate-warning">
+    <span class="duplicate-warning__icon"><i class="bi bi-archive-fill"></i></span>
+    <span>
+      This member was archived on {{ user.deletedAt|date('j M Y, H:i') }}{% if user.deletedBy %} by {{ (user.deletedBy.firstName ~ ' ' ~ user.deletedBy.lastName)|trim ?: user.deletedBy.email }}{% endif %}.
+      Their personal details have been removed; their booking and payment history is kept below.
+    </span>
+  </div>
+{% endif %}
+
 {% if duplicates is not empty %}
   {% set dupeQuery = user.firstName ~ ' ' ~ user.lastName %}
   <div class="duplicate-warning">
-    <span class="duplicate-warning__icon">⚠</span>
+    <span class="duplicate-warning__icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
     <span>
       {{ duplicates|length }} other {{ duplicates|length == 1 ? 'member' : 'members' }} found with the name <strong>{{ dupeQuery }}</strong>.
       <a href="{{ path('app_admin_users', {q: dupeQuery}) }}" class="duplicate-warning__link">View all matches</a>
@@ -49,7 +76,11 @@
     <div>
       <div class="card__label">Email</div>
       <div class="card__value">
-        <a href="mailto:{{ user.email }}" style="color:var(--teal);">{{ user.email }}</a>
+        {% if user.email %}
+          <a href="mailto:{{ user.email }}" style="color:var(--teal);">{{ user.email }}</a>
+        {% elseif not user.email2 and not user.email3 %}
+          —
+        {% endif %}
         {% if user.email2 %}
           <br><a href="mailto:{{ user.email2 }}" style="color:var(--teal);font-size:0.85rem;">{{ user.email2 }}</a>
         {% endif %}
@@ -115,6 +146,24 @@
 </div>
 {% endif %}
 
+{% if user.family is not empty %}
+<div class="card" id="family">
+  <div class="card__label" style="margin-bottom:0.6rem;">Family</div>
+  <div class="card__value">
+    {% for member in user.family %}
+      {% set memberName = (member.firstName ~ ' ' ~ member.lastName)|trim ?: member.email %}
+      {% set isParent = member == user.familyParent %}
+      {% if member == user %}
+        <span{% if isParent %} style="font-weight:700;"{% endif %}>{{ memberName }}</span>
+      {% else %}
+        <a href="{{ path('app_admin_user_show', {id: member.id}) }}" style="color:var(--teal);{% if isParent %} font-weight:700;{% endif %}">{{ memberName }}</a>
+      {% endif %}
+      {%- if not loop.last %}, {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Tags</div>
   {% if user.tags is empty %}
@@ -149,6 +198,14 @@
               · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
             {% else %}
               · System
+            {% endif %}
+            {% if note.addedBy and note.addedBy == app.user %}
+              · <form method="post" action="{{ path('app_admin_user_delete_note', {id: user.id, noteId: note.id}) }}"
+                      style="display:inline;"
+                      onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_note_' ~ note.id) }}">
+                  <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete</button>
+                </form>
             {% endif %}
           </p>
         </div>

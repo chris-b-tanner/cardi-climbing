@@ -18,6 +18,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -36,16 +37,19 @@ class AdminController extends AbstractController
             ? (int) $request->query->get('tag')
             : null;
 
-        $users = $userRepository->search($query, $tagId);
+        $users     = $userRepository->search($query, $tagId);
+        $parentIds = $userRepository->findParentIds();
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/users/_list.html.twig', [
-                'users' => $users,
+                'users'     => $users,
+                'parentIds' => $parentIds,
             ]);
         }
 
         return $this->render('admin/users/index.html.twig', [
             'users'        => $users,
+            'parentIds'    => $parentIds,
             'tags'         => $tagRepository->findBy([], ['name' => 'ASC']),
             'currentQuery' => $query,
             'currentTagId' => $tagId,
@@ -67,23 +71,19 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_home');
             }
 
-            $email = trim($request->request->get('email', ''));
+            $email = trim($request->request->get('email', '')) ?: null;
 
-            if ($userRepository->findOneBy(['email' => $email])) {
+            if ($email !== null && $userRepository->findOneBy(['email' => $email])) {
                 $error = 'A member with that email address already exists.';
             } else {
                 $user = new User();
                 $user->setEmail($email);
                 $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
                 $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
+                $user->setOptIn($request->request->has('optIn'));
 
-                $role = $request->request->get('role', User::ROLE_MEMBER);
-                if ($this->isGranted('ROLE_ADMIN') && in_array($role, [User::ROLE_ADMIN, User::ROLE_TEAM, User::ROLE_MEMBER], true)) {
-                    $user->setRoles([$role]);
-                }
-
-                $password = $request->request->get('password', '');
-                $user->setPassword($hasher->hashPassword($user, $password));
+                // No login for this contact until they set a password via "forgot password" — requires an email on file.
+                $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(32))));
 
                 $em->persist($user);
 
@@ -129,8 +129,10 @@ class AdminController extends AbstractController
         User $user,
         EntityManagerInterface $em,
         TagRepository $tagRepository,
+        UserRepository $userRepository,
     ): Response {
         $allTags = $tagRepository->findBy([], ['name' => 'ASC']);
+        $canHaveDependents = $user->getParent() === null && $user->getEmail() !== null;
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('admin_edit_' . $user->getId(), $request->request->get('_csrf_token'))) {
@@ -138,9 +140,16 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_home');
             }
 
+            $newEmail = trim($request->request->get('email', '')) ?: null;
+
+            if ($newEmail === null && $user->hasDependents()) {
+                $this->addFlash('error', 'Cannot remove this member\'s email address while they have dependents — remove their dependents first.');
+                return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+            }
+
             $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
             $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
-            $user->setEmail(trim($request->request->get('email', '')));
+            $user->setEmail($newEmail);
             $user->setEmail2(trim($request->request->get('email2', '')) ?: null);
             $user->setEmail3(trim($request->request->get('email3', '')) ?: null);
             $user->setMemo(trim($request->request->get('memo', '')) ?: null);
@@ -181,6 +190,23 @@ class AdminController extends AbstractController
                 }
             }
 
+            if ($canHaveDependents) {
+                $submittedDependentIds = array_map('intval', $request->request->all('dependents'));
+
+                foreach ($user->getDependents()->toArray() as $existingDependent) {
+                    if (!in_array($existingDependent->getId(), $submittedDependentIds, true)) {
+                        $existingDependent->setParent(null);
+                    }
+                }
+
+                foreach ($submittedDependentIds as $dependentId) {
+                    $candidate = $userRepository->find($dependentId);
+                    if ($candidate && $candidate !== $user && !$candidate->hasDependents()) {
+                        $candidate->setParent($user);
+                    }
+                }
+            }
+
             $em->flush();
 
             $this->addFlash('success', 'Member updated.');
@@ -188,9 +214,33 @@ class AdminController extends AbstractController
         }
 
         return $this->render('admin/users/edit.html.twig', [
-            'user'    => $user,
-            'allTags' => $allTags,
+            'user'              => $user,
+            'allTags'           => $allTags,
+            'canHaveDependents' => $canHaveDependents,
         ]);
+    }
+
+    /** Search members eligible to be recorded as a dependent of {id} — excludes the member themselves and anyone who already has dependents of their own. */
+    #[Route('/users/{id}/dependent-search', name: 'app_admin_user_dependent_search', requirements: ['id' => '\d+'])]
+    public function dependentSearch(Request $request, User $user, UserRepository $userRepository): JsonResponse
+    {
+        $query = trim($request->query->get('q', ''));
+
+        if (mb_strlen($query) < 2 || !$user->getEmail()) {
+            return $this->json([]);
+        }
+
+        $candidates = $userRepository->searchPotentialDependents($user, $query, 20);
+
+        return $this->json(array_map(static function (User $candidate) {
+            $displayName = trim(($candidate->getFirstName() ?? '') . ' ' . ($candidate->getLastName() ?? ''));
+            $name        = $displayName ?: ($candidate->getEmail() ?: 'Member #' . $candidate->getId());
+
+            return [
+                'id'    => $candidate->getId(),
+                'label' => $candidate->getEmail() ? $name . ' — ' . $candidate->getEmail() : $name,
+            ];
+        }, $candidates));
     }
 
     #[Route('/users/merge', name: 'app_admin_user_merge', methods: ['GET', 'POST'])]
@@ -295,7 +345,7 @@ class AdminController extends AbstractController
 
     #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function deleteUser(Request $request, User $user, EntityManagerInterface $em): Response
+    public function deleteUser(Request $request, User $user, EntityManagerInterface $em, AttendeeRepository $attendeeRepository): Response
     {
         if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -307,11 +357,84 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
+        if ($user->hasDependents()) {
+            $this->addFlash('error', 'Cannot delete a member with dependents — remove their dependents first.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if ($attendeeRepository->findAllForUser($user) || !$user->getPayments()->isEmpty()) {
+            $this->addFlash('error', 'Cannot delete a member with bookings or payments on record — archive them instead.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
         $em->remove($user);
         $em->flush();
 
         $this->addFlash('success', 'Member deleted.');
         return $this->redirectToRoute('app_admin_users');
+    }
+
+    /**
+     * "Delete" for a member with transactional history: scrubs personal details and marks
+     * the record as archived, but keeps the row (and thus their bookings/payments) intact.
+     */
+    #[Route('/users/{id}/archive', name: 'app_admin_user_archive', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function archiveUser(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('archive_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($user === $this->getUser()) {
+            $this->addFlash('error', 'You cannot archive your own account.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if ($user->isDeleted()) {
+            $this->addFlash('error', 'This member has already been archived.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if ($user->hasDependents()) {
+            $this->addFlash('error', 'Cannot archive a member with dependents — remove their dependents first.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $reason = trim($request->request->get('reason', ''));
+        if ($reason === '') {
+            $this->addFlash('error', 'Please give a reason for archiving this member.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $note = new Note();
+        $note->setUser($user);
+        $note->setContent('Member archived. Reason: ' . $reason);
+        $note->setAddedBy($admin);
+        $em->persist($note);
+
+        $user->setFirstName('Deleted');
+        $user->setLastName(null);
+        $user->setEmail(null);
+        $user->setEmail2(null);
+        $user->setEmail3(null);
+        $user->setAddressLine1(null);
+        $user->setAddressLine2(null);
+        $user->setTown(null);
+        $user->setPostcode(null);
+        $user->setEmergencyContactName(null);
+        $user->setEmergencyContactPhone(null);
+        $user->setDeletedAt(new \DateTimeImmutable());
+        $user->setDeletedBy($admin);
+
+        $em->flush();
+
+        $this->addFlash('success', 'Member archived.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
     #[Route('/users/{id}/notes', name: 'app_admin_user_add_note', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -337,6 +460,34 @@ class AdminController extends AbstractController
             $em->flush();
         }
 
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
+    /** Only the note's own author can delete it. */
+    #[Route('/users/{id}/notes/{noteId}/delete', name: 'app_admin_user_delete_note', requirements: ['id' => '\d+', 'noteId' => '\d+'], methods: ['POST'])]
+    public function deleteNote(Request $request, User $user, int $noteId, EntityManagerInterface $em): Response
+    {
+        $note = $em->getRepository(Note::class)->find($noteId);
+
+        if (!$note || $note->getUser() !== $user) {
+            $this->addFlash('error', 'Note not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('delete_note_' . $note->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($note->getAddedBy() !== $this->getUser()) {
+            $this->addFlash('error', 'You can only delete notes you added.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $em->remove($note);
+        $em->flush();
+
+        $this->addFlash('success', 'Note deleted.');
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
@@ -380,6 +531,11 @@ class AdminController extends AbstractController
         if (!$certification) {
             $this->addFlash('error', 'Certification not found.');
             return $this->redirectToRoute('app_admin_user_certification_pick', ['id' => $user->getId()]);
+        }
+
+        if (!$user->getEmail()) {
+            $this->addFlash('error', 'This member has no email address on file — add one before assigning a certification, since they need to be emailed a link to complete it.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
         $alreadyHeld = null;
@@ -464,6 +620,11 @@ class AdminController extends AbstractController
 
         if ($record->isSubmitted()) {
             $this->addFlash('error', 'That certification has already been submitted.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        }
+
+        if (!$user->getEmail()) {
+            $this->addFlash('error', 'This member has no email address on file — add one before resending the invitation.');
             return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
         }
 

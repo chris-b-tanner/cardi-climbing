@@ -24,7 +24,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180, unique: true)]
+    #[ORM\Column(length: 180, unique: true, nullable: true)]
     private ?string $email = null;
 
     #[ORM\Column]
@@ -96,6 +96,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $payments;
 
+    /** The member this one is a dependent of, if any. Used to let dependents inherit the parent's family membership. */
+    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'dependents')]
+    #[ORM\JoinColumn(name: 'parent_id', onDelete: 'SET NULL')]
+    private ?User $parent = null;
+
+    /** Members recorded as dependents of this one. */
+    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
+    #[ORM\OrderBy(['firstName' => 'ASC', 'lastName' => 'ASC'])]
+    private Collection $dependents;
+
+    /** When this member was archived (soft-deleted) — their personal details have been scrubbed but their transactional history is kept. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $deletedAt = null;
+
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?User $deletedBy = null;
+
     public function __construct()
     {
         $this->createdAt      = new \DateTimeImmutable();
@@ -104,6 +122,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->certifications = new ArrayCollection();
         $this->notes          = new ArrayCollection();
         $this->payments       = new ArrayCollection();
+        $this->dependents     = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -116,7 +135,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->email;
     }
 
-    public function setEmail(string $email): static
+    public function setEmail(?string $email): static
     {
         $this->email = $email;
 
@@ -283,4 +302,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /** This member's payments, most recent first. */
     public function getPayments(): Collection { return $this->payments; }
+
+    /** The member this one is a dependent of, if any. */
+    public function getParent(): ?User { return $this->parent; }
+    public function setParent(?User $parent): static { $this->parent = $parent; return $this; }
+
+    /** Members recorded as dependents of this one. */
+    public function getDependents(): Collection { return $this->dependents; }
+
+    public function hasDependents(): bool { return !$this->dependents->isEmpty(); }
+
+    /** The parent of this member's family group — this member itself if it has dependents, otherwise its parent. Null if not part of a family group. */
+    public function getFamilyParent(): ?User
+    {
+        return $this->parent ?? ($this->hasDependents() ? $this : null);
+    }
+
+    /** Everyone in this member's family group (the parent plus all its dependents), or empty if it's not part of one. */
+    public function getFamily(): array
+    {
+        $parent = $this->getFamilyParent();
+
+        return $parent ? [$parent, ...$parent->getDependents()] : [];
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable { return $this->deletedAt; }
+    public function setDeletedAt(?\DateTimeImmutable $deletedAt): static { $this->deletedAt = $deletedAt; return $this; }
+
+    public function getDeletedBy(): ?User { return $this->deletedBy; }
+    public function setDeletedBy(?User $deletedBy): static { $this->deletedBy = $deletedBy; return $this; }
+
+    public function isDeleted(): bool { return $this->deletedAt !== null; }
 }

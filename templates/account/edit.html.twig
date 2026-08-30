@@ -220,6 +220,19 @@
           </div>
         </div>
 
+        {% if user.dependents is not empty %}
+        <div class="account-card">
+          <div class="account-card__title">Dependents</div>
+          <div class="field" style="margin-bottom:0;">
+            {% for dependent in user.dependents %}
+              <div style="font-size:0.9375rem;color:#1a1a1a;{% if not loop.last %}margin-bottom:0.4rem;{% endif %}">
+                {{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
         <div class="account-actions">
           <button type="submit" class="btn btn--teal">Save changes</button>
           <span class="reset-link">

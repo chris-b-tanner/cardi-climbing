@@ -35,7 +35,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
             ->leftJoin('u.notes', 'n')
-            ->addSelect('t');
+            ->leftJoin('u.parent', 'p')
+            ->addSelect('t')
+            ->addSelect('p');
 
         if ($query !== '') {
             $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.memo LIKE :q OR n.content LIKE :q')
@@ -68,6 +70,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin('u.tags', 't')
             ->addSelect('t')
             ->where('u.optIn = true')
+            ->andWhere('u.email IS NOT NULL')
             ->orderBy('u.lastName', 'ASC')
             ->addOrderBy('u.firstName', 'ASC');
 
@@ -114,6 +117,45 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             $roles = $user->getRoles();
             return in_array(User::ROLE_ADMIN, $roles, true) || in_array(User::ROLE_TEAM, $roles, true);
         }));
+    }
+
+    /**
+     * IDs of every member who has at least one dependent. One query, used to flag parents in a
+     * member list without loading each row's dependents collection (which would be one query per row).
+     *
+     * @return int[]
+     */
+    public function findParentIds(): array
+    {
+        $rows = $this->createQueryBuilder('u')
+            ->select('IDENTITY(u.parent) AS parentId')
+            ->where('u.parent IS NOT NULL')
+            ->distinct()
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map(static fn(array $row) => (int) $row['parentId'], $rows);
+    }
+
+    /**
+     * Members matching $query who could be recorded as a dependent of $parent: everyone except
+     * $parent themselves and anyone who already has dependents of their own (no dependent chains).
+     * Members already dependent of someone else are included, since assigning them here
+     * reassigns them (a dependent can only have one parent).
+     *
+     * @return User[]
+     */
+    public function searchPotentialDependents(User $parent, string $query, int $limit = 20): array
+    {
+        // Over-fetch since some results get filtered out below, then trim back to $limit.
+        $candidates = $this->search($query, null, $limit + 20);
+
+        $filtered = array_values(array_filter(
+            $candidates,
+            static fn(User $candidate) => $candidate !== $parent && !$candidate->hasDependents(),
+        ));
+
+        return array_slice($filtered, 0, $limit);
     }
 
     public function findByFullName(string $firstName, string $lastName, int $excludeId): array

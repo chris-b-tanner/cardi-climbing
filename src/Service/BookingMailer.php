@@ -23,7 +23,7 @@ class BookingMailer
         $email = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))
             ->to($user->getEmail())
-            ->subject('Booking confirmed: ' . $event->getTitle() . ' — Y Wal')
+            ->subject('Booking confirmed: ' . $event->getTitle() . ' (' . $occurrenceDate->format('d M Y') . ') — Y Wal')
             ->htmlTemplate('email/booking_confirmation.html.twig')
             ->textTemplate('email/booking_confirmation.txt.twig')
             ->context([
