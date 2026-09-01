@@ -36,14 +36,18 @@ class AdminController extends AbstractController
         $tagId = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
             ? (int) $request->query->get('tag')
             : null;
+        $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
+        $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
 
-        $users     = $userRepository->search($query, $tagId);
+        $users     = $userRepository->search($query, $tagId, null, $sort, $dir);
         $parentIds = $userRepository->findParentIds();
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/users/_list.html.twig', [
-                'users'     => $users,
-                'parentIds' => $parentIds,
+                'users'       => $users,
+                'parentIds'   => $parentIds,
+                'currentSort' => $sort,
+                'currentDir'  => $dir,
             ]);
         }
 
@@ -53,6 +57,8 @@ class AdminController extends AbstractController
             'tags'         => $tagRepository->findBy([], ['name' => 'ASC']),
             'currentQuery' => $query,
             'currentTagId' => $tagId,
+            'currentSort'  => $sort,
+            'currentDir'   => $dir,
         ]);
     }
 

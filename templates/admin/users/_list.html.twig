@@ -11,9 +11,14 @@
       <thead>
         <tr>
           {% if is_granted('ROLE_ADMIN') %}<th class="admin-table__check"><span class="sr-only">Select</span></th>{% endif %}
-          <th>ID</th>
-          <th>Name</th>
-          <th>Email</th>
+          {% for col, label in {id: 'ID', name: 'Name', email: 'Email'} %}
+            <th class="admin-table__sortable{{ currentSort == col ? ' is-sorted' : '' }}" data-sort="{{ col }}">
+              {{ label }}
+              {% if currentSort == col %}
+                <span class="admin-table__sort-arrow">{{ currentDir == 'desc' ? '▼' : '▲' }}</span>
+              {% endif %}
+            </th>
+          {% endfor %}
           <th>Tags</th>
         </tr>
       </thead>

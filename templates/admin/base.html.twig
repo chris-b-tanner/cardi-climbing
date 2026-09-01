@@ -252,6 +252,12 @@
     .admin-table__link { color: var(--black); font-weight: 500; text-decoration: none; }
     .admin-table__link:hover { color: var(--teal-dk); text-decoration: underline; }
     .admin-table__muted { color: var(--muted); }
+    .admin-table th.admin-table__sortable {
+      cursor: pointer; user-select: none;
+    }
+    .admin-table th.admin-table__sortable:hover { color: var(--teal-dk); }
+    .admin-table th.admin-table__sortable.is-sorted { color: var(--teal-dk); }
+    .admin-table__sort-arrow { font-size: 0.6rem; margin-left: 0.2rem; }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;

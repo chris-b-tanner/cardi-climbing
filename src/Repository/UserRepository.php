@@ -30,7 +30,8 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
-    public function search(string $query = '', ?int $tagId = null, ?int $limit = null): array
+    /** @param 'id'|'name'|'email' $sort */
+    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc'): array
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
@@ -54,13 +55,21 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             $qb->setMaxResults($limit);
         }
 
-        return $qb
-            ->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
-            ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')
-            ->orderBy('sortLast', 'ASC')
-            ->addOrderBy('sortFirst', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $direction = strtolower($dir) === 'desc' ? 'DESC' : 'ASC';
+
+        if ($sort === 'id') {
+            $qb->orderBy('u.id', $direction);
+        } elseif ($sort === 'email') {
+            $qb->addSelect('COALESCE(u.email, \'\') AS HIDDEN sortEmail')
+               ->orderBy('sortEmail', $direction);
+        } else {
+            $qb->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
+               ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')
+               ->orderBy('sortLast', $direction)
+               ->addOrderBy('sortFirst', $direction);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /** @param int[] $tagIds Empty = all opted-in members */

@@ -54,6 +54,9 @@
   const mergeUrl    = '{{ path('app_admin_user_merge') }}';
   let debounce;
 
+  let currentSort = {{ currentSort|json_encode|raw }};
+  let currentDir  = {{ currentDir|json_encode|raw }};
+
   const selected = new Set();
 
   function syncCheckboxes() {
@@ -97,6 +100,8 @@
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
     if (tagSelect.value)   params.set('tag', tagSelect.value);
+    if (currentSort !== 'name') params.set('sort', currentSort);
+    if (currentDir !== 'asc')   params.set('dir', currentDir);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -124,6 +129,17 @@
   });
 
   tagSelect.addEventListener('change', fetchResults);
+
+  // Sortable column headers — delegated since the table is replaced on every fetch.
+  results.addEventListener('click', (e) => {
+    const th = e.target.closest('.admin-table__sortable');
+    if (!th) return;
+
+    const col = th.dataset.sort;
+    currentDir  = (currentSort === col && currentDir === 'asc') ? 'desc' : 'asc';
+    currentSort = col;
+    fetchResults();
+  });
 
   // Wire up checkboxes on initial load
   attachCheckboxListeners();
