@@ -155,6 +155,7 @@ class AdminController extends AbstractController
 
             $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
             $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
+            $user->setCompany(trim($request->request->get('company', '')) ?: null);
             $user->setEmail($newEmail);
             $user->setEmail2(trim($request->request->get('email2', '')) ?: null);
             $user->setEmail3(trim($request->request->get('email3', '')) ?: null);

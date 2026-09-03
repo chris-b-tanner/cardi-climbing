@@ -1,3 +1,10 @@
+app_survey_redirect:
+    path: /survey
+    controller: Symfony\Bundle\FrameworkBundle\Controller\RedirectController::urlRedirectAction
+    defaults:
+        path: https://forms.gle/c3YfdxHAJ7hfNz6Z9
+        permanent: true
+
 controllers:
     resource:
         path: ../src/Controller/

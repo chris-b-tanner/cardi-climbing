@@ -158,6 +158,11 @@
             </div>
           </div>
           <div class="field">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company"
+                   value="{{ user.company }}" autocomplete="organization">
+          </div>
+          <div class="field">
             <label for="email">Email address</label>
             <input type="email" id="email" name="email"
                    value="{{ user.email }}" autocomplete="email" required>

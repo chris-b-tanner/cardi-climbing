@@ -19,6 +19,7 @@
               {% endif %}
             </th>
           {% endfor %}
+          <th>Company</th>
           <th>Tags</th>
         </tr>
       </thead>
@@ -47,6 +48,7 @@
               {% endif %}
             </td>
             <td class="admin-table__muted">{{ user.email ?: '—' }}</td>
+            <td class="admin-table__muted">{{ user.company ?: '—' }}</td>
             <td>
               {% for tag in user.tags %}
                 <span class="tag-badge">{{ tag.name }}</span>

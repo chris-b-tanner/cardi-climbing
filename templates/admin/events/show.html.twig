@@ -204,6 +204,7 @@
     </div>
     <div class="btn-row">
       {% if attendees is not empty %}
+        <a href="{{ path('app_admin_event_attendees_print', event.isRecurring ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id}) }}" class="btn btn--ghost btn--sm" target="_blank"><i class="bi bi-printer-fill"></i> Print attendee list</a>
         {% if event.isRecurring %}
           <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email this date</a>
           <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email series</a>

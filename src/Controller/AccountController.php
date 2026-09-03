@@ -46,6 +46,7 @@ class AccountController extends AbstractController
             if (!$error) {
                 $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
                 $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
+                $user->setCompany(trim($request->request->get('company', '')) ?: null);
                 $user->setEmail($newEmail);
                 $user->setPhone(trim($request->request->get('phone', '')) ?: null);
                 $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);

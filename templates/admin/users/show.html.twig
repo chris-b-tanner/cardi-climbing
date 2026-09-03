@@ -74,6 +74,10 @@
       <div class="card__value">{{ user.lastName ?: '—' }}</div>
     </div>
     <div>
+      <div class="card__label">Company</div>
+      <div class="card__value">{{ user.company ?: '—' }}</div>
+    </div>
+    <div>
       <div class="card__label">Email</div>
       <div class="card__value">
         {% if user.email %}

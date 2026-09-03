@@ -89,17 +89,7 @@ class AdminEventController extends AbstractController
         $nextDate       = null;
 
         if ($event->isRecurring()) {
-            $requestedDate = null;
-            $requestedRaw  = $request->query->get('date', '');
-            if ($requestedRaw !== '') {
-                try {
-                    $requestedDate = new \DateTimeImmutable($requestedRaw);
-                } catch (\Exception) {
-                    $requestedDate = null;
-                }
-            }
-
-            $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate);
+            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
             $prevDate       = $this->adjacentOccurrence($event, $occurrenceDate, -1);
             $nextDate       = $this->adjacentOccurrence($event, $occurrenceDate, 1);
 
@@ -118,6 +108,39 @@ class AdminEventController extends AbstractController
             'prevDate'       => $prevDate,
             'nextDate'       => $nextDate,
             'staffing'       => $staffing,
+        ]);
+    }
+
+    /** A print-friendly page listing this occurrence's non-cancelled attendees — name, email, and membership number. */
+    #[Route('/{id}/attendees/print', name: 'app_admin_event_attendees_print', requirements: ['id' => '\d+'])]
+    public function printAttendees(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    {
+        $occurrenceDate = null;
+
+        if ($event->isRecurring()) {
+            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
+            $attendees      = $attendeeRepository->findForEventOccurrence($event, $occurrenceDate);
+        } else {
+            $attendees = $attendeeRepository->findForEvent($event);
+        }
+
+        $attendees = array_values(array_filter(
+            $attendees,
+            static fn(Attendee $attendee) => !$attendee->isCancelled(),
+        ));
+
+        usort($attendees, static function (Attendee $a, Attendee $b) {
+            $userA = $a->getUser();
+            $userB = $b->getUser();
+
+            return [strtolower($userA->getFirstName() ?? ''), strtolower($userA->getLastName() ?? '')]
+                <=> [strtolower($userB->getFirstName() ?? ''), strtolower($userB->getLastName() ?? '')];
+        });
+
+        return $this->render('admin/events/attendees_print.html.twig', [
+            'event'          => $event,
+            'attendees'      => $attendees,
+            'occurrenceDate' => $occurrenceDate,
         ]);
     }
 
@@ -411,6 +434,22 @@ class AdminEventController extends AbstractController
                 $em->remove($requirement);
             }
         }
+    }
+
+    /** Parses the `?date=` query param (if any) and resolves it to a real occurrence of this recurring event. */
+    private function resolveOccurrenceDateFromRequest(Request $request, Event $event): \DateTimeImmutable
+    {
+        $requestedDate = null;
+        $requestedRaw  = $request->query->get('date', '');
+        if ($requestedRaw !== '') {
+            try {
+                $requestedDate = new \DateTimeImmutable($requestedRaw);
+            } catch (\Exception) {
+                $requestedDate = null;
+            }
+        }
+
+        return $this->resolveOccurrenceDate($event, $requestedDate);
     }
 
     /**
