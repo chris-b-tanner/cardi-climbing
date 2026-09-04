@@ -194,6 +194,7 @@ class AdminEventController extends AbstractController
     {
         $year  = (int) $request->query->get('year', (int) date('Y'));
         $month = (int) $request->query->get('month', (int) date('n'));
+        $q     = trim($request->query->get('q', ''));
 
         $year  += intdiv($month - 1, 12);
         $month = (($month - 1) % 12 + 12) % 12 + 1;
@@ -241,6 +242,10 @@ class AdminEventController extends AbstractController
                     continue;
                 }
 
+                if ($q !== '' && stripos($event->getTitle(), $q) === false) {
+                    continue;
+                }
+
                 $key = $this->occurrenceKey($event, $day);
                 $coverage   = [];
                 $shortfalls = [];
@@ -273,6 +278,7 @@ class AdminEventController extends AbstractController
             'nextYear'         => $monthStart->modify('+1 month')->format('Y'),
             'nextMonth'        => $monthStart->modify('+1 month')->format('n'),
             'today'            => $today,
+            'q'                => $q,
         ]);
     }
 

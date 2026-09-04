@@ -250,6 +250,41 @@ class AdminController extends AbstractController
         }, $candidates));
     }
 
+    /** Make {id} the parent of its family, moving the current parent and all other dependents under them. */
+    #[Route('/users/{id}/make-parent', name: 'app_admin_user_make_parent', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function makeParent(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('make_parent_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $oldParent = $user->getFamilyParent();
+
+        if ($oldParent === null || $oldParent === $user) {
+            $this->addFlash('error', 'This member is already the family parent.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$user->getEmail()) {
+            $this->addFlash('error', 'Cannot make this member the family parent — they don\'t have an email address.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        foreach ($oldParent->getDependents()->toArray() as $dependent) {
+            if ($dependent !== $user) {
+                $dependent->setParent($user);
+            }
+        }
+        $oldParent->setParent($user);
+        $user->setParent(null);
+
+        $em->flush();
+
+        $this->addFlash('success', 'Family parent updated.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
     #[Route('/users/merge', name: 'app_admin_user_merge', methods: ['GET', 'POST'])]
     #[IsGranted('ROLE_ADMIN')]
     public function mergeUsers(

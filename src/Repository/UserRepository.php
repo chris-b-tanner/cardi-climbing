@@ -79,7 +79,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin('u.tags', 't')
             ->addSelect('t')
             ->where('u.optIn = true')
-            ->andWhere('u.email IS NOT NULL')
+            ->andWhere("u.email IS NOT NULL AND u.email != ''")
             ->orderBy('u.lastName', 'ASC')
             ->addOrderBy('u.firstName', 'ASC');
 

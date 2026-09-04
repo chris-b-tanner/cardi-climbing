@@ -1,0 +1,65 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New membership type — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New membership type</h1>
+  <a href="{{ path('app_admin_settings_membership_types') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_membership_type_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_membership_type_new') }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ app.request.request.get('name') }}" autocomplete="off" required>
+    </div>
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="3"
+                style="resize:vertical;font-family:inherit;line-height:1.6;">{{ app.request.request.get('description') }}</textarea>
+    </div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="price">Price (£)</label>
+        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0"
+               value="{{ app.request.request.get('price', '0.00') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="duration">Duration</label>
+        <select id="duration" name="duration" class="form-control">
+          {% set selectedDuration = app.request.request.get('duration', 'month') %}
+          <option value="day" {{ selectedDuration == 'day' ? 'selected' : '' }}>Day</option>
+          <option value="month" {{ selectedDuration == 'month' ? 'selected' : '' }}>Month</option>
+          <option value="year" {{ selectedDuration == 'year' ? 'selected' : '' }}>Year</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          {% set selectedStatus = app.request.request.get('status', 'active') %}
+          <option value="active" {{ selectedStatus == 'active' ? 'selected' : '' }}>Active</option>
+          <option value="inactive" {{ selectedStatus == 'inactive' ? 'selected' : '' }}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;">
+        <input type="checkbox" name="isFamily" value="1" {{ app.request.request.has('isFamily') ? 'checked' : '' }} style="width:auto;">
+        Family membership
+      </label>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Create membership type</button>
+    <a href="{{ path('app_admin_settings_membership_types') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

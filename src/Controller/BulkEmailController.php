@@ -139,9 +139,17 @@ class BulkEmailController extends AbstractController
             return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
         }
 
-        $sent = 0;
+        $sent    = 0;
+        $skipped = [];
 
         foreach ($recipients as $user) {
+            // Defends every audience type (not just the opted-in list, which already filters this
+            // out) — a member with no usable email address should never be able to halt the batch.
+            if (!$user->getEmail()) {
+                $skipped[] = $user;
+                continue;
+            }
+
             $context = [
                 'subject' => $subject,
                 'body'    => $body,
@@ -162,11 +170,31 @@ class BulkEmailController extends AbstractController
                 ->textTemplate('email/bulk.txt.twig')
                 ->context($context);
 
-            $mailer->send($email);
-            $sent++;
+            try {
+                $mailer->send($email);
+                $sent++;
+            } catch (\Throwable $e) {
+                // One bad address (or a transient mailer error) shouldn't halt the whole batch and
+                // leave everyone after it in the list never emailed.
+                $skipped[] = $user;
+                error_log('Bulk email failed for user ' . $user->getId() . ': ' . $e->getMessage());
+            }
         }
 
         $this->addFlash('success', sprintf('Email sent to %d member%s.', $sent, $sent === 1 ? '' : 's'));
+        if ($skipped) {
+            $this->addFlash('error', sprintf(
+                '%d member%s could not be emailed and %s skipped: %s.',
+                count($skipped),
+                count($skipped) === 1 ? '' : 's',
+                count($skipped) === 1 ? 'was' : 'were',
+                implode(', ', array_map(
+                    static fn(User $u) => (trim(($u->getFirstName() ?? '') . ' ' . ($u->getLastName() ?? ''))) . ' (#' . $u->getId() . ')',
+                    $skipped,
+                )),
+            ));
+        }
+
         return $this->redirectToRoute('app_admin_email_compose');
     }
 

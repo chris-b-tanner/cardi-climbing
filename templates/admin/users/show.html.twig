@@ -162,6 +162,14 @@
       {% else %}
         <a href="{{ path('app_admin_user_show', {id: member.id}) }}" style="color:var(--teal);{% if isParent %} font-weight:700;{% endif %}">{{ memberName }}</a>
       {% endif %}
+      {% if member == user and not isParent %}
+        <form method="post" action="{{ path('app_admin_user_make_parent', {id: member.id}) }}"
+              style="display:inline;"
+              onsubmit="return confirm('Make {{ memberName|e('js') }} the parent of this family?');">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('make_parent_' ~ member.id) }}">
+          <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">(make parent)</button>
+        </form>
+      {% endif %}
       {%- if not loop.last %}, {% endif %}
     {% endfor %}
   </div>
@@ -324,9 +332,12 @@
             <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
           </div>
           <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-            Started {{ record.startedAt|date('d M Y') }}
-            {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
-            {% if record.approved %} · Approved {{ record.approvedAt|date('d M Y') }}{% endif %}
+            {% if record.status == 'completed' %}
+              Approved {{ record.approvedAt|date('d M Y') }}
+            {% else %}
+              Started {{ record.startedAt|date('d M Y') }}
+              {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
+            {% endif %}
             {% if is_granted('ROLE_ADMIN') %}
               · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
             {% endif %}

@@ -1,0 +1,85 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Edit {{ membershipType.name }} — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit membership type</h1>
+  <a href="{{ path('app_admin_settings_membership_types') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_membership_type_edit', {id: membershipType.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_membership_type_edit_' ~ membershipType.id) }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ membershipType.name }}" autocomplete="off" required>
+    </div>
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="3"
+                style="resize:vertical;font-family:inherit;line-height:1.6;">{{ membershipType.description }}</textarea>
+    </div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="price">Price (£)</label>
+        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0"
+               value="{{ membershipType.price }}" required>
+      </div>
+      <div class="form-group">
+        <label for="duration">Duration</label>
+        <select id="duration" name="duration" class="form-control">
+          <option value="day" {{ membershipType.duration == 'day' ? 'selected' : '' }}>Day</option>
+          <option value="month" {{ membershipType.duration == 'month' ? 'selected' : '' }}>Month</option>
+          <option value="year" {{ membershipType.duration == 'year' ? 'selected' : '' }}>Year</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="active" {{ membershipType.status == 'active' ? 'selected' : '' }}>Active</option>
+          <option value="inactive" {{ membershipType.status == 'inactive' ? 'selected' : '' }}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;">
+        <input type="checkbox" name="isFamily" value="1" {{ membershipType.isFamily ? 'checked' : '' }} style="width:auto;">
+        Family membership
+      </label>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_settings_membership_types') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div class="card__label" style="margin-bottom:0.3rem;">Danger zone</div>
+      <p style="font-size:0.8rem;color:var(--muted);">
+        {% if membershipType.memberships is empty %}
+          Permanently delete this membership type. This cannot be undone.
+        {% else %}
+          {{ membershipType.memberships|length }} member{{ membershipType.memberships|length == 1 ? '' : 's' }} hold a membership against this type, so it can't be deleted. Mark it inactive instead.
+        {% endif %}
+      </p>
+    </div>
+    {% if membershipType.memberships is empty %}
+      <form method="post" action="{{ path('app_admin_settings_membership_type_delete', {id: membershipType.id}) }}"
+            onsubmit="return confirm('Permanently delete {{ membershipType.name|e('js') }}? This cannot be undone.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_membership_type_delete_' ~ membershipType.id) }}">
+        <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

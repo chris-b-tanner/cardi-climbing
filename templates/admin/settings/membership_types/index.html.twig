@@ -1,0 +1,53 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Membership types — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Membership types</h1>
+  <a href="{{ path('app_admin_settings_membership_type_new') }}" class="btn btn--teal btn--sm">+ New membership type</a>
+</div>
+
+{% if membershipTypes is empty %}
+  <div class="empty">
+    <strong>No membership types yet</strong>
+    Create one to start signing members up.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Price</th>
+          <th>Duration</th>
+          <th>Family</th>
+          <th>Status</th>
+          <th>Held by</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for membershipType in membershipTypes %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_membership_type_edit', {id: membershipType.id}) }}" class="admin-table__link">
+                {{ membershipType.name }}
+              </a>
+            </td>
+            <td class="admin-table__muted">£{{ membershipType.price }}</td>
+            <td class="admin-table__muted">{{ membershipType.durationLabel }}</td>
+            <td class="admin-table__muted">{{ membershipType.isFamily ? 'Yes' : 'No' }}</td>
+            <td>
+              <span class="status-pill{{ membershipType.isActive ? ' status-pill--published' : ' status-pill--cancelled' }}">{{ membershipType.statusLabel }}</span>
+            </td>
+            <td class="admin-table__muted">{{ membershipType.memberships|length }}</td>
+            <td class="btn-row" style="flex-wrap:nowrap;">
+              <a href="{{ path('app_admin_settings_membership_type_edit', {id: membershipType.id}) }}" class="admin-table__link">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

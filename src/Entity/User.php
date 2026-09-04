@@ -99,6 +99,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $payments;
 
+    /** This member's memberships — a full history, since changing membership is a cancel-and-create process rather than an edit. */
+    #[ORM\OneToMany(targetEntity: Membership::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    private Collection $memberships;
+
     /** The member this one is a dependent of, if any. Used to let dependents inherit the parent's family membership. */
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'dependents')]
     #[ORM\JoinColumn(name: 'parent_id', onDelete: 'SET NULL')]
@@ -125,6 +130,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->certifications = new ArrayCollection();
         $this->notes          = new ArrayCollection();
         $this->payments       = new ArrayCollection();
+        $this->memberships    = new ArrayCollection();
         $this->dependents     = new ArrayCollection();
     }
 
@@ -317,6 +323,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /** This member's payments, most recent first. */
     public function getPayments(): Collection { return $this->payments; }
+
+    /** This member's memberships, most recent first. */
+    public function getMemberships(): Collection { return $this->memberships; }
+
+    /** The member's current membership — pending or active — if any. */
+    public function getCurrentMembership(): ?Membership
+    {
+        foreach ($this->memberships as $membership) {
+            if (in_array($membership->getStatus(), [Membership::STATUS_PENDING, Membership::STATUS_ACTIVE], true)) {
+                return $membership;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The membership whose restrictions and benefits apply to this member: their own current
+     * membership if they hold one, otherwise — for a dependent — the family parent's. Dependents
+     * don't hold Memberships of their own; they inherit the primary member's.
+     */
+    public function getEffectiveMembership(): ?Membership
+    {
+        return $this->getCurrentMembership() ?? $this->parent?->getCurrentMembership();
+    }
 
     /** The member this one is a dependent of, if any. */
     public function getParent(): ?User { return $this->parent; }

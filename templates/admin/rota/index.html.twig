@@ -7,11 +7,18 @@
 </div>
 
 <div class="card" style="margin-bottom:1.25rem;">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-    <a href="{{ path('app_admin_rota', {year: prevYear, month: prevMonth}) }}" class="btn btn--ghost btn--sm">&lsaquo; Previous</a>
-    <strong>{{ monthStart|date('F Y') }}</strong>
-    <a href="{{ path('app_admin_rota', {year: nextYear, month: nextMonth}) }}" class="btn btn--ghost btn--sm">Next &rsaquo;</a>
-  </div>
+  <form method="get" action="{{ path('app_admin_rota') }}">
+    <input type="hidden" name="year" value="{{ monthStart|date('Y') }}">
+    <input type="hidden" name="month" value="{{ monthStart|date('n') }}">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+      <a href="{{ path('app_admin_rota', {year: prevYear, month: prevMonth, q: q}) }}" class="btn btn--ghost btn--sm">&lsaquo; Previous</a>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <strong>{{ monthStart|date('F Y') }}</strong>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search event title…" class="form-control" style="width:200px;">
+      </div>
+      <a href="{{ path('app_admin_rota', {year: nextYear, month: nextMonth, q: q}) }}" class="btn btn--ghost btn--sm">Next &rsaquo;</a>
+    </div>
+  </form>
 </div>
 
 {% set anyOccurrences = false %}
