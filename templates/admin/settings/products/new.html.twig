@@ -1,0 +1,150 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New product — Settings{% endblock %}
+
+{% set typeLabels = {stock: 'Stock', service: 'Service', credit: 'Credit', membership: 'Membership', event_ticket: 'Event ticket'} %}
+{% set vatLabels = {standard: 'Standard rate', reduced: 'Reduced rate', zero: 'Zero rated', exempt: 'Exempt'} %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New product</h1>
+  <a href="{{ path('app_admin_settings_products') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_product_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_new') }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control"
+             value="{{ app.request.request.get('name') }}" autocomplete="off" required>
+    </div>
+    <div class="form-group">
+      <label for="shortDescription">Short description</label>
+      <input type="text" id="shortDescription" name="shortDescription" class="form-control"
+             value="{{ app.request.request.get('shortDescription') }}" autocomplete="off">
+    </div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="variantName">Variant name</label>
+        <input type="text" id="variantName" name="variantName" class="form-control" placeholder="e.g. Size"
+               value="{{ app.request.request.get('variantName') }}" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="variantValue">Variant value</label>
+        <input type="text" id="variantValue" name="variantValue" class="form-control" placeholder="e.g. Small"
+               value="{{ app.request.request.get('variantValue') }}" autocomplete="off">
+      </div>
+    </div>
+    <p style="font-size:0.75rem;color:var(--muted);margin:-0.5rem 0 1rem;">
+      Products with the same name form a variant group (e.g. several "Climbing shoes" products, one per size). Renaming this product later renames every product in its group; variant name/value stay per-product.
+    </p>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="price">Price (£)</label>
+        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0"
+               value="{{ app.request.request.get('price', '0.00') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="vatCode">VAT code</label>
+        <select id="vatCode" name="vatCode" class="form-control">
+          {% set selectedVat = app.request.request.get('vatCode', 'standard') %}
+          {% for code in vatCodes %}
+            <option value="{{ code }}" {{ selectedVat == code ? 'selected' : '' }}>{{ vatLabels[code] ?? code }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="productType">Product type</label>
+        {% set selectedType = app.request.request.get('productType', 'stock') %}
+        <select id="productType" name="productType" class="form-control" onchange="toggleProductFields(this.value)">
+          {% for type in types %}
+            <option value="{{ type }}" {{ selectedType == type ? 'selected' : '' }}>{{ typeLabels[type] ?? type }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;">
+        <input type="checkbox" name="isActive" value="1" checked style="width:auto;">
+        Active
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="fields-stock" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Stock details</div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="sku">SKU</label>
+        <input type="text" id="sku" name="sku" class="form-control" autocomplete="off" value="{{ app.request.request.get('sku') }}">
+      </div>
+      <div class="form-group">
+        <label for="costPrice">Cost price (£)</label>
+        <input type="number" id="costPrice" name="costPrice" class="form-control" step="0.01" min="0" value="{{ app.request.request.get('costPrice', '0.00') }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="fields-credit" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Credit details</div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="creditsGranted">Credits granted</label>
+      <input type="number" id="creditsGranted" name="creditsGranted" class="form-control" min="1" step="1" value="{{ app.request.request.get('creditsGranted', '1') }}">
+    </div>
+  </div>
+
+  <div class="card" id="fields-membership" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Membership details</div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="membershipTypeId">Membership type</label>
+      <select id="membershipTypeId" name="membershipTypeId" class="form-control">
+        <option value="">Choose a membership type…</option>
+        {% set selectedMembershipType = app.request.request.get('membershipTypeId') %}
+        {% for membershipType in membershipTypes %}
+          <option value="{{ membershipType.id }}" {{ selectedMembershipType == membershipType.id ? 'selected' : '' }}>{{ membershipType.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="card" id="fields-event_ticket" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Event ticket details</div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="eventId">Event</label>
+      <select id="eventId" name="eventId" class="form-control">
+        <option value="">Choose an event…</option>
+        {% set selectedEvent = app.request.request.get('eventId') %}
+        {% for event in events %}
+          <option value="{{ event.id }}" {{ selectedEvent == event.id ? 'selected' : '' }}>{{ event.title }} ({{ event.date|date('d M Y') }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="card" id="fields-service" style="margin-top:1.25rem;">
+    <p style="font-size:0.875rem;color:var(--muted);margin:0;">Service products use only the common fields above — no extra details are needed.</p>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Create product</button>
+    <a href="{{ path('app_admin_settings_products') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleProductFields(type) {
+    ['stock', 'service', 'credit', 'membership', 'event_ticket'].forEach(function (t) {
+      var el = document.getElementById('fields-' + t);
+      if (el) { el.style.display = (t === type) ? '' : 'none'; }
+    });
+  }
+  toggleProductFields(document.getElementById('productType').value);
+</script>
+{% endblock %}

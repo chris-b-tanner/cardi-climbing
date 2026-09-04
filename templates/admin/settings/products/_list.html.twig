@@ -1,0 +1,58 @@
+{% if products is empty %}
+  <div class="empty">
+    <strong>No products found</strong>
+    {{ currentQuery is defined and currentQuery ? 'Try a different search.' : 'Create one to start selling memberships, stock, credits, or event tickets.' }}
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Details</th>
+          <th>Price</th>
+          <th>VAT</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="admin-table__link">
+                {{ product.name }}
+              </a>
+              {% if product.variantName or product.variantValue %}
+                <div style="font-size:0.72rem;color:var(--muted);">{{ product.variantName ?: 'Variant' }}: {{ product.variantValue ?: '—' }}</div>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ product.productTypeLabel }}</td>
+            <td class="admin-table__muted">
+              {% if product.productType == 'stock' and product.stockProduct %}
+                SKU {{ product.stockProduct.sku }} · {{ product.stockProduct.currentStock }} in stock · £{{ product.stockProduct.assetValue }} asset value
+              {% elseif product.productType == 'credit' and product.creditProduct %}
+                {{ product.creditProduct.creditsGranted }} credit{{ product.creditProduct.creditsGranted == 1 ? '' : 's' }}
+              {% elseif product.productType == 'membership' and product.membershipProduct %}
+                {{ product.membershipProduct.membershipType.name }}
+              {% elseif product.productType == 'event_ticket' and product.eventTicketProduct %}
+                {{ product.eventTicketProduct.event.title }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">£{{ product.price }}</td>
+            <td class="admin-table__muted">{{ product.vatCodeLabel }}</td>
+            <td>
+              <span class="status-pill{{ product.isActive ? ' status-pill--published' : ' status-pill--cancelled' }}">{{ product.isActive ? 'Active' : 'Inactive' }}</span>
+            </td>
+            <td class="btn-row" style="flex-wrap:nowrap;">
+              <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="admin-table__link">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

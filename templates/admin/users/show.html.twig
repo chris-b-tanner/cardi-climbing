@@ -239,6 +239,42 @@
 <div class="member-col-right">
 
 <div class="card">
+  <div class="card__label" style="margin-bottom:0.75rem;">Memberships</div>
+  {% if user.memberships is empty %}
+    {% set inherited = user.parent ? user.parent.currentMembership : null %}
+    {% if inherited %}
+      {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
+      <p style="font-size:0.875rem;">
+        Inherits <strong>{{ inherited.membershipType.name }}</strong> from
+        <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
+        <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
+      </p>
+    {% else %}
+      <p style="color:var(--muted);font-size:0.875rem;">No memberships yet.</p>
+    {% endif %}
+  {% else %}
+    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+      {% for membership in user.memberships %}
+        {% set pillClass = membership.status == 'active' ? ' status-pill--published' : (membership.status in ['expired', 'cancelled'] ? ' status-pill--cancelled' : ' status-pill--pending') %}
+        <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+            <span style="font-size:0.9375rem;">{{ membership.membershipType.name }}</span>
+            <span class="status-pill{{ pillClass }}">{{ membership.statusLabel }}</span>
+          </div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
+            {{ membership.createdAt|date('d M Y') }}
+            {% if membership.expiresAt %} · Expires {{ membership.expiresAt|date('d M Y') }}{% endif %}
+            · £{{ membership.price }}
+            {% if membership.paidAmount != '0.00' %} · Paid £{{ membership.paidAmount }}{% endif %}
+            {% if membership.autoRenew %} · Auto-renews{% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
     <div class="card__label" style="margin-bottom:0;">Bookings</div>
     <a href="{{ path('app_admin_booking_new', {userId: user.id}) }}" class="btn btn--teal btn--sm">+ Add booking</a>

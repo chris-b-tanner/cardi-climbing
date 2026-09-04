@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>Edit membership type</h1>
+  <h1><a href="{{ path('app_admin_settings_membership_types') }}" class="page-header__crumb">Membership types</a> &raquo; {{ membershipType.name }}</h1>
   <a href="{{ path('app_admin_settings_membership_types') }}" class="btn btn--ghost btn--sm">← Cancel</a>
 </div>
 

@@ -137,6 +137,8 @@
       margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
     }
     .page-header h1 { font-size: 1.25rem; font-weight: 600; }
+    .page-header__crumb { color: var(--muted); text-decoration: none; }
+    .page-header__crumb:hover { text-decoration: underline; }
 
     .btn {
       display: inline-block; padding: 0.5rem 1rem; border-radius: 6px;
@@ -405,6 +407,10 @@
         <a href="{{ path('app_admin_settings_membership_types') }}"
            class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_membership_type' ? ' is-active' : '' }}">
           Membership types
+        </a>
+        <a href="{{ path('app_admin_settings_products') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_product' ? ' is-active' : '' }}">
+          Products
         </a>
         <a href="{{ path('app_admin_settings_tags') }}"
            class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_tag' ? ' is-active' : '' }}">

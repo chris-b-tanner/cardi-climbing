@@ -1,0 +1,150 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Edit {{ product.name }} — Settings{% endblock %}
+
+{% set vatLabels = {standard: 'Standard rate', reduced: 'Reduced rate', zero: 'Zero rated', exempt: 'Exempt'} %}
+
+{% block content %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_settings_products') }}" class="page-header__crumb">Products</a> &raquo; {{ product.name }}</h1>
+  <a href="{{ path('app_admin_settings_products') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_edit_' ~ product.id) }}">
+
+  <div class="card">
+    <div class="form-group">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" class="form-control" value="{{ product.name }}" autocomplete="off" required>
+    </div>
+    <div class="form-group">
+      <label for="shortDescription">Short description</label>
+      <input type="text" id="shortDescription" name="shortDescription" class="form-control" value="{{ product.shortDescription }}" autocomplete="off">
+    </div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="variantName">Variant name</label>
+        <input type="text" id="variantName" name="variantName" class="form-control" placeholder="e.g. Size" value="{{ product.variantName }}" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="variantValue">Variant value</label>
+        <input type="text" id="variantValue" name="variantValue" class="form-control" placeholder="e.g. Small" value="{{ product.variantValue }}" autocomplete="off">
+      </div>
+    </div>
+    <p style="font-size:0.75rem;color:var(--muted);margin:-0.5rem 0 1rem;">
+      Renaming this product renames every other product that currently shares its name (its variant group). Variant name/value are per-product and won't be copied to the others.
+    </p>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="price">Price (£)</label>
+        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="{{ product.price }}" required>
+      </div>
+      <div class="form-group">
+        <label for="vatCode">VAT code</label>
+        <select id="vatCode" name="vatCode" class="form-control">
+          {% for code in vatCodes %}
+            <option value="{{ code }}" {{ product.vatCode == code ? 'selected' : '' }}>{{ vatLabels[code] ?? code }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Product type</label>
+        <input type="text" class="form-control" value="{{ product.productTypeLabel }}" disabled>
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">Product type can't be changed after creation — create a new product instead.</p>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;">
+        <input type="checkbox" name="isActive" value="1" {{ product.isActive ? 'checked' : '' }} style="width:auto;">
+        Active
+      </label>
+    </div>
+  </div>
+
+  {% if product.productType == 'stock' %}
+    <div class="card" style="margin-top:1.25rem;">
+      <div class="card__label" style="margin-bottom:0.6rem;">Stock details</div>
+      <div class="detail-grid">
+        <div class="form-group">
+          <label for="sku">SKU</label>
+          <input type="text" id="sku" name="sku" class="form-control" autocomplete="off" value="{{ product.stockProduct.sku }}">
+        </div>
+        <div class="form-group">
+          <label for="costPrice">Cost price (£)</label>
+          <input type="number" id="costPrice" name="costPrice" class="form-control" step="0.01" min="0" value="{{ product.stockProduct.costPrice }}">
+        </div>
+        <div class="form-group">
+          <label>Current stock</label>
+          <input type="text" class="form-control" value="{{ product.stockProduct.currentStock }}" disabled>
+        </div>
+        <div class="form-group">
+          <label>Asset value (ex VAT)</label>
+          <input type="text" class="form-control" value="£{{ product.stockProduct.assetValue }}" disabled>
+          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">Built from each stock movement's own net price, not the current cost price.</p>
+        </div>
+      </div>
+    </div>
+  {% elseif product.productType == 'credit' %}
+    <div class="card" style="margin-top:1.25rem;">
+      <div class="card__label" style="margin-bottom:0.6rem;">Credit details</div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="creditsGranted">Credits granted</label>
+        <input type="number" id="creditsGranted" name="creditsGranted" class="form-control" min="1" step="1" value="{{ product.creditProduct.creditsGranted }}">
+      </div>
+    </div>
+  {% elseif product.productType == 'membership' %}
+    <div class="card" style="margin-top:1.25rem;">
+      <div class="card__label" style="margin-bottom:0.6rem;">Membership details</div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="membershipTypeId">Membership type</label>
+        <select id="membershipTypeId" name="membershipTypeId" class="form-control">
+          <option value="">Choose a membership type…</option>
+          {% for membershipType in membershipTypes %}
+            <option value="{{ membershipType.id }}" {{ product.membershipProduct.membershipType.id == membershipType.id ? 'selected' : '' }}>{{ membershipType.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  {% elseif product.productType == 'event_ticket' %}
+    <div class="card" style="margin-top:1.25rem;">
+      <div class="card__label" style="margin-bottom:0.6rem;">Event ticket details</div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="eventId">Event</label>
+        <select id="eventId" name="eventId" class="form-control">
+          <option value="">Choose an event…</option>
+          {% for event in events %}
+            <option value="{{ event.id }}" {{ product.eventTicketProduct.event.id == event.id ? 'selected' : '' }}>{{ event.title }} ({{ event.date|date('d M Y') }})</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="margin-top:1.25rem;">
+      <p style="font-size:0.875rem;color:var(--muted);margin:0;">Service products use only the common fields above — no extra details are needed.</p>
+    </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Save changes</button>
+    <a href="{{ path('app_admin_settings_products') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div class="card__label" style="margin-bottom:0.3rem;">Danger zone</div>
+      <p style="font-size:0.8rem;color:var(--muted);">Permanently delete this product. This cannot be undone.</p>
+    </div>
+    <form method="post" action="{{ path('app_admin_settings_product_delete', {id: product.id}) }}"
+          onsubmit="return confirm('Permanently delete {{ product.name|e('js') }}? This cannot be undone.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_delete_' ~ product.id) }}">
+      <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
