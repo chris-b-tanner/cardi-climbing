@@ -38,9 +38,14 @@ class Attendee
     #[ORM\Column(length: 20)]
     private string $status = self::STATUS_PENDING;
 
-    /** Overrides the event's price for this attendee. Null = inherit the event price. */
+    /** Overrides the event's price for this attendee. Null = inherit the event price. Ignored once salesOrderRow is set — see getEffectivePrice(). */
     #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2, nullable: true)]
     private ?string $price = null;
+
+    /** Set when this booking was created by fulfilling a SalesOrderRow (an event ticket purchase) — its chargedPrice then drives getEffectivePrice(). Null for admin-added or free bookings. */
+    #[ORM\ManyToOne(targetEntity: SalesOrderRow::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?SalesOrderRow $salesOrderRow = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2, options: ['default' => '0.00'])]
     private string $paidAmount = '0.00';
@@ -120,10 +125,10 @@ class Attendee
         return $this->status === self::STATUS_CANCELLED;
     }
 
-    /** This attendee's price, or the event's price if not overridden. */
+    /** This attendee's price: the linked sale's charged price if bought via a SalesOrderRow, otherwise the price override, otherwise the event's price. */
     public function getEffectivePrice(): ?string
     {
-        return $this->price ?? $this->event->getPrice();
+        return $this->salesOrderRow?->getChargedPrice() ?? $this->price ?? $this->event->getPrice();
     }
 
     public function getPrice(): ?string
@@ -134,6 +139,17 @@ class Attendee
     public function setPrice(?string $price): static
     {
         $this->price = $price;
+        return $this;
+    }
+
+    public function getSalesOrderRow(): ?SalesOrderRow
+    {
+        return $this->salesOrderRow;
+    }
+
+    public function setSalesOrderRow(?SalesOrderRow $salesOrderRow): static
+    {
+        $this->salesOrderRow = $salesOrderRow;
         return $this;
     }
 

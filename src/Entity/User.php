@@ -104,6 +104,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $memberships;
 
+    /** This member's sales orders, as payer/context. */
+    #[ORM\OneToMany(targetEntity: SalesOrder::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    private Collection $salesOrders;
+
+    /** This member's drop-in credit ledger — purchases and redemptions. */
+    #[ORM\OneToMany(targetEntity: CreditLedgerEntry::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['createdAt' => 'DESC'])]
+    private Collection $creditLedgerEntries;
+
     /** The member this one is a dependent of, if any. Used to let dependents inherit the parent's family membership. */
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'dependents')]
     #[ORM\JoinColumn(name: 'parent_id', onDelete: 'SET NULL')]
@@ -131,6 +141,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->notes          = new ArrayCollection();
         $this->payments       = new ArrayCollection();
         $this->memberships    = new ArrayCollection();
+        $this->salesOrders    = new ArrayCollection();
+        $this->creditLedgerEntries = new ArrayCollection();
         $this->dependents     = new ArrayCollection();
     }
 
@@ -326,6 +338,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /** This member's memberships, most recent first. */
     public function getMemberships(): Collection { return $this->memberships; }
+
+    /** This member's sales orders (as payer/context), most recent first. */
+    public function getSalesOrders(): Collection { return $this->salesOrders; }
+
+    /** This member's credit ledger entries, most recent first. */
+    public function getCreditLedgerEntries(): Collection { return $this->creditLedgerEntries; }
+
+    /** Current drop-in credit balance — the sum of every recorded ledger entry. */
+    public function getCreditBalance(): int
+    {
+        $total = 0;
+        foreach ($this->creditLedgerEntries as $entry) {
+            $total += $entry->getCreditChange();
+        }
+        return $total;
+    }
 
     /** The member's current membership — pending or active — if any. */
     public function getCurrentMembership(): ?Membership

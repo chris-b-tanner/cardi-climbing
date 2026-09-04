@@ -3,8 +3,12 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>Members</h1>
-  <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+  <h1>{{ context == 'new_sale' ? 'Choose a member' : 'Members' }}</h1>
+  {% if context == 'new_sale' %}
+    <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+  {% else %}
+    <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+  {% endif %}
 </div>
 
 <div class="filter-form">
@@ -18,11 +22,13 @@
   </select>
 </div>
 
+{% if context != 'new_sale' %}
 <div id="merge-toolbar" style="display:none;" class="merge-toolbar">
   <span id="merge-count" class="merge-count"></span>
   <a id="merge-btn" href="#" class="btn btn--teal btn--sm">Merge selected</a>
   <button type="button" id="merge-clear" class="btn btn--ghost btn--sm">Clear selection</button>
 </div>
+{% endif %}
 
 <div id="results">
   {% include 'admin/users/_list.html.twig' %}
@@ -56,6 +62,7 @@
 
   let currentSort = {{ currentSort|json_encode|raw }};
   let currentDir  = {{ currentDir|json_encode|raw }};
+  const context   = {{ context|json_encode|raw }};
 
   const selected = new Set();
 
@@ -102,6 +109,7 @@
     if (tagSelect.value)   params.set('tag', tagSelect.value);
     if (currentSort !== 'name') params.set('sort', currentSort);
     if (currentDir !== 'asc')   params.set('dir', currentDir);
+    if (context) params.set('context', context);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -117,11 +125,13 @@
       });
   }
 
-  mergeClear.addEventListener('click', () => {
-    selected.clear();
-    syncCheckboxes();
-    updateToolbar();
-  });
+  if (mergeClear) {
+    mergeClear.addEventListener('click', () => {
+      selected.clear();
+      syncCheckboxes();
+      updateToolbar();
+    });
+  }
 
   searchInput.addEventListener('input', () => {
     clearTimeout(debounce);

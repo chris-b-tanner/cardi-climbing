@@ -7,6 +7,7 @@ use App\Entity\Refund;
 use App\Repository\PaymentRepository;
 use App\Repository\RefundRepository;
 use App\Service\PaymentMailer;
+use App\Service\SalesOrderService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Event;
 use Stripe\Webhook;
@@ -32,6 +33,7 @@ class StripeWebhookController extends AbstractController
         RefundRepository $refundRepository,
         EntityManagerInterface $em,
         PaymentMailer $paymentMailer,
+        SalesOrderService $salesOrderService,
     ): JsonResponse {
         try {
             $event = Webhook::constructEvent(
@@ -44,7 +46,7 @@ class StripeWebhookController extends AbstractController
         }
 
         match ($event->type) {
-            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $em, $paymentMailer),
+            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $em, $paymentMailer, $salesOrderService),
             'payment_intent.payment_failed' => $this->onPaymentFailed($event, $paymentRepository, $em),
             'charge.refunded' => $this->onChargeRefunded($event, $paymentRepository, $refundRepository, $em),
             default => null,
@@ -53,7 +55,7 @@ class StripeWebhookController extends AbstractController
         return new JsonResponse(['status' => 'ok']);
     }
 
-    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em, PaymentMailer $paymentMailer): void
+    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em, PaymentMailer $paymentMailer, SalesOrderService $salesOrderService): void
     {
         $intent  = $event->data->object;
         $payment = $paymentRepository->findOneBy(['stripePaymentIntentId' => $intent->id]);
@@ -70,6 +72,10 @@ class StripeWebhookController extends AbstractController
         }
 
         $em->flush();
+
+        if ($payment->getOrder() !== null) {
+            $salesOrderService->completeFromPayment($payment);
+        }
 
         try {
             $paymentMailer->sendReceipt($payment);

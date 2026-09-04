@@ -10,7 +10,7 @@
     <table class="admin-table">
       <thead>
         <tr>
-          {% if is_granted('ROLE_ADMIN') %}<th class="admin-table__check"><span class="sr-only">Select</span></th>{% endif %}
+          {% if context != 'new_sale' and is_granted('ROLE_ADMIN') %}<th class="admin-table__check"><span class="sr-only">Select</span></th>{% endif %}
           {% for col, label in {id: 'ID', name: 'Name', email: 'Email'} %}
             <th class="admin-table__sortable{{ currentSort == col ? ' is-sorted' : '' }}" data-sort="{{ col }}">
               {{ label }}
@@ -21,13 +21,14 @@
           {% endfor %}
           <th>Company</th>
           <th>Tags</th>
+          {% if context == 'new_sale' %}<th></th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for user in users %}
           {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
           <tr>
-            {% if is_granted('ROLE_ADMIN') %}
+            {% if context != 'new_sale' and is_granted('ROLE_ADMIN') %}
               <td class="admin-table__check">
                 <label title="Select for merge">
                   <input type="checkbox" class="merge-check" value="{{ user.id }}">
@@ -56,6 +57,14 @@
                 <span class="admin-table__muted">—</span>
               {% endfor %}
             </td>
+            {% if context == 'new_sale' %}
+              <td>
+                <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}" style="margin:0;">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
+                  <button type="submit" class="btn btn--teal btn--sm">Choose</button>
+                </form>
+              </td>
+            {% endif %}
           </tr>
         {% endfor %}
       </tbody>

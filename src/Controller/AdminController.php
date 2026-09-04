@@ -32,12 +32,13 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        $query = trim($request->query->get('q', ''));
-        $tagId = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
+        $query   = trim($request->query->get('q', ''));
+        $tagId   = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
             ? (int) $request->query->get('tag')
             : null;
-        $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
-        $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
+        $sort    = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
+        $dir     = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
+        $context = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
 
         $users     = $userRepository->search($query, $tagId, null, $sort, $dir);
         $parentIds = $userRepository->findParentIds();
@@ -48,6 +49,7 @@ class AdminController extends AbstractController
                 'parentIds'   => $parentIds,
                 'currentSort' => $sort,
                 'currentDir'  => $dir,
+                'context'     => $context,
             ]);
         }
 
@@ -59,6 +61,7 @@ class AdminController extends AbstractController
             'currentTagId' => $tagId,
             'currentSort'  => $sort,
             'currentDir'   => $dir,
+            'context'      => $context,
         ]);
     }
 

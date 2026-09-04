@@ -363,6 +363,12 @@
         </a>
       </li>
       <li>
+        <a href="{{ path('app_admin_sales') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_sale' ? ' is-active' : '' }}">
+          Sales
+        </a>
+      </li>
+      <li>
         <a href="{{ path('app_admin_payments') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_payment' ? ' is-active' : '' }}">
           Payments

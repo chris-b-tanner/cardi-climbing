@@ -1,0 +1,238 @@
+{% extends 'admin/base.html.twig' %}
+{% set memberName = (order.user.firstName ~ ' ' ~ order.user.lastName)|trim ?: (order.user.email ?: 'Member #' ~ order.user.id) %}
+{% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
+{% set pendingCardPayment = null %}
+{% for payment in order.payments %}
+  {% if payment.method == 'terminal' and payment.succeededAt is null and payment.failedAt is null %}
+    {% set pendingCardPayment = payment %}
+  {% endif %}
+{% endfor %}
+{% block title %}Sale #{{ order.id }}{% endblock %}
+
+{% block content %}
+{% set csrfToken = csrf_token('admin_sale_' ~ order.id) %}
+
+<div class="page-header">
+  <h1>Sale #{{ order.id }} — {{ memberName }} <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></h1>
+  <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Sales</a>
+</div>
+
+<div class="member-columns">
+  <div>
+    <div class="page-header" style="margin-bottom:0.75rem;">
+      <h2 style="font-size:1rem;">Products</h2>
+    </div>
+    {% if order.status != 'draft' %}
+      <div class="empty" style="padding:1.5rem 1rem;">This order is no longer open — items can't be added.</div>
+    {% elseif products is empty %}
+      <div class="empty" style="padding:1.5rem 1rem;">No active products to sell.</div>
+    {% else %}
+      {% set typeTabs = [
+        {key: 'membership', label: 'Memberships'},
+        {key: 'stock', label: 'Stock'},
+        {key: 'event_ticket', label: 'Events'},
+        {key: 'credit', label: 'Drop-ins'},
+        {key: 'service', label: 'Services'},
+      ] %}
+      <div class="pos-tabs">
+        {% for tab in typeTabs %}
+          <button type="button" class="pos-tab" data-type="{{ tab.key }}">{{ tab.label }}</button>
+        {% endfor %}
+      </div>
+      <div class="product-tile-grid">
+        {% for product in products %}
+          <form method="post" action="{{ path('app_admin_sale_add_row', {id: order.id}) }}" data-type="{{ product.productType }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+            <input type="hidden" name="productId" value="{{ product.id }}">
+            <button type="submit" class="product-tile">
+              <span class="product-tile__name">{{ product.name }}{% if product.variantValue %}<br><small>{{ product.variantValue }}</small>{% endif %}</span>
+              <span class="product-tile__price">£{{ product.price }}</span>
+            </button>
+          </form>
+        {% endfor %}
+      </div>
+      <div id="product-tile-empty" class="empty" style="display:none;padding:1.5rem 1rem;">No products in this category.</div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="page-header" style="margin-bottom:0.75rem;">
+      <h2 style="font-size:1rem;">Order</h2>
+    </div>
+
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>For</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+            {% if order.status == 'draft' %}<th></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in order.rows %}
+            <tr>
+              <td>{{ row.product.name }}{% if row.product.variantValue %} ({{ row.product.variantValue }}){% endif %}</td>
+              <td class="admin-table__muted">
+                {% if row.beneficiaryMember %}
+                  {{ (row.beneficiaryMember.firstName ~ ' ' ~ row.beneficiaryMember.lastName)|trim ?: row.beneficiaryMember.email }}
+                {% else %}
+                  {{ memberName }}
+                {% endif %}
+              </td>
+              <td>
+                {% if order.status == 'draft' %}
+                  <div class="btn-row" style="flex-wrap:nowrap;align-items:center;">
+                    <form method="post" action="{{ path('app_admin_sale_row_decrease', {id: order.id, rowId: row.id}) }}">
+                      <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                      <button type="submit" class="btn btn--ghost btn--sm" aria-label="Decrease quantity">−</button>
+                    </form>
+                    <span>{{ row.qty }}</span>
+                    <form method="post" action="{{ path('app_admin_sale_row_increase', {id: order.id, rowId: row.id}) }}">
+                      <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                      <button type="submit" class="btn btn--ghost btn--sm" aria-label="Increase quantity">+</button>
+                    </form>
+                  </div>
+                {% else %}
+                  {{ row.qty }}
+                {% endif %}
+              </td>
+              <td class="admin-table__muted">£{{ row.chargedPrice }}</td>
+              <td class="admin-table__muted">£{{ row.lineTotal }}</td>
+              {% if order.status == 'draft' %}
+                <td>
+                  <form method="post" action="{{ path('app_admin_sale_row_remove', {id: order.id, rowId: row.id}) }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                    <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="admin-table__muted">No items yet — add a product from the left.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:right;font-weight:600;font-size:1.05rem;margin:0.9rem 0;">
+      Total: £{{ order.total }}
+    </div>
+
+    {% if order.status == 'draft' %}
+      {% if pendingCardPayment %}
+        <div class="empty" style="padding:1.25rem 1rem;">
+          Waiting for card payment confirmation (£{{ pendingCardPayment.amount }})… the card machine isn't connected yet, so this needs the Stripe integration to finish before it can confirm automatically.
+        </div>
+      {% elseif order.rows is empty %}
+        {# Nothing to complete yet #}
+      {% elseif order.total == '0.00' %}
+        <form method="post" action="{{ path('app_admin_sale_complete_free', {id: order.id}) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+          <button type="submit" class="btn btn--teal">Complete order</button>
+        </form>
+      {% else %}
+        <div id="complete-prompt">
+          <button type="button" id="complete-order-btn" class="btn btn--teal">Complete order</button>
+          <div id="payment-method-choice" class="card" style="display:none;margin-top:0.75rem;">
+            <p style="margin-bottom:0.75rem;font-size:0.875rem;color:var(--muted);">Choose a payment method:</p>
+            <div class="btn-row">
+              <form method="post" action="{{ path('app_admin_sale_complete_cash', {id: order.id}) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                <button type="submit" class="btn btn--teal">Cash</button>
+              </form>
+              <form method="post" action="{{ path('app_admin_sale_pay_card', {id: order.id}) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                <button type="submit" class="btn btn--ghost">Card</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    {% if order.payments is not empty %}
+      <div class="card" style="margin-top:1rem;">
+        <div class="card__label">Payments</div>
+        {% set methodLabels = {'cash': 'Cash', 'terminal': 'Card', 'online': 'Online'} %}
+        {% for payment in order.payments %}
+          <div style="font-size:0.875rem;padding:0.3rem 0;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
+            £{{ payment.amount }} · {{ methodLabels[payment.method] ?? payment.method }} · {{ payment.statusLabel }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .product-tile-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.6rem;
+  }
+  .product-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.35rem; width: 100%; min-height: 84px;
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.75rem 0.5rem; cursor: pointer; font-family: inherit;
+    text-align: center; transition: border-color 0.12s, background 0.12s;
+  }
+  .product-tile:hover { border-color: var(--teal); background: #f0fdfa; }
+  .product-tile__name { font-size: 0.85rem; font-weight: 500; color: var(--black); }
+  .product-tile__name small { font-weight: 400; color: var(--muted); }
+  .product-tile__price { font-size: 0.8rem; color: var(--teal-dk); font-weight: 600; }
+
+  .pos-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+  .pos-tab {
+    padding: 0.4rem 0.85rem; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--white);
+    font-size: 0.8rem; font-weight: 500; color: var(--muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .pos-tab:hover { border-color: var(--teal); color: var(--black); }
+  .pos-tab.is-active { background: var(--teal); border-color: var(--teal); color: #fff; }
+</style>
+{% if products is not empty and order.status == 'draft' %}
+<script>
+  const posTabs      = document.querySelectorAll('.pos-tab');
+  const productForms = document.querySelectorAll('.product-tile-grid form[data-type]');
+  const tileEmpty     = document.getElementById('product-tile-empty');
+
+  function selectPosTab(type) {
+    posTabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.type === type));
+    let visible = 0;
+    productForms.forEach(form => {
+      const match = form.dataset.type === type;
+      form.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    tileEmpty.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  posTabs.forEach(tab => tab.addEventListener('click', () => selectPosTab(tab.dataset.type)));
+
+  // Default to the first tab that actually has products.
+  let defaultType = posTabs[0] ? posTabs[0].dataset.type : null;
+  for (const tab of posTabs) {
+    if ([...productForms].some(form => form.dataset.type === tab.dataset.type)) {
+      defaultType = tab.dataset.type;
+      break;
+    }
+  }
+  if (defaultType) selectPosTab(defaultType);
+</script>
+{% endif %}
+{% if not pendingCardPayment and order.status == 'draft' and order.rows is not empty and order.total != '0.00' %}
+<script>
+  document.getElementById('complete-order-btn').addEventListener('click', () => {
+    document.getElementById('complete-order-btn').style.display = 'none';
+    document.getElementById('payment-method-choice').style.display = 'block';
+  });
+</script>
+{% endif %}
+{% endblock %}

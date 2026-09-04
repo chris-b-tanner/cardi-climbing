@@ -30,4 +30,15 @@ class ProductRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    /** Active products for the POS product grid. */
+    public function findActive(): array
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.isActive = true')
+            ->orderBy('p.name', 'ASC')
+            ->addOrderBy('p.variantValue', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

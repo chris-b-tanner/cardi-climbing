@@ -14,6 +14,7 @@ class Payment
 {
     public const METHOD_ONLINE   = 'online';
     public const METHOD_TERMINAL = 'terminal';
+    public const METHOD_CASH     = 'cash';
 
     public const STATUS_PENDING             = 'pending';
     public const STATUS_SUCCEEDED           = 'succeeded';
@@ -34,6 +35,11 @@ class Payment
     #[ORM\ManyToOne(targetEntity: Attendee::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Attendee $attendee = null;
+
+    /** Set for a payment made against a SalesOrder. An order can have more than one — e.g. a failed attempt followed by a successful retry. */
+    #[ORM\ManyToOne(targetEntity: SalesOrder::class, inversedBy: 'payments')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?SalesOrder $order = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2)]
     private string $amount;
@@ -98,6 +104,17 @@ class Payment
     public function setAttendee(?Attendee $attendee): static
     {
         $this->attendee = $attendee;
+        return $this;
+    }
+
+    public function getOrder(): ?SalesOrder
+    {
+        return $this->order;
+    }
+
+    public function setOrder(?SalesOrder $order): static
+    {
+        $this->order = $order;
         return $this;
     }
 

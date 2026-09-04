@@ -23,6 +23,16 @@ class Refund
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private Payment $payment;
 
+    /**
+     * Set for a line-level refund (e.g. one session out of a term); null for an order-level or
+     * account-level refund (e.g. repaying a credit balance with no specific line attached). A
+     * separate axis from payment: payment says whose money and how to return it, this says which
+     * fulfilment is being reversed — a single payment can cover many rows in one cart.
+     */
+    #[ORM\ManyToOne(targetEntity: SalesOrderRow::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?SalesOrderRow $salesOrderRow = null;
+
     #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2)]
     private string $amount;
 
@@ -66,6 +76,17 @@ class Refund
     public function setPayment(Payment $payment): static
     {
         $this->payment = $payment;
+        return $this;
+    }
+
+    public function getSalesOrderRow(): ?SalesOrderRow
+    {
+        return $this->salesOrderRow;
+    }
+
+    public function setSalesOrderRow(?SalesOrderRow $salesOrderRow): static
+    {
+        $this->salesOrderRow = $salesOrderRow;
         return $this;
     }
 

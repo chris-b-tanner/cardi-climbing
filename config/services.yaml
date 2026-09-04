@@ -14,6 +14,10 @@ services:
             string $stripePublishableKey: '%env(STRIPE_PUBLISHABLE_KEY)%'
             string $stripeTerminalReaderId: '%env(STRIPE_TERMINAL_READER_ID)%'
 
+    _instanceof:
+        App\Service\Fulfilment\FulfilmentHandlerInterface:
+            tags: ['app.fulfilment_handler']
+
     App\:
         resource: '../src/'
         exclude:
