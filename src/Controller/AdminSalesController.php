@@ -2,16 +2,19 @@
 
 namespace App\Controller;
 
+use App\Entity\Event;
 use App\Entity\Product;
 use App\Entity\SalesOrder;
 use App\Entity\SalesOrderRow;
 use App\Entity\User;
+use App\Repository\EventRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\SalesOrderService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -80,15 +83,25 @@ class AdminSalesController extends AbstractController
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
+        $occurrenceDate = null;
         $eventTicketProduct = $product->getEventTicketProduct();
         if ($eventTicketProduct !== null && $eventTicketProduct->getEvent()->isRecurring()) {
-            $this->addFlash('error', 'That event repeats — booking a specific occurrence isn\'t supported here yet.');
-            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+            $event = $eventTicketProduct->getEvent();
+            $raw   = trim($request->request->get('occurrenceDate', ''));
+            $occurrenceDate = $raw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $raw) ?: null) : null;
+
+            if ($occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
+                $this->addFlash('error', 'Choose a valid date for this event.');
+                return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+            }
         }
 
         $existing = null;
         foreach ($order->getRows() as $candidate) {
-            if ($candidate->getProduct() === $product && $candidate->getBeneficiaryMember() === null) {
+            if ($candidate->getProduct() === $product
+                && $candidate->getBeneficiaryMember() === null
+                && $candidate->getOccurrenceDate() == $occurrenceDate
+            ) {
                 $existing = $candidate;
                 break;
             }
@@ -103,6 +116,7 @@ class AdminSalesController extends AbstractController
             $row->setListPriceAtSale($product->getPrice());
             $row->setChargedPrice($product->getPrice());
             $row->setVatCodeAtSale($product->getVatCode());
+            $row->setOccurrenceDate($occurrenceDate);
             $order->addRow($row);
             $em->persist($row);
         }
@@ -110,6 +124,44 @@ class AdminSalesController extends AbstractController
         $em->flush();
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /** Valid upcoming occurrence dates for a recurring event, for the "choose a date" calendar modal on the product tile. */
+    #[Route('/occurrences', name: 'app_admin_sale_occurrences')]
+    public function occurrences(Request $request, EventRepository $eventRepository): JsonResponse
+    {
+        $event = $eventRepository->find((int) $request->query->get('eventId', 0));
+        if (!$event instanceof Event) {
+            return $this->json(['error' => 'Event not found.'], 404);
+        }
+
+        $year  = (int) $request->query->get('year', (int) date('Y'));
+        $month = (int) $request->query->get('month', (int) date('n'));
+        $year += intdiv($month - 1, 12);
+        $month = (($month - 1) % 12 + 12) % 12 + 1;
+
+        $monthStart = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+        $monthEnd   = $monthStart->modify('last day of this month');
+        $today      = new \DateTimeImmutable('today');
+
+        $occurrences = [];
+        $period = new \DatePeriod($monthStart, new \DateInterval('P1D'), $monthEnd->modify('+1 day'));
+        foreach ($period as $day) {
+            if ($day >= $today && $event->isValidForDate($day)) {
+                $occurrences[] = $day->format('Y-m-d');
+            }
+        }
+
+        return $this->json([
+            'monthLabel'  => $monthStart->format('F Y'),
+            'year'        => (int) $year,
+            'month'       => $month,
+            'prevYear'    => (int) $monthStart->modify('-1 month')->format('Y'),
+            'prevMonth'   => (int) $monthStart->modify('-1 month')->format('n'),
+            'nextYear'    => (int) $monthStart->modify('+1 month')->format('Y'),
+            'nextMonth'   => (int) $monthStart->modify('+1 month')->format('n'),
+            'occurrences' => $occurrences,
+        ]);
     }
 
     #[Route('/{id}/rows/{rowId}/increase', name: 'app_admin_sale_row_increase', requirements: ['id' => '\d+', 'rowId' => '\d+'], methods: ['POST'])]

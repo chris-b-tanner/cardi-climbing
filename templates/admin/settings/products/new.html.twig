@@ -19,6 +19,15 @@
 
   <div class="card">
     <div class="form-group">
+      <label for="productType">Product type</label>
+      {% set selectedType = app.request.request.get('productType', 'stock') %}
+      <select id="productType" name="productType" class="form-control" onchange="toggleProductFields(this.value)">
+        {% for type in types %}
+          <option value="{{ type }}" {{ selectedType == type ? 'selected' : '' }}>{{ typeLabels[type] ?? type }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
       <label for="name">Name</label>
       <input type="text" id="name" name="name" class="form-control"
              value="{{ app.request.request.get('name') }}" autocomplete="off" required>
@@ -55,15 +64,6 @@
           {% set selectedVat = app.request.request.get('vatCode', 'standard') %}
           {% for code in vatCodes %}
             <option value="{{ code }}" {{ selectedVat == code ? 'selected' : '' }}>{{ vatLabels[code] ?? code }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="productType">Product type</label>
-        {% set selectedType = app.request.request.get('productType', 'stock') %}
-        <select id="productType" name="productType" class="form-control" onchange="toggleProductFields(this.value)">
-          {% for type in types %}
-            <option value="{{ type }}" {{ selectedType == type ? 'selected' : '' }}>{{ typeLabels[type] ?? type }}</option>
           {% endfor %}
         </select>
       </div>
