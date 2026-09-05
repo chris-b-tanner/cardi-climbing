@@ -3,14 +3,15 @@ Y WAL — Payment receipt
 
 Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
 
+{% set description = payment.order ? 'Sale #' ~ payment.order.id : (payment.attendee ? payment.attendee.event.title : 'Donation') %}
 {% if payment.isDonation %}
 We've received your donation — thank you for supporting Y Wal! Here's your receipt:
 {% else %}
-We've received your payment for {{ payment.attendee.event.title }}. Here's your receipt:
+We've received your payment for {{ description }}. Here's your receipt:
 {% endif %}
 
 Date:            {{ payment.succeededAt|date('l j F Y') }}
-Description:     {{ payment.isDonation ? 'Donation' : payment.attendee.event.title }}
+Description:     {{ description }}
 Payment method:  {{ payment.method == 'terminal' ? 'Card (in person)' : 'Card (online)' }}
 Amount:          £{{ payment.amount }}
 

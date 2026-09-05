@@ -118,10 +118,10 @@ class Payment
         return $this;
     }
 
-    /** Whether this payment is a donation, i.e. not linked to a booking. */
+    /** Whether this payment is a donation, i.e. not linked to a booking or a sale. */
     public function isDonation(): bool
     {
-        return $this->attendee === null;
+        return $this->attendee === null && $this->order === null;
     }
 
     public function getAmount(): string

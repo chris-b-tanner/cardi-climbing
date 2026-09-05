@@ -56,7 +56,7 @@ class AdminPaymentController extends AbstractController
                     $payment->getCreatedAt()->format('Y-m-d H:i'),
                     trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')),
                     $user->getEmail(),
-                    $payment->isDonation() ? 'Donation' : 'Booking',
+                    $payment->getOrder() ? 'Sale #' . $payment->getOrder()->getId() : ($payment->isDonation() ? 'Donation' : 'Booking'),
                     ucfirst($payment->getMethod()),
                     $payment->getAmount(),
                     strtoupper($payment->getCurrency()),

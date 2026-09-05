@@ -13,7 +13,7 @@
 {% set csrfToken = csrf_token('admin_sale_' ~ order.id) %}
 
 <div class="page-header">
-  <h1>Sale #{{ order.id }} — {{ memberName }} <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></h1>
+  <h1>Sale #{{ order.id }} — <a href="{{ path('app_admin_user_show', {id: order.user.id}) }}" class="admin-table__link">{{ memberName }}</a> <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></h1>
   <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Sales</a>
 </div>
 
@@ -29,10 +29,10 @@
     {% else %}
       {% set typeTabs = [
         {key: 'membership', label: 'Memberships'},
-        {key: 'stock', label: 'Stock'},
         {key: 'event_ticket', label: 'Events'},
         {key: 'credit', label: 'Drop-ins'},
-        {key: 'service', label: 'Services'},
+        {key: 'stock', label: 'Stock'},
+        {key: 'service', label: 'Non-stock / services'},
       ] %}
       <input type="search" id="product-search" class="form-control" style="margin-bottom:0.75rem;"
              placeholder="Search products or SKU…" autocomplete="off">
@@ -216,6 +216,7 @@
     text-align: center; transition: border-color 0.12s, background 0.12s;
   }
   .product-tile:hover { border-color: var(--teal); background: #f0fdfa; }
+  .product-tile:disabled { opacity: 0.55; cursor: default; pointer-events: none; }
   .product-tile__name { font-size: 0.85rem; font-weight: 500; color: var(--black); }
   .product-tile__name small { font-weight: 400; color: var(--muted); }
   .product-tile__price { font-size: 0.8rem; color: var(--teal-dk); font-weight: 600; }
@@ -405,7 +406,9 @@
       occurrenceForm.appendChild(input);
     }
     input.value = dateStr;
-    occurrenceForm.submit();
+    // requestSubmit() (unlike submit()) fires a real 'submit' event, so the global
+    // double-submit-prevention handler in base.html.twig also applies here.
+    occurrenceForm.requestSubmit();
   }
 
   occurrenceClose.addEventListener('click', closeOccurrenceModal);

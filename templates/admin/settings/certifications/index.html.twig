@@ -33,9 +33,11 @@
             </td>
             <td class="admin-table__muted">{{ certification.description ?: '—' }}</td>
             <td class="admin-table__muted">{{ certification.userCertifications|length }}</td>
-            <td class="btn-row" style="flex-wrap:nowrap;">
-              <a href="{{ path('app_admin_settings_certification_edit', {id: certification.id}) }}" class="admin-table__link">Edit</a>
-              <a href="{{ path('app_admin_email_compose', {certificationId: certification.id}) }}" class="admin-table__link">Email</a>
+            <td>
+              <div class="btn-row" style="flex-wrap:nowrap;">
+                <a href="{{ path('app_admin_settings_certification_edit', {id: certification.id}) }}" class="admin-table__link">Edit</a>
+                <a href="{{ path('app_admin_email_compose', {certificationId: certification.id}) }}" class="admin-table__link">Email</a>
+              </div>
             </td>
           </tr>
         {% endfor %}

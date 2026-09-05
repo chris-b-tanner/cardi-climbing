@@ -30,7 +30,15 @@
                 {{ displayName ?: payment.user.email }}
               </a>
             </td>
-            <td class="admin-table__muted">{{ payment.isDonation ? 'Donation' : 'Booking' }}</td>
+            <td class="admin-table__muted">
+              {% if payment.order %}
+                <a href="{{ path('app_admin_sale_show', {id: payment.order.id}) }}" class="admin-table__link">Sale #{{ payment.order.id }}</a>
+              {% elseif payment.attendee %}
+                Booking
+              {% else %}
+                Donation
+              {% endif %}
+            </td>
             <td class="admin-table__muted">{{ payment.method|capitalize }}</td>
             <td class="admin-table__muted">£{{ payment.amount }}</td>
             <td><span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span></td>

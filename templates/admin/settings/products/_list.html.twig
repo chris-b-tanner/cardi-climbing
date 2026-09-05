@@ -11,8 +11,8 @@
           <th>Name</th>
           <th>Type</th>
           <th>Details</th>
+          <th>Stock</th>
           <th>Price</th>
-          <th>VAT</th>
           <th>Status</th>
           <th></th>
         </tr>
@@ -31,7 +31,7 @@
             <td class="admin-table__muted">{{ product.productTypeLabel }}</td>
             <td class="admin-table__muted">
               {% if product.productType == 'stock' and product.stockProduct %}
-                SKU {{ product.stockProduct.sku }} · {{ product.stockProduct.currentStock }} in stock · £{{ product.stockProduct.assetValue }} asset value
+                {{ product.stockProduct.sku }}
               {% elseif product.productType == 'credit' and product.creditProduct %}
                 {{ product.creditProduct.creditsGranted }} credit{{ product.creditProduct.creditsGranted == 1 ? '' : 's' }}
               {% elseif product.productType == 'membership' and product.membershipProduct %}
@@ -42,12 +42,16 @@
                 —
               {% endif %}
             </td>
+            <td class="admin-table__muted">
+              {% if product.productType == 'stock' and product.stockProduct %}
+              {{ product.stockProduct.currentStock }}
+              {% endif %}
+            </td>
             <td class="admin-table__muted">£{{ product.price }}</td>
-            <td class="admin-table__muted">{{ product.vatCodeLabel }}</td>
             <td>
               <span class="status-pill{{ product.isActive ? ' status-pill--published' : ' status-pill--cancelled' }}">{{ product.isActive ? 'Active' : 'Inactive' }}</span>
             </td>
-            <td class="btn-row" style="flex-wrap:nowrap;">
+            <td>
               <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="admin-table__link">Edit</a>
             </td>
           </tr>

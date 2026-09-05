@@ -153,6 +153,7 @@
     .btn--danger:hover { background: #b91c1c; }
     .btn--sm    { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
     .btn-row    { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn:disabled, .btn.is-loading { opacity: 0.65; cursor: default; pointer-events: none; }
 
     .card {
       background: var(--white); border: 1px solid var(--border);
@@ -330,6 +331,7 @@
   <aside class="admin-sidebar">
     <a href="{{ path('app_admin_users') }}" class="admin-sidebar__brand">
       <span>Y Wal</span> Admin
+      {% if app.environment == 'dev' %}<span class="admin-nav__badge">Dev</span>{% endif %}
     </a>
     <ul class="admin-nav">
       <li>
@@ -438,6 +440,35 @@
   </div>
 </div>
 
+<script>
+  // Disables the submit button (and shows a loading label) on every POST form's submit, so a slow
+  // request or an impatient double-click can't fire the same mutation twice. Delegated on document
+  // so it also covers forms injected later (AJAX list refreshes, etc.) with no extra wiring.
+  // Bubble phase (not capture) is deliberate: several forms use onsubmit="return confirm(...)" or
+  // their own submit listener to cancel the submit — those run first, at the form itself, setting
+  // e.defaultPrevented, and we must not disable the button for a submission that never happened.
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post' || e.defaultPrevented) {
+      return;
+    }
+
+    const button = e.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+    if (!button || button.disabled) {
+      return;
+    }
+
+    button.disabled = true;
+    button.classList.add('is-loading');
+    if (button.tagName === 'INPUT') {
+      button.dataset.originalValue = button.value;
+      button.value = 'Please wait…';
+    } else {
+      button.dataset.originalHtml = button.innerHTML;
+      button.innerHTML = 'Please wait…';
+    }
+  });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

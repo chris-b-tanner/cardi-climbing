@@ -41,7 +41,7 @@
               <span class="status-pill{{ membershipType.isActive ? ' status-pill--published' : ' status-pill--cancelled' }}">{{ membershipType.statusLabel }}</span>
             </td>
             <td class="admin-table__muted">{{ membershipType.memberships|length }}</td>
-            <td class="btn-row" style="flex-wrap:nowrap;">
+            <td>
               <a href="{{ path('app_admin_settings_membership_type_edit', {id: membershipType.id}) }}" class="admin-table__link">Edit</a>
             </td>
           </tr>

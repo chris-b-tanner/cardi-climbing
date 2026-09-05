@@ -274,6 +274,14 @@
   {% endif %}
 </div>
 
+{% if user.creditBalance > 0 %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.4rem;">Drop-in credits</div>
+  <div style="font-size:1.75rem;font-weight:600;color:var(--teal-dk);">{{ user.creditBalance }}</div>
+  <p style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Available balance</p>
+</div>
+{% endif %}
+
 <div class="card">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
     <div class="card__label" style="margin-bottom:0;">Bookings</div>
@@ -316,7 +324,14 @@
         <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
             <span style="font-size:0.9375rem;">
-              £{{ payment.amount }} · {{ payment.isDonation ? 'Donation' : 'Booking' }}
+              £{{ payment.amount }} ·
+              {% if payment.order %}
+                <a href="{{ path('app_admin_sale_show', {id: payment.order.id}) }}" class="admin-table__link">Sale #{{ payment.order.id }}</a>
+              {% elseif payment.attendee %}
+                Booking
+              {% else %}
+                Donation
+              {% endif %}
               <span style="color:var(--muted);font-size:0.8rem;">({{ payment.method|capitalize }})</span>
             </span>
             <span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span>
