@@ -12,7 +12,7 @@
           <th>Type</th>
           <th>Details</th>
           <th>Stock</th>
-          <th>Price</th>
+          <th style="text-align:right;">Price</th>
           <th>Status</th>
           <th></th>
         </tr>
@@ -44,10 +44,16 @@
             </td>
             <td class="admin-table__muted">
               {% if product.productType == 'stock' and product.stockProduct %}
-              {{ product.stockProduct.currentStock }}
+                {{ product.stockProduct.currentStock }}
+                <button type="button" class="icon-btn inventory-adjust-trigger" title="Adjust stock"
+                        data-product-id="{{ product.id }}"
+                        data-product-name="{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}"
+                        data-csrf="{{ csrf_token('admin_product_inventory_' ~ product.id) }}">
+                  <i class="bi bi-pencil"></i>
+                </button>
               {% endif %}
             </td>
-            <td class="admin-table__muted">£{{ product.price }}</td>
+            <td class="admin-table__muted" style="text-align:right;">£{{ product.price }}</td>
             <td>
               <span class="status-pill{{ product.isActive ? ' status-pill--published' : ' status-pill--cancelled' }}">{{ product.isActive ? 'Active' : 'Inactive' }}</span>
             </td>

@@ -41,9 +41,6 @@
           <button type="button" class="pos-tab" data-type="{{ tab.key }}">{{ tab.label }}</button>
         {% endfor %}
       </div>
-      <div id="pos-tab-hint-membership" class="pos-tab-hint" style="display:none;">
-        Selling these will add a membership to the selected person when you complete the order.
-      </div>
       <div class="product-tile-grid">
         {% for product in products %}
           {% set eventTicketProduct = product.eventTicketProduct %}
@@ -95,10 +92,9 @@
         <thead>
           <tr>
             <th>Product</th>
-            <th>For</th>
             <th>Qty</th>
-            <th>Price</th>
-            <th>Total</th>
+            <th style="text-align:right;">Price</th>
+            <th style="text-align:right;">Total</th>
             {% if order.status == 'draft' %}<th></th>{% endif %}
           </tr>
         </thead>
@@ -106,18 +102,23 @@
           {% for row in order.rows %}
             <tr>
               <td>
-                {{ row.product.name }}{% if row.product.variantValue %} ({{ row.product.variantValue }}){% endif %}
+                {{ row.product.name }}{% if row.product.variantValue %}<br><small class="admin-table__muted">{{ row.product.variantValue }}</small>{% endif %}
                 {% if row.occurrenceDate %}<br><small class="admin-table__muted">{{ row.occurrenceDate|date('D d M Y') }}</small>{% endif %}
-              </td>
-              <td class="admin-table__muted">
-                {% if row.beneficiaryMember %}
-                  {{ (row.beneficiaryMember.firstName ~ ' ' ~ row.beneficiaryMember.lastName)|trim ?: row.beneficiaryMember.email }}
-                {% else %}
-                  {{ memberName }}
+                {% if row.product.requiresBeneficiary %}
+                  <br><small class="admin-table__muted">
+                    For: {% if row.beneficiaryMember %}
+                      {{ (row.beneficiaryMember.firstName ~ ' ' ~ row.beneficiaryMember.lastName)|trim ?: row.beneficiaryMember.email }}
+                    {% else %}
+                      {{ memberName }}
+                    {% endif %}
+                    {% if order.status == 'draft' %}
+                      · <a href="#" class="beneficiary-change-link" data-row-id="{{ row.id }}">Change</a>
+                    {% endif %}
+                  </small>
                 {% endif %}
               </td>
               <td>
-                {% if order.status == 'draft' %}
+                {% if order.status == 'draft' and not row.product.requiresBeneficiary %}
                   <div class="btn-row" style="flex-wrap:nowrap;align-items:center;">
                     <form method="post" action="{{ path('app_admin_sale_row_decrease', {id: order.id, rowId: row.id}) }}">
                       <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
@@ -133,13 +134,13 @@
                   {{ row.qty }}
                 {% endif %}
               </td>
-              <td class="admin-table__muted">£{{ row.chargedPrice }}</td>
-              <td class="admin-table__muted">£{{ row.lineTotal }}</td>
+              <td class="admin-table__muted" style="text-align:right;">£{{ row.chargedPrice }}</td>
+              <td class="admin-table__muted" style="text-align:right;">£{{ row.lineTotal }}</td>
               {% if order.status == 'draft' %}
                 <td>
                   <form method="post" action="{{ path('app_admin_sale_row_remove', {id: order.id, rowId: row.id}) }}">
                     <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
-                    <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+                    <button type="submit" class="btn btn--ghost btn--sm">x</button>
                   </form>
                 </td>
               {% endif %}
@@ -200,12 +201,74 @@
     {% endif %}
   </div>
 </div>
+
+{% if order.status == 'draft' %}
+  <div id="beneficiary-modal" class="pos-modal" style="display:none;">
+    <div id="beneficiary-modal-backdrop" class="pos-modal__backdrop"></div>
+    <div class="pos-modal__box">
+      <div class="pos-modal__header">
+        <strong>Change beneficiary</strong>
+        <button type="button" id="beneficiary-modal-close" class="btn btn--ghost btn--sm">✕</button>
+      </div>
+
+      <div id="beneficiary-search-view">
+        <input type="text" id="beneficiary-search" class="form-control" placeholder="Search members…"
+               autocomplete="off" style="margin-bottom:0.75rem;">
+        <div id="beneficiary-results" style="display:flex;flex-direction:column;gap:0.3rem;max-height:260px;overflow-y:auto;"></div>
+        <button type="button" id="beneficiary-create-toggle" class="btn btn--ghost btn--sm" style="margin-top:0.75rem;">+ Create new person</button>
+      </div>
+
+      <div id="beneficiary-create-view" style="display:none;">
+        <div class="form-group">
+          <label for="beneficiary-firstName">First name</label>
+          <input type="text" id="beneficiary-firstName" class="form-control" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label for="beneficiary-lastName">Last name</label>
+          <input type="text" id="beneficiary-lastName" class="form-control" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="beneficiary-email">Email</label>
+          <input type="email" id="beneficiary-email" class="form-control" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="beneficiary-dateOfBirth">Date of birth</label>
+          <input type="date" id="beneficiary-dateOfBirth" class="form-control" autocomplete="off">
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;margin-bottom:1rem;">
+          <input type="checkbox" id="beneficiary-makeDependent" style="width:auto;">
+          Make dependent of {{ memberName }}
+        </label>
+        <div class="btn-row">
+          <button type="button" id="beneficiary-create-submit" class="btn btn--teal btn--sm">Create and use</button>
+          <button type="button" id="beneficiary-create-cancel" class="btn btn--ghost btn--sm">← Back to search</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form id="beneficiary-select-form" method="post" action="{{ path('app_admin_sale_set_beneficiary', {id: order.id}) }}" style="display:none;">
+    <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+    <input type="hidden" name="rowId" id="beneficiary-select-row-id">
+    <input type="hidden" name="userId" id="beneficiary-select-user-id">
+  </form>
+
+  <form id="beneficiary-new-form" method="post" action="{{ path('app_admin_sale_create_beneficiary', {id: order.id}) }}" style="display:none;">
+    <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+    <input type="hidden" name="rowId" id="beneficiary-new-row-id">
+    <input type="hidden" name="firstName" id="beneficiary-new-firstName">
+    <input type="hidden" name="lastName" id="beneficiary-new-lastName">
+    <input type="hidden" name="email" id="beneficiary-new-email">
+    <input type="hidden" name="dateOfBirth" id="beneficiary-new-dateOfBirth">
+    <input type="hidden" name="makeDependent" id="beneficiary-new-makeDependent" value="">
+  </form>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <style>
   .product-tile-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
     gap: 0.6rem;
   }
   .product-tile {
@@ -221,15 +284,6 @@
   .product-tile__name small { font-weight: 400; color: var(--muted); }
   .product-tile__price { font-size: 0.8rem; color: var(--teal-dk); font-weight: 600; }
 
-  .pos-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
-  .pos-tab {
-    padding: 0.4rem 0.85rem; border-radius: 999px;
-    border: 1px solid var(--border); background: var(--white);
-    font-size: 0.8rem; font-weight: 500; color: var(--muted);
-    cursor: pointer; font-family: inherit;
-  }
-  .pos-tab:hover { border-color: var(--teal); color: var(--black); }
-  .pos-tab.is-active { background: var(--teal); border-color: var(--teal); color: #fff; }
   .pos-tab.is-disabled { opacity: 0.4; }
 
   .pos-tab-hint {
@@ -239,18 +293,6 @@
     margin-bottom: 0.75rem;
   }
 
-  .pos-modal {
-    position: fixed; inset: 0; z-index: 50;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .pos-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
-  .pos-modal__box {
-    position: relative; z-index: 1; width: min(420px, calc(100vw - 2rem));
-    max-height: calc(100vh - 4rem); overflow-y: auto;
-    background: var(--white); border-radius: var(--radius);
-    padding: 1.25rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-  }
-  .pos-modal__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
   .pos-modal__nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; font-size: 0.875rem; font-weight: 500; }
   .pos-calendar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.4rem; }
   .pos-calendar-day {
@@ -269,7 +311,6 @@
   const productForms = document.querySelectorAll('.product-tile-grid form[data-type]');
   const tileEmpty     = document.getElementById('product-tile-empty');
   const productSearch = document.getElementById('product-search');
-  const membershipHint = document.getElementById('pos-tab-hint-membership');
 
   let activeType = posTabs[0] ? posTabs[0].dataset.type : null;
 
@@ -305,8 +346,6 @@
       tab.classList.toggle('is-active', tab.dataset.type === activeType);
       tab.classList.toggle('is-disabled', query !== '' && !matchingTypes.has(tab.dataset.type));
     });
-
-    membershipHint.style.display = activeType === 'membership' ? 'block' : 'none';
 
     let visible = 0;
     productForms.forEach(form => {
@@ -439,6 +478,104 @@
   document.getElementById('complete-order-btn').addEventListener('click', () => {
     document.getElementById('complete-order-btn').style.display = 'none';
     document.getElementById('payment-method-choice').style.display = 'block';
+  });
+</script>
+{% endif %}
+{% if order.status == 'draft' %}
+<script>
+  const beneficiaryModal      = document.getElementById('beneficiary-modal');
+  const beneficiaryBackdrop   = document.getElementById('beneficiary-modal-backdrop');
+  const beneficiaryClose      = document.getElementById('beneficiary-modal-close');
+  const beneficiarySearchView = document.getElementById('beneficiary-search-view');
+  const beneficiaryCreateView = document.getElementById('beneficiary-create-view');
+  const beneficiarySearch     = document.getElementById('beneficiary-search');
+  const beneficiaryResults    = document.getElementById('beneficiary-results');
+  const beneficiaryCreateToggle = document.getElementById('beneficiary-create-toggle');
+  const beneficiaryCreateCancel = document.getElementById('beneficiary-create-cancel');
+  const beneficiaryCreateSubmit = document.getElementById('beneficiary-create-submit');
+  const beneficiarySearchUrl  = '{{ path('app_admin_sale_beneficiary_search', {id: order.id}) }}';
+
+  let beneficiaryRowId = null;
+  let beneficiarySearchDebounce;
+
+  function openBeneficiaryModal(rowId) {
+    beneficiaryRowId = rowId;
+    beneficiarySearch.value = '';
+    showBeneficiarySearchView();
+    beneficiaryModal.style.display = 'flex';
+    loadBeneficiaryResults('');
+  }
+
+  function closeBeneficiaryModal() {
+    beneficiaryModal.style.display = 'none';
+    beneficiaryRowId = null;
+  }
+
+  function showBeneficiarySearchView() {
+    beneficiarySearchView.style.display = '';
+    beneficiaryCreateView.style.display = 'none';
+  }
+
+  function showBeneficiaryCreateView() {
+    beneficiarySearchView.style.display = 'none';
+    beneficiaryCreateView.style.display = '';
+  }
+
+  function loadBeneficiaryResults(query) {
+    fetch(`${beneficiarySearchUrl}?q=${encodeURIComponent(query)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.json())
+      .then(members => {
+        if (!members.length) {
+          beneficiaryResults.innerHTML = `<div class="member-search-empty">${query ? 'No members found' : 'No dependents on record — search for someone, or create a new person'}</div>`;
+          return;
+        }
+        beneficiaryResults.innerHTML = members.map(m => `<button type="button" class="member-search-item" data-id="${m.id}">${m.label}</button>`).join('');
+      });
+  }
+
+  beneficiarySearch.addEventListener('input', () => {
+    clearTimeout(beneficiarySearchDebounce);
+    beneficiarySearchDebounce = setTimeout(() => loadBeneficiaryResults(beneficiarySearch.value.trim()), 250);
+  });
+
+  beneficiaryResults.addEventListener('click', (e) => {
+    const btn = e.target.closest('.member-search-item');
+    if (!btn || !beneficiaryRowId) return;
+
+    document.getElementById('beneficiary-select-row-id').value = beneficiaryRowId;
+    document.getElementById('beneficiary-select-user-id').value = btn.dataset.id;
+    document.getElementById('beneficiary-select-form').requestSubmit();
+  });
+
+  beneficiaryCreateToggle.addEventListener('click', showBeneficiaryCreateView);
+  beneficiaryCreateCancel.addEventListener('click', showBeneficiarySearchView);
+
+  beneficiaryCreateSubmit.addEventListener('click', () => {
+    if (!beneficiaryRowId) return;
+
+    const firstName = document.getElementById('beneficiary-firstName').value.trim();
+    if (!firstName) {
+      document.getElementById('beneficiary-firstName').focus();
+      return;
+    }
+
+    document.getElementById('beneficiary-new-row-id').value = beneficiaryRowId;
+    document.getElementById('beneficiary-new-firstName').value = firstName;
+    document.getElementById('beneficiary-new-lastName').value = document.getElementById('beneficiary-lastName').value.trim();
+    document.getElementById('beneficiary-new-email').value = document.getElementById('beneficiary-email').value.trim();
+    document.getElementById('beneficiary-new-dateOfBirth').value = document.getElementById('beneficiary-dateOfBirth').value;
+    document.getElementById('beneficiary-new-makeDependent').value = document.getElementById('beneficiary-makeDependent').checked ? '1' : '';
+    document.getElementById('beneficiary-new-form').requestSubmit();
+  });
+
+  beneficiaryClose.addEventListener('click', closeBeneficiaryModal);
+  beneficiaryBackdrop.addEventListener('click', closeBeneficiaryModal);
+
+  document.querySelectorAll('.beneficiary-change-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      openBeneficiaryModal(link.dataset.rowId);
+    });
   });
 </script>
 {% endif %}

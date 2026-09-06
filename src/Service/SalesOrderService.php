@@ -86,10 +86,38 @@ class SalesOrderService
 
     private function markComplete(SalesOrder $order): void
     {
+        $this->assertValidRows($order);
+
         $order->setStatus(SalesOrder::STATUS_COMPLETE);
 
         foreach ($order->getRows() as $row) {
             $this->fulfil($row);
+        }
+    }
+
+    /**
+     * A beneficiary-relevant row (membership/credit/event ticket) is always qty 1, and there's never
+     * more than one such row per (product, beneficiary, occurrence) — the admin UI already enforces
+     * this when rows are added, but a completing order is checked again here since fulfilment is
+     * where a violation would actually do damage (e.g. two Memberships from one line).
+     */
+    private function assertValidRows(SalesOrder $order): void
+    {
+        $seen = [];
+        foreach ($order->getRows() as $row) {
+            if (!$row->getProduct()->requiresBeneficiary()) {
+                continue;
+            }
+
+            if ($row->getQty() !== 1) {
+                throw new \LogicException(sprintf('Row #%d ("%s") requires a beneficiary and must have a quantity of 1, has %d.', $row->getId(), $row->getProduct()->getName(), $row->getQty()));
+            }
+
+            $key = $row->getProduct()->getId() . ':' . $row->getEffectiveBeneficiary()->getId() . ':' . ($row->getOccurrenceDate()?->format('Y-m-d') ?? '');
+            if (isset($seen[$key])) {
+                throw new \LogicException(sprintf('More than one row for the same beneficiary and product ("%s") in order #%d.', $row->getProduct()->getName(), $order->getId()));
+            }
+            $seen[$key] = true;
         }
     }
 

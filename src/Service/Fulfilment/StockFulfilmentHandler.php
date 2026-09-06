@@ -26,6 +26,7 @@ class StockFulfilmentHandler implements FulfilmentHandlerInterface
         $movement->setQuantityChange(-$row->getQty());
         $movement->setNetPrice($stockProduct->getCostPrice());
         $movement->setReason(InventoryMovement::REASON_SALE);
+        $movement->setSalesOrderRow($row);
 
         $this->em->persist($movement);
     }

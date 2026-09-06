@@ -20,7 +20,7 @@
           <th>ID</th>
           <th>Member</th>
           <th>Status</th>
-          <th>Total</th>
+          <th style="text-align:right;">Total</th>
           <th>Created</th>
           <th></th>
         </tr>
@@ -37,7 +37,7 @@
               </a>
             </td>
             <td><span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></td>
-            <td class="admin-table__muted">£{{ order.total }}</td>
+            <td class="admin-table__muted" style="text-align:right;">£{{ order.total }}</td>
             <td class="admin-table__muted">{{ order.createdAt|date('d M Y H:i') }}</td>
             <td>
               <a href="{{ path('app_admin_sale_show', {id: order.id}) }}" class="admin-table__link">

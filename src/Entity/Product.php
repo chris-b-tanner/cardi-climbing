@@ -177,6 +177,12 @@ class Product
         };
     }
 
+    /** Whether a sale of this product is "for" a specific person rather than just the payer — a SalesOrderRow of this type may only appear once per beneficiary in an order, at qty 1. */
+    public function requiresBeneficiary(): bool
+    {
+        return in_array($this->productType, [self::TYPE_MEMBERSHIP, self::TYPE_CREDIT, self::TYPE_EVENT_TICKET], true);
+    }
+
     public function isActive(): bool
     {
         return $this->isActive;

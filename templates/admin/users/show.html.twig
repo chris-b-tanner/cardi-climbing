@@ -60,7 +60,7 @@
   </div>
 {% endif %}
 
-<div class="member-columns">
+<div class="member-columns member-columns--thirds">
 <div class="member-col-left">
 
 <div class="card">
@@ -194,211 +194,308 @@
 </div>
 {% endif %}
 
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Notes</div>
-
-  {% if user.notes is empty %}
-    <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
-  {% else %}
-    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
-      {% for note in user.notes %}
-        <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
-          <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
-          <p style="font-size:0.75rem;color:var(--muted);">
-            {{ note.createdAt|date('j M Y, H:i') }}
-            {% if note.addedBy %}
-              · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
-            {% else %}
-              · System
-            {% endif %}
-            {% if note.addedBy and note.addedBy == app.user %}
-              · <form method="post" action="{{ path('app_admin_user_delete_note', {id: user.id, noteId: note.id}) }}"
-                      style="display:inline;"
-                      onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">
-                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_note_' ~ note.id) }}">
-                  <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete</button>
-                </form>
-            {% endif %}
-          </p>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  <form method="post" action="{{ path('app_admin_user_add_note', {id: user.id}) }}" novalidate>
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_' ~ user.id) }}">
-    <div class="form-group" style="margin-bottom:0.5rem;">
-      <textarea name="content" class="form-control" rows="3"
-                placeholder="Add a note…" style="resize:vertical;"></textarea>
-    </div>
-    <button type="submit" class="btn btn--teal btn--sm">Add note</button>
-  </form>
-</div>
-
 </div>
 <div class="member-col-right">
 
+{% set payments = user.payments|filter(p => p.status != 'pending') %}
+{% set hasBookings = bookings is not empty %}
+{% set hasPayments = payments is not empty %}
+{% set hasCredits = user.creditLedgerEntries is not empty %}
+{% set hasMemberships = user.memberships is not empty or (user.parent and user.parent.currentMembership) %}
+{% set hasCertifications = user.certifications is not empty %}
+{% set hasNotes = user.notes is not empty %}
+
 <div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Memberships</div>
-  {% if user.memberships is empty %}
-    {% set inherited = user.parent ? user.parent.currentMembership : null %}
-    {% if inherited %}
-      {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
-      <p style="font-size:0.875rem;">
-        Inherits <strong>{{ inherited.membershipType.name }}</strong> from
-        <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
-        <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
-      </p>
+  <div class="pos-tabs" id="member-tabs">
+    <button type="button" class="pos-tab" data-tab="bookings" data-has-content="{{ hasBookings ? '1' : '0' }}">Bookings</button>
+    <button type="button" class="pos-tab" data-tab="payments" data-has-content="{{ hasPayments ? '1' : '0' }}">Payments</button>
+    <button type="button" class="pos-tab" data-tab="credits" data-has-content="{{ hasCredits ? '1' : '0' }}">Credit transactions</button>
+    <button type="button" class="pos-tab" data-tab="memberships" data-has-content="{{ hasMemberships ? '1' : '0' }}">Memberships</button>
+    <button type="button" class="pos-tab" data-tab="certifications" data-has-content="{{ hasCertifications ? '1' : '0' }}">Certifications</button>
+    <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}">Notes</button>
+  </div>
+
+  <div class="tab-panel" data-tab-panel="bookings">
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:0.75rem;">
+      <a href="{{ path('app_admin_booking_new', {userId: user.id}) }}" class="btn btn--teal btn--sm">+ Add booking</a>
+    </div>
+    {% if bookings is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No bookings yet.</p>
     {% else %}
-      <p style="color:var(--muted);font-size:0.875rem;">No memberships yet.</p>
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Date</th>
+              <th>Price</th>
+              <th>Paid</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in bookings %}
+              {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+              <tr>
+                <td>
+                  <a href="{{ path('app_admin_event_show', booking.event.isRecurring ? {id: booking.event.id, date: (booking.occurrenceDate ?? booking.event.date)|date('Y-m-d')} : {id: booking.event.id}) }}" class="admin-table__link">
+                    {{ booking.event.title }}
+                  </a>
+                </td>
+                <td class="admin-table__muted">{{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}</td>
+                <td class="admin-table__muted">{{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}</td>
+                <td class="admin-table__muted">{{ booking.paidAmount != '0.00' ? '£' ~ booking.paidAmount : '—' }}</td>
+                <td><span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span></td>
+                <td><a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" class="admin-table__link">Edit</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% endif %}
-  {% else %}
-    <div style="display:flex;flex-direction:column;gap:0.6rem;">
-      {% for membership in user.memberships %}
-        {% set pillClass = membership.status == 'active' ? ' status-pill--published' : (membership.status in ['expired', 'cancelled'] ? ' status-pill--cancelled' : ' status-pill--pending') %}
-        <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <span style="font-size:0.9375rem;">{{ membership.membershipType.name }}</span>
-            <span class="status-pill{{ pillClass }}">{{ membership.statusLabel }}</span>
-          </div>
-          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-            {{ membership.createdAt|date('d M Y') }}
-            {% if membership.expiresAt %} · Expires {{ membership.expiresAt|date('d M Y') }}{% endif %}
-            · £{{ membership.price }}
-            {% if membership.paidAmount != '0.00' %} · Paid £{{ membership.paidAmount }}{% endif %}
-            {% if membership.autoRenew %} · Auto-renews{% endif %}
-          </p>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-</div>
-
-{% if user.creditBalance > 0 %}
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.4rem;">Drop-in credits</div>
-  <div style="font-size:1.75rem;font-weight:600;color:var(--teal-dk);">{{ user.creditBalance }}</div>
-  <p style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Available balance</p>
-</div>
-{% endif %}
-
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-    <div class="card__label" style="margin-bottom:0;">Bookings</div>
-    <a href="{{ path('app_admin_booking_new', {userId: user.id}) }}" class="btn btn--teal btn--sm">+ Add booking</a>
   </div>
-  {% if bookings is empty %}
-    <p style="color:var(--muted);font-size:0.875rem;">No bookings yet.</p>
-  {% else %}
-    <div style="display:flex;flex-direction:column;gap:0.6rem;">
-      {% for booking in bookings %}
-        {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
-        <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <a href="{{ path('app_admin_event_show', booking.event.isRecurring ? {id: booking.event.id, date: (booking.occurrenceDate ?? booking.event.date)|date('Y-m-d')} : {id: booking.event.id}) }}" class="admin-table__link" style="font-size:0.9375rem;">
-              {{ booking.event.title }}
-            </a>
-            <span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span>
-          </div>
-          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-            {{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}
-            · {{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}
-            {% if booking.paidAmount != '0.00' %} · Paid £{{ booking.paidAmount }}{% endif %}
-            · <a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
-          </p>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-</div>
 
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Payments</div>
-  {% set payments = user.payments|filter(p => p.status != 'pending') %}
-  {% if payments is empty %}
-    <p style="color:var(--muted);font-size:0.875rem;">No payments yet.</p>
-  {% else %}
-    <div style="display:flex;flex-direction:column;gap:0.6rem;">
-      {% for payment in payments %}
-        {% set pillClass = payment.status == 'succeeded' ? ' status-pill--published' : (payment.status in ['failed'] ? ' status-pill--cancelled' : (payment.status in ['refunded', 'partially_refunded'] ? ' status-pill--pending' : '')) %}
-        <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <span style="font-size:0.9375rem;">
-              £{{ payment.amount }} ·
-              {% if payment.order %}
-                <a href="{{ path('app_admin_sale_show', {id: payment.order.id}) }}" class="admin-table__link">Sale #{{ payment.order.id }}</a>
-              {% elseif payment.attendee %}
-                Booking
-              {% else %}
-                Donation
-              {% endif %}
-              <span style="color:var(--muted);font-size:0.8rem;">({{ payment.method|capitalize }})</span>
-            </span>
-            <span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span>
-          </div>
-          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-            {{ payment.createdAt|date('d M Y, H:i') }}
-            {% if payment.refunds is not empty %}
-              {% for refund in payment.refunds %}
-                <br>↳ Refund of £{{ refund.amount }} ({{ refund.statusLabel }}){% if refund.reason %} — {{ refund.reason }}{% endif %}
-              {% endfor %}
-            {% endif %}
-          </p>
-          {% if payment.status in ['succeeded', 'partially_refunded'] %}
-            <a href="#" onclick="document.getElementById('refund-form-{{ payment.id }}').style.display = 'flex'; this.hidden = true; return false;"
-               style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">Refund this</a>
-            <form id="refund-form-{{ payment.id }}" method="post" action="{{ path('app_admin_payment_refund', {id: payment.id}) }}"
-                  style="display:none;gap:0.4rem;align-items:center;margin-top:0.5rem;"
-                  onsubmit="return confirm('Issue this refund?');">
-              <input type="hidden" name="_csrf_token" value="{{ csrf_token('refund_payment_' ~ payment.id) }}">
-              <span style="font-size:0.8rem;color:var(--muted);">£</span>
-              <input type="number" name="amount" step="0.01" min="0.01" max="{{ payment.remainingRefundable }}"
-                     value="{{ payment.remainingRefundable }}" style="width:5.5rem;" class="form-control">
-              <input type="text" name="reason" placeholder="Reason (optional)" class="form-control" style="flex:1;">
-              <button type="submit" class="btn btn--ghost btn--sm">Refund</button>
-            </form>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-</div>
+  <div class="tab-panel" data-tab-panel="payments" style="display:none;">
+    {% if payments is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No payments yet.</p>
+    {% else %}
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Method</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in payments %}
+              {% set pillClass = payment.status == 'succeeded' ? ' status-pill--published' : (payment.status in ['failed'] ? ' status-pill--cancelled' : (payment.status in ['refunded', 'partially_refunded'] ? ' status-pill--pending' : '')) %}
+              <tr>
+                <td class="admin-table__muted">{{ payment.createdAt|date('d M Y, H:i') }}</td>
+                <td class="admin-table__muted">
+                  {% if payment.order %}
+                    <a href="{{ path('app_admin_sale_show', {id: payment.order.id}) }}" class="admin-table__link">Sale #{{ payment.order.id }}</a>
+                  {% elseif payment.attendee %}
+                    Booking
+                  {% else %}
+                    Donation
+                  {% endif %}
+                </td>
+                <td class="admin-table__muted">{{ payment.method|capitalize }}</td>
+                <td class="admin-table__muted">
+                  £{{ payment.amount }}
+                  {% if payment.refunds is not empty %}
+                    {% for refund in payment.refunds %}
+                      <br><span style="font-size:0.78rem;">↳ Refund £{{ refund.amount }} ({{ refund.statusLabel }}){% if refund.reason %} — {{ refund.reason }}{% endif %}</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td><span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span></td>
+                <td>
+                  {% if payment.status in ['succeeded', 'partially_refunded'] %}
+                    <a href="#" onclick="document.getElementById('refund-form-{{ payment.id }}').style.display = 'flex'; this.hidden = true; return false;"
+                       class="admin-table__link">Refund</a>
+                    <form id="refund-form-{{ payment.id }}" method="post" action="{{ path('app_admin_payment_refund', {id: payment.id}) }}"
+                          style="display:none;gap:0.4rem;align-items:center;margin-top:0.5rem;"
+                          onsubmit="return confirm('Issue this refund?');">
+                      <input type="hidden" name="_csrf_token" value="{{ csrf_token('refund_payment_' ~ payment.id) }}">
+                      <span style="font-size:0.8rem;color:var(--muted);">£</span>
+                      <input type="number" name="amount" step="0.01" min="0.01" max="{{ payment.remainingRefundable }}"
+                             value="{{ payment.remainingRefundable }}" style="width:5.5rem;" class="form-control">
+                      <input type="text" name="reason" placeholder="Reason (optional)" class="form-control" style="flex:1;min-width:80px;">
+                      <button type="submit" class="btn btn--ghost btn--sm">Refund</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
 
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-    <div class="card__label" style="margin-bottom:0;">Certifications</div>
+  <div class="tab-panel" data-tab-panel="credits" style="display:none;">
+    {% if user.creditBalance > 0 %}
+      <div style="margin-bottom:1rem;">
+        <div class="card__label" style="margin-bottom:0.3rem;">Available balance</div>
+        <div style="font-size:1.75rem;font-weight:600;color:var(--teal-dk);">{{ user.creditBalance }}</div>
+      </div>
+    {% endif %}
+    {% if hasCredits %}
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Change</th>
+              <th>Reason</th>
+              <th>Note</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in user.creditLedgerEntries %}
+              <tr>
+                <td class="admin-table__muted">{{ entry.createdAt|date('d M Y, H:i') }}</td>
+                <td style="{{ entry.creditChange > 0 ? 'color:var(--green);' : 'color:var(--red);' }}font-weight:600;">
+                  {{ entry.creditChange > 0 ? '+' : '' }}{{ entry.creditChange }}
+                </td>
+                <td class="admin-table__muted">{{ entry.reason|capitalize }}</td>
+                <td class="admin-table__muted">{{ entry.note ?: '—' }}</td>
+                <td class="admin-table__muted">
+                  {{ entry.createdBy ? ((entry.createdBy.firstName ~ ' ' ~ entry.createdBy.lastName)|trim ?: entry.createdBy.email) : 'System' }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color:var(--muted);font-size:0.875rem;">No credit transactions yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-tab-panel="memberships" style="display:none;">
+    {% if user.memberships is empty %}
+      {% set inherited = user.parent ? user.parent.currentMembership : null %}
+      {% if inherited %}
+        {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
+        <p style="font-size:0.875rem;">
+          Inherits <strong>{{ inherited.membershipType.name }}</strong> from
+          <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
+          <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
+        </p>
+      {% else %}
+        <p style="color:var(--muted);font-size:0.875rem;">No memberships yet.</p>
+      {% endif %}
+    {% else %}
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        {% for membership in user.memberships %}
+          {% set pillClass = membership.status == 'active' ? ' status-pill--published' : (membership.status in ['expired', 'cancelled'] ? ' status-pill--cancelled' : ' status-pill--pending') %}
+          <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+              <span style="font-size:0.9375rem;">{{ membership.membershipType.name }}</span>
+              <span class="status-pill{{ pillClass }}">{{ membership.statusLabel }}</span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
+              {{ membership.createdAt|date('d M Y') }}
+              {% if membership.expiresAt %} · Expires {{ membership.expiresAt|date('d M Y') }}{% endif %}
+              · £{{ membership.price }}
+              {% if membership.paidAmount != '0.00' %} · Paid £{{ membership.paidAmount }}{% endif %}
+              {% if membership.autoRenew %} · Auto-renews{% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-tab-panel="certifications" style="display:none;">
     {% if is_granted('ROLE_ADMIN') %}
-      <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--teal btn--sm">+ Add certification</a>
+      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:0.75rem;">
+        <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--teal btn--sm">+ Add certification</a>
+      </div>
+    {% endif %}
+    {% if user.certifications is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No certifications on record.</p>
+    {% else %}
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        {% for record in user.certifications %}
+          {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
+          <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+              <span style="font-size:0.9375rem;">{{ record.certification.name }}</span>
+              <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
+              {% if record.status == 'completed' %}
+                Approved {{ record.approvedAt|date('d M Y') }}
+              {% else %}
+                Started {{ record.startedAt|date('d M Y') }}
+                {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
+              {% endif %}
+              {% if is_granted('ROLE_ADMIN') %}
+                · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
+              {% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
     {% endif %}
   </div>
-  {% if user.certifications is empty %}
-    <p style="color:var(--muted);font-size:0.875rem;">No certifications on record.</p>
-  {% else %}
-    <div style="display:flex;flex-direction:column;gap:0.6rem;">
-      {% for record in user.certifications %}
-        {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
-        <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-            <span style="font-size:0.9375rem;">{{ record.certification.name }}</span>
-            <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
+
+  <div class="tab-panel" data-tab-panel="notes" style="display:none;">
+    {% if user.notes is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
+    {% else %}
+      <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
+        {% for note in user.notes %}
+          <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
+            <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
+            <p style="font-size:0.75rem;color:var(--muted);">
+              {{ note.createdAt|date('j M Y, H:i') }}
+              {% if note.addedBy %}
+                · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
+              {% else %}
+                · System
+              {% endif %}
+              {% if note.addedBy and note.addedBy == app.user %}
+                · <form method="post" action="{{ path('app_admin_user_delete_note', {id: user.id, noteId: note.id}) }}"
+                        style="display:inline;"
+                        onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_note_' ~ note.id) }}">
+                    <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete</button>
+                  </form>
+              {% endif %}
+            </p>
           </div>
-          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-            {% if record.status == 'completed' %}
-              Approved {{ record.approvedAt|date('d M Y') }}
-            {% else %}
-              Started {{ record.startedAt|date('d M Y') }}
-              {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
-            {% endif %}
-            {% if is_granted('ROLE_ADMIN') %}
-              · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
-            {% endif %}
-          </p>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_admin_user_add_note', {id: user.id}) }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_' ~ user.id) }}">
+      <div class="form-group" style="margin-bottom:0.5rem;">
+        <textarea name="content" class="form-control" rows="3"
+                  placeholder="Add a note…" style="resize:vertical;"></textarea>
+      </div>
+      <button type="submit" class="btn btn--teal btn--sm">Add note</button>
+    </form>
+  </div>
 </div>
 
 </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const tabs   = document.querySelectorAll('#member-tabs .pos-tab');
+    const panels = document.querySelectorAll('.tab-panel');
+
+    function selectTab(tab) {
+      tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tab));
+      panels.forEach(p => p.style.display = p.dataset.tabPanel === tab ? '' : 'none');
+    }
+
+    tabs.forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+    // Default to the first tab that actually has something in it.
+    let defaultTab = tabs[0] ? tabs[0].dataset.tab : null;
+    for (const tab of tabs) {
+      if (tab.dataset.hasContent === '1') {
+        defaultTab = tab.dataset.tab;
+        break;
+      }
+    }
+    if (defaultTab) selectTab(defaultTab);
+  })();
+</script>
 {% endblock %}

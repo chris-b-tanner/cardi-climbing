@@ -15,9 +15,49 @@
 <div id="results">
   {% include 'admin/settings/products/_list.html.twig' %}
 </div>
+
+<div id="inventory-modal" class="pos-modal" style="display:none;">
+  <div id="inventory-modal-backdrop" class="pos-modal__backdrop"></div>
+  <div class="pos-modal__box">
+    <div class="pos-modal__header">
+      <strong id="inventory-modal-title">Adjust stock</strong>
+      <button type="button" id="inventory-modal-close" class="btn btn--ghost btn--sm">✕</button>
+    </div>
+    <form id="inventory-form" method="post" action="{{ path('app_admin_settings_product_inventory') }}">
+      <input type="hidden" name="_csrf_token" id="inventory-csrf">
+      <input type="hidden" name="productId" id="inventory-product-id">
+      <div class="form-group">
+        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-weight:normal;text-transform:none;font-size:0.9375rem;margin-right:1.25rem;">
+          <input type="radio" name="direction" value="add" checked style="width:auto;">
+          Add stock
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-weight:normal;text-transform:none;font-size:0.9375rem;">
+          <input type="radio" name="direction" value="remove" style="width:auto;">
+          Remove stock
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="inventory-qty">Quantity</label>
+        <input type="number" id="inventory-qty" name="qty" class="form-control" min="1" step="1" required>
+      </div>
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label for="inventory-note">Note (required)</label>
+        <textarea id="inventory-note" name="note" class="form-control" rows="2" required></textarea>
+      </div>
+      <button type="submit" class="btn btn--teal btn--sm">Save</button>
+    </form>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .icon-btn {
+    border: none; background: none; padding: 0 0.2rem; margin-left: 0.3rem;
+    cursor: pointer; color: var(--muted); font-size: 0.85rem; vertical-align: middle;
+  }
+  .icon-btn:hover { color: var(--teal-dk); }
+</style>
 <script>
   const searchInput = document.getElementById('search-q');
   const results      = document.getElementById('results');
@@ -42,5 +82,37 @@
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
   });
+
+  // ── Stock adjustment modal — delegated so it also works on rows loaded via search ──
+  const inventoryModal    = document.getElementById('inventory-modal');
+  const inventoryBackdrop = document.getElementById('inventory-modal-backdrop');
+  const inventoryClose    = document.getElementById('inventory-modal-close');
+  const inventoryTitle    = document.getElementById('inventory-modal-title');
+  const inventoryCsrf     = document.getElementById('inventory-csrf');
+  const inventoryProductId = document.getElementById('inventory-product-id');
+  const inventoryQty      = document.getElementById('inventory-qty');
+  const inventoryNote     = document.getElementById('inventory-note');
+
+  function openInventoryModal(trigger) {
+    inventoryTitle.textContent = 'Adjust stock — ' + trigger.dataset.productName;
+    inventoryCsrf.value = trigger.dataset.csrf;
+    inventoryProductId.value = trigger.dataset.productId;
+    inventoryQty.value = '';
+    inventoryNote.value = '';
+    document.querySelector('#inventory-form input[name="direction"][value="add"]').checked = true;
+    inventoryModal.style.display = 'flex';
+  }
+
+  function closeInventoryModal() {
+    inventoryModal.style.display = 'none';
+  }
+
+  results.addEventListener('click', (e) => {
+    const trigger = e.target.closest('.inventory-adjust-trigger');
+    if (trigger) openInventoryModal(trigger);
+  });
+
+  inventoryClose.addEventListener('click', closeInventoryModal);
+  inventoryBackdrop.addEventListener('click', closeInventoryModal);
 </script>
 {% endblock %}

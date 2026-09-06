@@ -169,7 +169,32 @@
     @media (max-width: 480px) { .detail-grid { grid-template-columns: 1fr; } }
 
     .member-columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; align-items: start; }
+    .member-columns--thirds { grid-template-columns: 1fr 2fr; }
+    .member-columns--halves { grid-template-columns: 1fr 1fr; }
     @media (max-width: 900px) { .member-columns { grid-template-columns: 1fr; } }
+
+    .pos-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .pos-tab {
+      padding: 0.4rem 0.85rem; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--white);
+      font-size: 0.8rem; font-weight: 500; color: var(--muted);
+      cursor: pointer; font-family: inherit;
+    }
+    .pos-tab:hover { border-color: var(--teal); color: var(--black); }
+    .pos-tab.is-active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+    .pos-modal {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pos-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+    .pos-modal__box {
+      position: relative; z-index: 1; width: min(420px, calc(100vw - 2rem));
+      max-height: calc(100vh - 4rem); overflow-y: auto;
+      background: var(--white); border-radius: var(--radius);
+      padding: 1.25rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+    .pos-modal__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
 
     .event-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
     @media (max-width: 1000px) { .event-columns { grid-template-columns: 1fr; } }

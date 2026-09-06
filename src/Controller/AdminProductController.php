@@ -5,10 +5,12 @@ namespace App\Controller;
 use App\Entity\CreditProduct;
 use App\Entity\Event;
 use App\Entity\EventTicketProduct;
+use App\Entity\InventoryMovement;
 use App\Entity\MembershipProduct;
 use App\Entity\MembershipType;
 use App\Entity\Product;
 use App\Entity\StockProduct;
+use App\Entity\User;
 use App\Repository\EventRepository;
 use App\Repository\MembershipTypeRepository;
 use App\Repository\ProductRepository;
@@ -167,6 +169,62 @@ class AdminProductController extends AbstractController
         $em->flush();
 
         $this->addFlash('success', 'Product deleted.');
+        return $this->redirectToRoute('app_admin_settings_products');
+    }
+
+    /** Manual stock adjustment (restock, damage, stocktake correction, etc.) from the pencil icon on the products list. */
+    #[Route('/inventory', name: 'app_admin_settings_product_inventory', methods: ['POST'])]
+    public function inventory(Request $request, ProductRepository $productRepository, EntityManagerInterface $em): Response
+    {
+        $product = $productRepository->find((int) $request->request->get('productId', 0));
+        if (!$product instanceof Product) {
+            $this->addFlash('error', 'Product not found.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+
+        if (!$this->isCsrfTokenValid('admin_product_inventory_' . $product->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+
+        $stockProduct = $product->getStockProduct();
+        if ($product->getProductType() !== Product::TYPE_STOCK || !$stockProduct) {
+            $this->addFlash('error', 'Not a stock product.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+
+        $direction = $request->request->get('direction', '');
+        $qtyRaw    = $request->request->get('qty', '');
+        $note      = trim($request->request->get('note', ''));
+
+        if (!in_array($direction, ['add', 'remove'], true)) {
+            $this->addFlash('error', 'Choose add or remove stock.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+        if (!ctype_digit((string) $qtyRaw) || (int) $qtyRaw < 1) {
+            $this->addFlash('error', 'Enter a valid quantity.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+        if ($note === '') {
+            $this->addFlash('error', 'A note is required.');
+            return $this->redirectToRoute('app_admin_settings_products');
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $movement = new InventoryMovement();
+        $movement->setStockProduct($stockProduct);
+        $movement->setQuantityChange($direction === 'add' ? (int) $qtyRaw : -(int) $qtyRaw);
+        $movement->setNetPrice($stockProduct->getCostPrice());
+        $movement->setReason(InventoryMovement::REASON_ADJUSTMENT);
+        $movement->setNote($note);
+        $movement->setCreatedBy($admin);
+
+        $em->persist($movement);
+        $em->flush();
+
+        $this->addFlash('success', 'Stock updated.');
         return $this->redirectToRoute('app_admin_settings_products');
     }
 

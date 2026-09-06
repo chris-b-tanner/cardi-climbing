@@ -28,6 +28,11 @@ class InventoryMovement
     #[ORM\Column]
     private int $quantityChange;
 
+    /** Set for a sale-driven movement — the row whose fulfilment moved this stock. Null for a manual adjustment, initial stock, etc. */
+    #[ORM\ManyToOne(targetEntity: SalesOrderRow::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?SalesOrderRow $salesOrderRow = null;
+
     /** Net cost price (ex VAT) at the time of this movement — copied from the stock product's cost price when stock is added, so past purchases keep the price paid at the time. */
     #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2, nullable: true)]
     private ?string $netPrice = null;
@@ -74,6 +79,17 @@ class InventoryMovement
     public function setQuantityChange(int $quantityChange): static
     {
         $this->quantityChange = $quantityChange;
+        return $this;
+    }
+
+    public function getSalesOrderRow(): ?SalesOrderRow
+    {
+        return $this->salesOrderRow;
+    }
+
+    public function setSalesOrderRow(?SalesOrderRow $salesOrderRow): static
+    {
+        $this->salesOrderRow = $salesOrderRow;
         return $this;
     }
 

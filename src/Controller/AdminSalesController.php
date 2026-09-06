@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Event;
+use App\Entity\Note;
 use App\Entity\Product;
 use App\Entity\SalesOrder;
 use App\Entity\SalesOrderRow;
@@ -17,6 +18,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -96,20 +98,15 @@ class AdminSalesController extends AbstractController
             }
         }
 
-        $existing = null;
-        foreach ($order->getRows() as $candidate) {
-            if ($candidate->getProduct() === $product
-                && $candidate->getBeneficiaryMember() === null
-                && $candidate->getOccurrenceDate() == $occurrenceDate
-            ) {
-                $existing = $candidate;
-                break;
+        if ($product->requiresBeneficiary()) {
+            // One line per beneficiary (and occurrence, for an event ticket) — never merge qty here.
+            // New rows always default to the order's own member; the only way to free up this slot
+            // for another line is changing an existing row's beneficiary away from the order's member.
+            if ($this->hasConflictingRow($order, $product, $occurrenceDate, $order->getUser())) {
+                $this->addFlash('error', 'This member already has a line for this product. Change its beneficiary first if you want to add another.');
+                return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
             }
-        }
 
-        if ($existing !== null) {
-            $existing->setQty($existing->getQty() + 1);
-        } else {
             $row = new SalesOrderRow();
             $row->setProduct($product);
             $row->setQty(1);
@@ -119,6 +116,28 @@ class AdminSalesController extends AbstractController
             $row->setOccurrenceDate($occurrenceDate);
             $order->addRow($row);
             $em->persist($row);
+        } else {
+            // Stock/service — repeat adds just bump the quantity on the existing line.
+            $existing = null;
+            foreach ($order->getRows() as $candidate) {
+                if ($candidate->getProduct() === $product && $candidate->getBeneficiaryMember() === null) {
+                    $existing = $candidate;
+                    break;
+                }
+            }
+
+            if ($existing !== null) {
+                $existing->setQty($existing->getQty() + 1);
+            } else {
+                $row = new SalesOrderRow();
+                $row->setProduct($product);
+                $row->setQty(1);
+                $row->setListPriceAtSale($product->getPrice());
+                $row->setChargedPrice($product->getPrice());
+                $row->setVatCodeAtSale($product->getVatCode());
+                $order->addRow($row);
+                $em->persist($row);
+            }
         }
 
         $em->flush();
@@ -172,6 +191,11 @@ class AdminSalesController extends AbstractController
         }
 
         $row = $this->getOwnedRow($order, $rowId);
+        if ($row->getProduct()->requiresBeneficiary()) {
+            $this->addFlash('error', 'This line can only have a quantity of 1 — add another line for a different beneficiary instead.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
         $row->setQty($row->getQty() + 1);
         $em->flush();
 
@@ -212,6 +236,125 @@ class AdminSalesController extends AbstractController
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
+    /** Members for the "change beneficiary" picker — the order member's dependents by default, or a general search once a query is typed. */
+    #[Route('/{id}/beneficiary-search', name: 'app_admin_sale_beneficiary_search', requirements: ['id' => '\d+'])]
+    public function beneficiarySearch(Request $request, SalesOrder $order, UserRepository $userRepository): JsonResponse
+    {
+        $query = trim($request->query->get('q', ''));
+
+        if ($query === '') {
+            $candidates = $order->getUser()->getDependents()->toArray();
+        } elseif (mb_strlen($query) < 2) {
+            $candidates = [];
+        } else {
+            $candidates = $userRepository->search($query, null, 20);
+        }
+
+        return $this->json(array_map(function (User $candidate) {
+            $displayName = trim(($candidate->getFirstName() ?? '') . ' ' . ($candidate->getLastName() ?? ''));
+            $name        = $displayName ?: ($candidate->getEmail() ?: 'Member #' . $candidate->getId());
+
+            return [
+                'id'    => $candidate->getId(),
+                'label' => $candidate->getEmail() ? $name . ' — ' . $candidate->getEmail() : $name,
+            ];
+        }, $candidates));
+    }
+
+    /** Points a row at an existing member as its beneficiary. */
+    #[Route('/{id}/beneficiary', name: 'app_admin_sale_set_beneficiary', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function setBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $row = $this->getOwnedRow($order, (int) $request->request->get('rowId', 0));
+        if (!$row->getProduct()->requiresBeneficiary()) {
+            $this->addFlash('error', 'This line has no beneficiary to change.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $beneficiary = $userRepository->find((int) $request->request->get('userId', 0));
+        if (!$beneficiary instanceof User) {
+            $this->addFlash('error', 'Choose a member.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        if ($this->hasConflictingRow($order, $row->getProduct(), $row->getOccurrenceDate(), $beneficiary, $row)) {
+            $this->addFlash('error', 'That member already has a line for this product.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        // null is the canonical "same as the order's member" — store it that way rather than an explicit self-reference.
+        $row->setBeneficiaryMember($beneficiary === $order->getUser() ? null : $beneficiary);
+        $em->flush();
+
+        $this->addFlash('success', 'Beneficiary updated.');
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /** Creates a new member on the fly (optionally as the order member's dependent) and uses them as a row's beneficiary. */
+    #[Route('/{id}/beneficiary/new', name: 'app_admin_sale_create_beneficiary', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function createBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, UserPasswordHasherInterface $hasher, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $row = $this->getOwnedRow($order, (int) $request->request->get('rowId', 0));
+        if (!$row->getProduct()->requiresBeneficiary()) {
+            $this->addFlash('error', 'This line has no beneficiary to change.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $firstName     = trim($request->request->get('firstName', ''));
+        $lastName      = trim($request->request->get('lastName', ''));
+        $email         = trim($request->request->get('email', '')) ?: null;
+        $dateOfBirthRaw = trim($request->request->get('dateOfBirth', ''));
+        $dateOfBirth   = $dateOfBirthRaw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $dateOfBirthRaw) ?: null) : null;
+
+        if ($firstName === '') {
+            $this->addFlash('error', 'First name is required.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        if ($email !== null && $userRepository->findOneBy(['email' => $email])) {
+            $this->addFlash('error', 'A member with that email address already exists.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $beneficiary = new User();
+        $beneficiary->setFirstName($firstName);
+        $beneficiary->setLastName($lastName ?: null);
+        $beneficiary->setEmail($email);
+        $beneficiary->setDateOfBirth($dateOfBirth);
+        // No login for this contact until they set a password via "forgot password" — requires an email on file.
+        $beneficiary->setPassword($hasher->hashPassword($beneficiary, bin2hex(random_bytes(32))));
+
+        if ($request->request->has('makeDependent')) {
+            $beneficiary->setParent($order->getUser());
+        }
+
+        $em->persist($beneficiary);
+
+        /** @var User $admin */
+        $admin     = $this->getUser();
+        $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
+
+        $note = new Note();
+        $note->setUser($beneficiary);
+        $note->setContent('Added as a beneficiary on Sale #' . $order->getId() . ' by ' . $adminName . '.');
+        $note->setAddedBy($admin);
+        $em->persist($note);
+
+        $row->setBeneficiaryMember($beneficiary);
+        $em->flush();
+
+        $this->addFlash('success', 'New member created and set as beneficiary.');
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
     #[Route('/{id}/complete-free', name: 'app_admin_sale_complete_free', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function completeFree(Request $request, SalesOrder $order, SalesOrderService $salesOrderService): Response
     {
@@ -224,7 +367,13 @@ class AdminSalesController extends AbstractController
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
-        $salesOrderService->completeFree($order);
+        try {
+            $salesOrderService->completeFree($order);
+        } catch (\LogicException $e) {
+            $this->addFlash('error', $e->getMessage());
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
         $this->addFlash('success', 'Order completed.');
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
@@ -240,7 +389,13 @@ class AdminSalesController extends AbstractController
         /** @var User $admin */
         $admin = $this->getUser();
 
-        $salesOrderService->completeWithCash($order, $admin);
+        try {
+            $salesOrderService->completeWithCash($order, $admin);
+        } catch (\LogicException $e) {
+            $this->addFlash('error', $e->getMessage());
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
         $this->addFlash('success', 'Order completed — cash payment recorded.');
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
@@ -287,5 +442,22 @@ class AdminSalesController extends AbstractController
         }
 
         throw $this->createNotFoundException('Row not found.');
+    }
+
+    /** Whether some other row in the order already has this exact (product, occurrence, beneficiary) combination. */
+    private function hasConflictingRow(SalesOrder $order, Product $product, ?\DateTimeImmutable $occurrenceDate, User $beneficiary, ?SalesOrderRow $exclude = null): bool
+    {
+        foreach ($order->getRows() as $candidate) {
+            if ($candidate === $exclude) {
+                continue;
+            }
+            if ($candidate->getProduct() === $product
+                && $candidate->getOccurrenceDate() == $occurrenceDate
+                && $candidate->getEffectiveBeneficiary() === $beneficiary
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 }
