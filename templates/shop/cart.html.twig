@@ -1,0 +1,241 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Your cart — Y Wal{% endblock %}
+
+{% block head %}
+<style>
+  .cart-page { padding: 7rem 1rem 5rem; }
+  .cart-wrap { max-width: 640px; margin: 0 auto; }
+  .cart-wrap h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
+
+  .cart-back-link { font-size: 0.875rem; color: #6b7280; text-decoration: none; display: inline-block; margin-bottom: 1.5rem; }
+  .cart-back-link:hover { color: #1a1a1a; }
+
+  .account-card {
+    background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .cart-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb; }
+  .cart-line:last-child { border-bottom: none; }
+  .cart-line__name { font-weight: 600; color: #1a1a1a; font-size: 0.9375rem; }
+  .cart-line__meta { font-size: 0.8rem; color: #6b7280; margin-top: 0.15rem; }
+  .cart-line__price { font-weight: 600; color: #1a1a1a; white-space: nowrap; text-align: right; }
+  .cart-line__unit-price { font-weight: 400; font-size: 0.75rem; color: #6b7280; margin-top: 0.15rem; }
+  .cart-line__qty-form { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+  .cart-line__qty-label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #6b7280; }
+  .cart-line__qty-input { width: 3.5rem; padding: 0.25rem 0.4rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.85rem; font-family: inherit; }
+  .cart-line__qty-update {
+    background: none; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.25rem 0.6rem;
+    font-size: 0.78rem; color: #1a1a1a; cursor: pointer; font-family: inherit;
+  }
+  .cart-line__qty-update:hover { background: #f9fafb; }
+  .cart-line__remove {
+    background: none; border: none; padding: 0; margin-top: 0.4rem;
+    font-size: 0.78rem; color: #dc2626; text-decoration: underline; cursor: pointer; font-family: inherit;
+  }
+  .cart-total { display: flex; justify-content: space-between; font-size: 1.05rem; font-weight: 700; padding-top: 0.75rem; margin-top: 0.5rem; border-top: 1px solid #e5e7eb; }
+
+  .item-card__meta { font-size: 0.82rem; color: #6b7280; line-height: 1.6; }
+  .alert--success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
+  .alert--error { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
+  .cart-step + .cart-step { margin-top: 1.25rem; }
+  .cart-empty { color: #6b7280; font-size: 0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cart-page">
+  <div class="cart-wrap">
+    <a href="{{ path('app_shop') }}" class="cart-back-link">&larr; Back to shop</a>
+    <h1>Your cart</h1>
+
+    {% for msg in app.flashes('success') %}<div class="alert--success">{{ msg }}</div>{% endfor %}
+    {% for msg in app.flashes('error') %}<div class="alert--error">{{ msg }}</div>{% endfor %}
+
+    <div id="cart-step-review" class="cart-step">
+      {% if lines is empty %}
+        <div class="account-card">
+          <p class="cart-empty">Your cart is empty. <a href="{{ path('app_shop') }}">Browse the shop</a>.</p>
+        </div>
+      {% else %}
+        <div class="account-card">
+          {% for key, line in lines %}
+            {% set eventTicketProduct = line.product.eventTicketProduct %}
+            {% set canChangeQty = eventTicketProduct and eventTicketProduct.event.restrictions is empty %}
+            <div class="cart-line">
+              <div>
+                <div class="cart-line__name">{{ line.product.name }}{% if line.product.variantValue %} ({{ line.product.variantValue }}){% endif %}</div>
+                <div class="cart-line__meta">
+                  For {{ (line.beneficiary.firstName ~ ' ' ~ line.beneficiary.lastName)|trim ?: line.beneficiary.email }}
+                  {% if line.occurrenceDate %} &middot; {{ line.occurrenceDate|date('d M Y') }}{% endif %}
+                </div>
+                {% if canChangeQty %}
+                  <form method="post" action="{{ path('app_cart_qty') }}" class="cart-line__qty-form">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('cart_qty') }}">
+                    <input type="hidden" name="key" value="{{ key }}">
+                    <label class="cart-line__qty-label">
+                      Qty
+                      <input type="number" name="qty" value="{{ line.qty }}" min="1" class="cart-line__qty-input">
+                    </label>
+                    <button type="submit" class="cart-line__qty-update">Update</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="{{ path('app_cart_remove') }}" style="margin-top:0.4rem;">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('cart_remove') }}">
+                  <input type="hidden" name="key" value="{{ key }}">
+                  <button type="submit" class="cart-line__remove">Remove</button>
+                </form>
+              </div>
+              <div class="cart-line__price">
+                £{{ line.lineTotal }}
+                {% if line.qty > 1 %}<div class="cart-line__unit-price">£{{ line.product.price }} &times; {{ line.qty }}</div>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+          <div class="cart-total"><span>Total</span><span>£{{ total }}</span></div>
+        </div>
+
+        <button type="button" class="btn btn--teal" id="cart-pay-btn">Pay with card</button>
+      {% endif %}
+    </div>
+
+    <div id="cart-step-card" class="cart-step" hidden>
+      <div class="account-card">
+        <p class="item-card__meta">Total: £{{ total }}</p>
+        <div id="payment-element" style="margin: 1rem 0;"></div>
+        <button type="button" class="btn btn--teal" id="cart-submit-card-btn">Pay now</button>
+        <div id="cart-card-error" class="alert--error" style="display:none;margin-top:0.75rem;"></div>
+      </div>
+    </div>
+
+    <div id="cart-step-processing" class="cart-step" hidden>
+      <div class="account-card">
+        <p class="item-card__meta">Processing your payment&hellip;</p>
+      </div>
+    </div>
+
+    <div id="cart-step-success" class="cart-step" hidden>
+      <div class="alert--success">Thank you! Your order is complete — you'll receive a receipt by email.</div>
+      <a href="{{ path('app_account') }}" class="btn btn--outline">Go to my account</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+{% if lines is not empty %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+(function () {
+  const csrfCheckout = {{ csrf_token('cart_checkout')|json_encode|raw }};
+  const stripe = Stripe({{ stripePublishableKey|json_encode|raw }});
+  const statusUrlTemplate = {{ path('app_cart_status', {id: 999999999})|json_encode|raw }};
+
+  const steps = {
+    review:     document.getElementById('cart-step-review'),
+    card:       document.getElementById('cart-step-card'),
+    processing: document.getElementById('cart-step-processing'),
+    success:    document.getElementById('cart-step-success'),
+  };
+
+  const submitCardBtn = document.getElementById('cart-submit-card-btn');
+
+  function showStep(name) {
+    Object.values(steps).forEach(el => { el.hidden = true; });
+    steps[name].hidden = false;
+
+    if (name === 'card') {
+      submitCardBtn.disabled = false;
+      submitCardBtn.textContent = 'Pay now';
+    }
+  }
+
+  let elements = null;
+  let pollTimer = null;
+
+  document.getElementById('cart-pay-btn').addEventListener('click', async () => {
+    const payBtn = document.getElementById('cart-pay-btn');
+    payBtn.disabled = true;
+    payBtn.textContent = 'Please wait…';
+
+    const body = new URLSearchParams({ _csrf_token: csrfCheckout });
+    const response = await fetch('{{ path('app_cart_checkout') }}', { method: 'POST', body });
+    const data = await response.json();
+
+    if (!response.ok) {
+      payBtn.disabled = false;
+      payBtn.textContent = 'Pay with card';
+      alert(data.error || 'Something went wrong starting the payment.');
+      return;
+    }
+
+    showStep('card');
+
+    elements = stripe.elements({ clientSecret: data.clientSecret });
+    elements.create('payment').mount('#payment-element');
+
+    submitCardBtn.onclick = async () => {
+      const cardError = document.getElementById('cart-card-error');
+      cardError.style.display = 'none';
+      submitCardBtn.disabled = true;
+      submitCardBtn.textContent = 'Processing…';
+
+      const result = await stripe.confirmPayment({
+        elements,
+        confirmParams: { return_url: window.location.origin + '{{ path('app_cart') }}' },
+        redirect: 'if_required',
+      });
+
+      if (result.error) {
+        submitCardBtn.disabled = false;
+        submitCardBtn.textContent = 'Pay now';
+        cardError.textContent = result.error.message;
+        cardError.style.display = 'block';
+        return;
+      }
+
+      showStep('processing');
+      pollPaymentStatus(data.paymentId);
+    };
+  });
+
+  function pollPaymentStatus(paymentId) {
+    let attempts = 0;
+    clearInterval(pollTimer);
+    const statusUrl = statusUrlTemplate.replace('999999999', paymentId);
+
+    pollTimer = setInterval(async () => {
+      attempts++;
+
+      let data;
+      try {
+        const response = await fetch(statusUrl);
+        data = await response.json();
+      } catch (e) {
+        return; // transient network error — keep polling
+      }
+
+      if (data.status === 'succeeded') {
+        clearInterval(pollTimer);
+        showStep('success');
+        return;
+      }
+
+      if (data.status === 'failed') {
+        clearInterval(pollTimer);
+        alert('The payment did not go through. Please try again.');
+        window.location.reload();
+        return;
+      }
+
+      if (attempts >= 20) {
+        clearInterval(pollTimer);
+        alert('This is taking longer than expected — please check back shortly.');
+      }
+    }, 1500);
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

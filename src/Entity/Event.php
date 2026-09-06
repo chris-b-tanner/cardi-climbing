@@ -337,6 +337,12 @@ class Event
         return false;
     }
 
+    /** A free event still restricted to a certification needs the booker to have an active membership or a spare credit — there's no ticket sale here to actually pay for the seat. */
+    public function requiresMembershipOrCredit(): bool
+    {
+        return $this->price === null && !$this->restrictions->isEmpty();
+    }
+
     public function getAttendees(): Collection
     {
         return $this->attendees;

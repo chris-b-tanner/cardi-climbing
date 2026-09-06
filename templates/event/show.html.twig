@@ -14,7 +14,8 @@
 </section>
 
 <section class="section section--off">
-  <div class="wrap event-show__wrap">
+  <div class="wrap">
+  <div class="event-show__wrap">
 
     <div class="event-show__meta">
       <span class="event-show__meta-item">
@@ -141,6 +142,10 @@
         <div class="alert alert--warning event-show__actions">
           {{ 'events_not_eligible'|trans }}
         </div>
+      {% elseif blockedByMembershipOrCredit %}
+        <div class="alert alert--warning event-show__actions">
+          {{ 'events_needs_membership_or_credit'|trans }}
+        </div>
       {% elseif canBook %}
         <div class="agenda-event__actions event-show__actions">
           <form method="post" action="{{ path('app_event_book', {id: event.id}) }}" class="agenda-event__form">
@@ -163,6 +168,7 @@
       {% endif %}
     {% endif %}
 
+  </div>
   </div>
 </section>
 {% endblock %}

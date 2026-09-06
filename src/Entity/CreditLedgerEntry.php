@@ -30,6 +30,11 @@ class CreditLedgerEntry
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?SalesOrderRow $salesOrderRow = null;
 
+    /** Set for a redemption entry created by booking directly onto a certification-restricted free event with a credit — the attendee it paid for. Null otherwise. */
+    #[ORM\ManyToOne(targetEntity: Attendee::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Attendee $attendee = null;
+
     #[ORM\Column(length: 20)]
     private string $reason;
 
@@ -83,6 +88,17 @@ class CreditLedgerEntry
     public function setSalesOrderRow(?SalesOrderRow $salesOrderRow): static
     {
         $this->salesOrderRow = $salesOrderRow;
+        return $this;
+    }
+
+    public function getAttendee(): ?Attendee
+    {
+        return $this->attendee;
+    }
+
+    public function setAttendee(?Attendee $attendee): static
+    {
+        $this->attendee = $attendee;
         return $this;
     }
 

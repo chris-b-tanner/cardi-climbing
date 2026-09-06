@@ -7,47 +7,40 @@
   <a href="{{ path('app_admin_users', {context: 'new_sale'}) }}" class="btn btn--teal btn--sm">+ New sale</a>
 </div>
 
-{% if orders is empty %}
-  <div class="empty">
-    <strong>No sales yet</strong>
-    Start a new sale to sell stock, credits, memberships or event tickets.
-  </div>
-{% else %}
-  <div class="table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Member</th>
-          <th>Status</th>
-          <th style="text-align:right;">Total</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for order in orders %}
-          {% set displayName = (order.user.firstName ~ ' ' ~ order.user.lastName)|trim %}
-          {% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
-          <tr>
-            <td class="admin-table__muted">#{{ order.id }}</td>
-            <td>
-              <a href="{{ path('app_admin_user_show', {id: order.user.id}) }}" class="admin-table__link">
-                {{ displayName ?: (order.user.email ?: 'Member #' ~ order.user.id) }}
-              </a>
-            </td>
-            <td><span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></td>
-            <td class="admin-table__muted" style="text-align:right;">£{{ order.total }}</td>
-            <td class="admin-table__muted">{{ order.createdAt|date('d M Y H:i') }}</td>
-            <td>
-              <a href="{{ path('app_admin_sale_show', {id: order.id}) }}" class="admin-table__link">
-                {{ order.status == 'draft' ? 'Continue' : 'View' }}
-              </a>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% endif %}
+<div class="filter-form">
+  <input type="search" id="search-q" placeholder="Search member…"
+         value="{{ currentQuery }}" aria-label="Search sales" autocomplete="off">
+</div>
+
+<div id="results">
+  {% include 'admin/sales/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput = document.getElementById('search-q');
+  const results      = document.getElementById('results');
+  const endpoint      = '{{ path('app_admin_sales') }}';
+  let debounce;
+
+  function fetchResults() {
+    const params = new URLSearchParams();
+    if (searchInput.value) params.set('q', searchInput.value);
+
+    const qs = params.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+    fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+</script>
 {% endblock %}

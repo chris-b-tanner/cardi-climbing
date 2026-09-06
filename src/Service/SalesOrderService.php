@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Payment;
+use App\Entity\Product;
 use App\Entity\SalesOrder;
 use App\Entity\SalesOrderRow;
 use App\Entity\User;
@@ -84,6 +85,30 @@ class SalesOrderService
         $this->em->flush();
     }
 
+    /**
+     * Whether adding {product} (at {occurrenceDate}, for {beneficiary}) alongside {existingLines}
+     * would break the one-line-per-beneficiary rule for a beneficiary-relevant product (always false
+     * for stock/service, which have no such rule). Shared by anything that builds up a set of lines
+     * before they're real SalesOrderRows — the admin POS cart and the public self-serve cart both
+     * call this with their own in-progress lines rather than duplicating the rule.
+     *
+     * @param iterable<array{0: Product, 1: ?\DateTimeImmutable, 2: User}> $existingLines each as [product, occurrenceDate, effectiveBeneficiary]
+     */
+    public function wouldConflictWithExisting(Product $product, ?\DateTimeImmutable $occurrenceDate, User $beneficiary, iterable $existingLines): bool
+    {
+        if (!$product->requiresBeneficiary()) {
+            return false;
+        }
+
+        foreach ($existingLines as [$existingProduct, $existingOccurrenceDate, $existingBeneficiary]) {
+            if ($existingProduct === $product && $existingOccurrenceDate == $occurrenceDate && $existingBeneficiary === $beneficiary) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function markComplete(SalesOrder $order): void
     {
         $this->assertValidRows($order);
@@ -96,29 +121,43 @@ class SalesOrderService
     }
 
     /**
-     * A beneficiary-relevant row (membership/credit/event ticket) is always qty 1, and there's never
-     * more than one such row per (product, beneficiary, occurrence) — the admin UI already enforces
-     * this when rows are added, but a completing order is checked again here since fulfilment is
-     * where a violation would actually do damage (e.g. two Memberships from one line).
+     * A beneficiary-relevant row (membership/credit/event ticket) is normally qty 1, and there's
+     * never more than one such row per (product, beneficiary, occurrence) — the admin UI and cart
+     * already enforce this when rows are added, but a completing order is checked again here since
+     * fulfilment is where a violation would actually do damage (e.g. two Memberships from one line).
+     *
+     * The one exception is an event ticket for an unrestricted event: with no certification to
+     * check per attendee, a single row can cover several anonymous seats bought by the same person
+     * (e.g. 3 places on an open film night), so qty > 1 is allowed there.
      */
     private function assertValidRows(SalesOrder $order): void
     {
         $seen = [];
         foreach ($order->getRows() as $row) {
-            if (!$row->getProduct()->requiresBeneficiary()) {
+            $product = $row->getProduct();
+            if (!$product->requiresBeneficiary()) {
                 continue;
             }
 
-            if ($row->getQty() !== 1) {
-                throw new \LogicException(sprintf('Row #%d ("%s") requires a beneficiary and must have a quantity of 1, has %d.', $row->getId(), $row->getProduct()->getName(), $row->getQty()));
+            if ($row->getQty() !== 1 && !$this->allowsMultipleQty($product)) {
+                throw new \LogicException(sprintf('Row #%d ("%s") requires a beneficiary and must have a quantity of 1, has %d.', $row->getId(), $product->getName(), $row->getQty()));
             }
 
-            $key = $row->getProduct()->getId() . ':' . $row->getEffectiveBeneficiary()->getId() . ':' . ($row->getOccurrenceDate()?->format('Y-m-d') ?? '');
+            $key = $product->getId() . ':' . $row->getEffectiveBeneficiary()->getId() . ':' . ($row->getOccurrenceDate()?->format('Y-m-d') ?? '');
             if (isset($seen[$key])) {
-                throw new \LogicException(sprintf('More than one row for the same beneficiary and product ("%s") in order #%d.', $row->getProduct()->getName(), $order->getId()));
+                throw new \LogicException(sprintf('More than one row for the same beneficiary and product ("%s") in order #%d.', $product->getName(), $order->getId()));
             }
             $seen[$key] = true;
         }
+    }
+
+    private function allowsMultipleQty(Product $product): bool
+    {
+        if ($product->getProductType() !== Product::TYPE_EVENT_TICKET) {
+            return false;
+        }
+
+        return $product->getEventTicketProduct()->getEvent()->getRestrictions()->isEmpty();
     }
 
     private function fulfil(SalesOrderRow $row): void

@@ -72,7 +72,9 @@
                         </span>
                       {% endif %}
                     </div>
-                    <a href="{{ path('app_event_show', {id: event.id, date: occ.date|date('Y-m-d')}) }}" class="btn btn--outline btn--sm agenda-event__cta">
+                    <a href="{{ path('app_event_show', {id: event.id, date: occ.date|date('Y-m-d')}) }}"
+                       class="btn btn--outline btn--sm agenda-event__cta"
+                       data-preview-url="{{ path('app_event_preview', {id: event.id, date: occ.date|date('Y-m-d')}) }}">
                       {{ 'events_view'|trans }}
                     </a>
                   </div>
@@ -85,6 +87,14 @@
     </div>
   </div>
 </section>
+
+<div id="event-preview-modal" class="event-preview-modal" style="display:none;" aria-hidden="true">
+  <div id="event-preview-backdrop" class="event-preview-modal__backdrop"></div>
+  <div class="event-preview-modal__box" role="dialog" aria-modal="true">
+    <button type="button" id="event-preview-close" class="event-preview-modal__close" aria-label="{{ 'events_close'|trans }}">&times;</button>
+    <div id="event-preview-body" class="event-preview-modal__body"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -110,5 +120,77 @@
   const dayKeys    = [...dayTabs].map(tab => tab.dataset.day);
   const initialDay = dayKeys.includes(todayKey) ? todayKey : dayKeys[0];
   if (initialDay) showDay(initialDay);
+
+  // ── Event preview modal — progressive enhancement over the plain link to the full event page ──
+  const previewModal   = document.getElementById('event-preview-modal');
+  const previewBackdrop = document.getElementById('event-preview-backdrop');
+  const previewClose    = document.getElementById('event-preview-close');
+  const previewBody     = document.getElementById('event-preview-body');
+
+  let currentPreviewUrl = null;
+
+  function openPreview(url) {
+    currentPreviewUrl = url;
+    previewBody.innerHTML = '';
+    previewModal.style.display = 'flex';
+    previewModal.setAttribute('aria-hidden', 'false');
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.text())
+      .then(html => { previewBody.innerHTML = html; });
+  }
+
+  function closePreview() {
+    previewModal.style.display = 'none';
+    previewModal.setAttribute('aria-hidden', 'true');
+  }
+
+  document.querySelectorAll('.agenda-event__cta[data-preview-url]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      // Let a modifier-click or non-primary button open the full page normally (new tab, etc.).
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      e.preventDefault();
+      openPreview(link.dataset.previewUrl);
+    });
+  });
+
+  previewClose.addEventListener('click', closePreview);
+  previewBackdrop.addEventListener('click', closePreview);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePreview();
+  });
+
+  // ── "Add to cart" forms inside the modal — delegated since its content is swapped in via fetch ──
+  previewBody.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!form.classList.contains('event-preview__ticket-form')) return;
+
+    e.preventDefault();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalLabel = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Adding…';
+
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: new FormData(form),
+    })
+      .then(r => r.json().then(data => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalLabel;
+          alert(data.error || 'Could not add that to your cart.');
+          return;
+        }
+
+        // Refresh the whole modal rather than just this form — that's what picks up the
+        // "you have N in your cart" notice, which depends on the cart count as of right now.
+        if (currentPreviewUrl) openPreview(currentPreviewUrl);
+      });
+  });
 </script>
 {% endblock %}

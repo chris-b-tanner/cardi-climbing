@@ -39,22 +39,13 @@
 
   <div class="card">
     <div class="detail-grid">
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0;">
         <label for="status">Status</label>
         <select id="status" name="status" class="form-control">
           <option value="confirmed" {{ attendee.status == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
           <option value="pending" {{ attendee.status == 'pending' ? 'selected' : '' }}>Pending</option>
           <option value="cancelled" {{ attendee.status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
         </select>
-      </div>
-      <div class="form-group">
-        <label for="price">Price override (£)</label>
-        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
-               placeholder="Leave blank to use the event price" value="{{ attendee.price }}">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="paidAmount">Paid amount (£)</label>
-        <input type="number" id="paidAmount" name="paidAmount" class="form-control" min="0" step="0.01" value="{{ attendee.paidAmount }}">
       </div>
     </div>
   </div>

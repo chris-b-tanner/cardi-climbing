@@ -1,0 +1,137 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Shop — Y Wal{% endblock %}
+
+{% block head %}
+<style>
+  .shop-page { padding: 7rem 1rem 5rem; }
+  .shop-wrap { max-width: 720px; margin: 0 auto; }
+  .shop-wrap h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .shop-wrap .subtitle { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+  .shop-cart-link {
+    display: inline-block; margin-bottom: 1.5rem;
+    font-size: 0.875rem; font-weight: 600; color: #2a9d8f; text-decoration: none;
+  }
+  .shop-cart-link:hover { text-decoration: underline; }
+
+  .shop-section-title {
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #6b7280; margin: 2rem 0 0.75rem;
+  }
+  .shop-section-title:first-of-type { margin-top: 0; }
+
+  .shop-item {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+  }
+  .shop-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.5rem; }
+  .shop-item__name { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+  .shop-item__variant { font-size: 0.8rem; color: #6b7280; font-weight: 400; }
+  .shop-item__price { font-size: 1rem; font-weight: 700; color: #2a9d8f; white-space: nowrap; }
+  .shop-item__desc { font-size: 0.85rem; color: #6b7280; margin-bottom: 0.9rem; }
+  .shop-item__form { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; }
+  .shop-item__field { flex: 1 1 160px; min-width: 140px; }
+  .shop-item__field label {
+    display: block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #6b7280; margin-bottom: 0.3rem;
+  }
+  .shop-item__field select,
+  .shop-item__field input {
+    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: 0.875rem; font-family: inherit; color: #1a1a1a;
+  }
+  .shop-item__field select {
+    appearance: none; -webkit-appearance: none;
+    padding-right: 2rem; background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.55rem center; background-size: 1rem;
+    cursor: pointer;
+  }
+  .shop-item__field select:focus,
+  .shop-item__field input:focus {
+    outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent;
+  }
+  .shop-item__field-inline {
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #6b7280; margin-bottom: 0.3rem;
+  }
+  .shop-item__field-inline strong { color: #1a1a1a; }
+  .shop-item__field-hint { font-size: 0.75rem; color: #9ca3af; margin-top: 0.35rem; text-transform: none; letter-spacing: normal; }
+
+  .alert--success {
+    background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
+  }
+  .alert--error {
+    background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
+  }
+  .shop-empty { color: #6b7280; font-size: 0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shop-page">
+  <div class="shop-wrap">
+    <h1>Shop</h1>
+    <p class="subtitle">Buy a membership or drop-in credits — for yourself or a dependent.</p>
+
+    <a href="{{ path('app_cart') }}" class="shop-cart-link">View cart ({{ cartCount }}) &rarr;</a>
+
+    {% for msg in app.flashes('success') %}<div class="alert--success">{{ msg }}</div>{% endfor %}
+    {% for msg in app.flashes('error') %}<div class="alert--error">{{ msg }}</div>{% endfor %}
+
+    {% if products is empty %}
+      <p class="shop-empty">Nothing's available to buy online right now.</p>
+    {% else %}
+      {% set sections = [
+        {type: 'membership', label: 'Memberships'},
+        {type: 'credit', label: 'Drop-in credits'},
+      ] %}
+      {% for section in sections %}
+        {% set sectionProducts = products|filter(p => p.productType == section.type) %}
+        {% if sectionProducts is not empty %}
+          <div class="shop-section-title">{{ section.label }}</div>
+          {% for product in sectionProducts %}
+            <div class="shop-item">
+              <div class="shop-item__head">
+                <span class="shop-item__name">
+                  {{ product.name }}
+                  {% if product.variantValue %}<span class="shop-item__variant">({{ product.variantValue }})</span>{% endif %}
+                </span>
+                <span class="shop-item__price">£{{ product.price }}</span>
+              </div>
+              {% if product.shortDescription %}
+                <p class="shop-item__desc">{{ product.shortDescription }}</p>
+              {% endif %}
+
+              <form method="post" action="{{ path('app_shop_add') }}" class="shop-item__form">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
+                <input type="hidden" name="productId" value="{{ product.id }}">
+
+                <div class="shop-item__field">
+                  {% if app.user.dependents is not empty %}
+                    <label for="beneficiary-{{ product.id }}">For</label>
+                    <select id="beneficiary-{{ product.id }}" name="beneficiaryId">
+                      <option value="">Myself</option>
+                      {% for dependent in app.user.dependents %}
+                        <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+                      {% endfor %}
+                    </select>
+                  {% else %}
+                    <p class="shop-item__field-inline">For: <strong>Me</strong></p>
+                    <p class="shop-item__field-hint">You can buy for a dependent too, once one's linked to your account.</p>
+                  {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn--teal">Add to cart</button>
+              </form>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

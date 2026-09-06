@@ -74,9 +74,11 @@
         <li><a href="{{ path('app_events') }}">{{ 'nav_events'|trans }}</a></li>
         <li><a href="{{ path('app_news') }}">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
+          <li><a href="{{ path('app_shop') }}">Shop</a></li>
           <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
           <li><a href="{{ path('app_logout') }}">Sign out</a></li>
         {% elseif is_granted('ROLE_USER') %}
+          <li><a href="{{ path('app_shop') }}">Shop</a></li>
           <li><a href="{{ path('app_account') }}">My account</a></li>
           <li><a href="{{ path('app_logout') }}">Sign out</a></li>
         {% else %}
@@ -102,9 +104,11 @@
         <li><a href="{{ path('app_events') }}" class="nav__mobile-link">{{ 'nav_events'|trans }}</a></li>
         <li><a href="{{ path('app_news') }}" class="nav__mobile-link">{{ 'nav_news'|trans }}</a></li>
         {% if is_granted('ROLE_ADMIN') %}
+          <li><a href="{{ path('app_shop') }}" class="nav__mobile-link">Shop</a></li>
           <li><a href="{{ path('app_admin_users') }}" class="nav__mobile-link">Admin</a></li>
           <li><a href="{{ path('app_logout') }}" class="nav__mobile-link">Sign out</a></li>
         {% elseif is_granted('ROLE_USER') %}
+          <li><a href="{{ path('app_shop') }}" class="nav__mobile-link">Shop</a></li>
           <li><a href="{{ path('app_account') }}" class="nav__mobile-link">My account</a></li>
           <li><a href="{{ path('app_logout') }}" class="nav__mobile-link">Sign out</a></li>
         {% else %}

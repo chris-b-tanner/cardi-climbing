@@ -124,6 +124,13 @@ class Membership
         return $this;
     }
 
+    /** Actually in effect right now: active status, and not past its expiry if it has one — status alone can lag expiry since nothing flips it to "expired" automatically. */
+    public function isCurrentlyActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE
+            && ($this->expiresAt === null || $this->expiresAt > new \DateTimeImmutable());
+    }
+
     public function getStatusLabel(): string
     {
         return match ($this->status) {

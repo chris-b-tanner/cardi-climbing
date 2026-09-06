@@ -1,0 +1,152 @@
+{# Preview modal fragment for the calendar — fetched via AJAX, no layout of its own. #}
+<h2 class="event-preview__title">
+  {{ event.title }}
+  {% if isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
+</h2>
+
+<div class="event-show__meta">
+  <span class="event-show__meta-item">
+    <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    {{ date|date('d M Y') }}
+  </span>
+  <span class="event-show__meta-item">
+    <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+    {{ event.timeFrom }}&ndash;{{ event.timeTo }}
+  </span>
+  <span class="event-show__meta-item">
+    <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+    {{ event.location }}
+  </span>
+  {% if spotsLeft is not null %}
+    <span class="event-show__meta-item">
+      <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      {% if spotsLeft > 0 %}
+        {{ spotsLeft }} {{ spotsLeft == 1 ? 'events_place_left'|trans : 'events_places_left'|trans }}
+      {% else %}
+        {{ 'events_full'|trans }}
+      {% endif %}
+    </span>
+  {% endif %}
+  {% if event.restrictions is not empty %}
+    <span class="event-show__meta-item agenda-event__restricted">
+      <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      {{ 'events_restricted_to'|trans }}
+      {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor %}
+    </span>
+  {% endif %}
+</div>
+
+{% if existingBookingCount is defined and existingBookingCount > 0 %}
+  <div class="event-preview__cart-notice">
+    You already have {{ existingBookingCount }} booking{{ existingBookingCount == 1 ? '' : 's' }} on this event.
+  </div>
+{% endif %}
+
+{% if event.isRecurring %}
+  {% set dayNames = {1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday'} %}
+  <p class="event-show__recurring">
+    {{ 'events_recurs_on'|trans }}
+    {%- for d in event.recurDaysArray %} {{ dayNames[d] }}{% if not loop.last %},{% endif %}{% endfor -%}
+    {% if event.recurUntil %} {{ 'events_recurs_until'|trans }} {{ event.recurUntil|date('d M Y') }}{% endif %}.
+  </p>
+{% endif %}
+
+{% if event.description %}
+  <div class="event-show__desc">{{ event.description|nl2br }}</div>
+{% endif %}
+
+{% if event.externalUrl %}
+  <div class="agenda-event__details">
+    <a href="{{ event.externalUrl }}" target="_blank" rel="noopener" class="agenda-event__signin">{{ 'events_view_details'|trans }}</a>
+  </div>
+{% endif %}
+
+{% if eventTicketProducts is not empty %}
+  {% set canShowTicketForms = app.user and (not isRestricted or app.user.dependents is not empty) %}
+  <div class="event-preview__tickets">
+    {% if cartTicketCount is defined and cartTicketCount > 0 %}
+      <div class="event-preview__cart-notice">
+        You have {{ cartTicketCount }} ticket{{ cartTicketCount == 1 ? '' : 's' }} for this event in your cart.
+        <a href="{{ path('app_cart') }}">View cart</a>
+      </div>
+    {% endif %}
+
+    {% if app.user and isRestricted %}
+      <div class="alert alert--warning" style="margin-bottom:0.9rem;">
+        {{ 'events_not_eligible'|trans }}
+        {% if event.restrictions is not empty %}
+          &mdash; requires
+          {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor -%}
+        {% endif %}
+        {% if app.user.dependents is empty %}
+          . Tickets for this event aren't available to you.
+        {% else %}
+          . You can still book one for a dependent who holds it.
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="event-preview__tickets-title">Tickets</div>
+    {% if canShowTicketForms %}
+      {% for product in eventTicketProducts %}
+        <div class="event-preview__ticket">
+          <div class="event-preview__ticket-info">
+            <span class="event-preview__ticket-name">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</span>
+            <span class="event-preview__ticket-price">£{{ product.price }}</span>
+          </div>
+          <form method="post" action="{{ path('app_shop_add') }}" class="event-preview__ticket-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
+            <input type="hidden" name="productId" value="{{ product.id }}">
+            {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">{% endif %}
+            <select name="beneficiaryId" class="event-preview__ticket-select">
+              {% if not isRestricted %}<option value="">Myself</option>{% endif %}
+              {% for dependent in app.user.dependents %}
+                <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
+          </form>
+        </div>
+      {% endfor %}
+    {% elseif not app.user %}
+      <p class="event-preview__ticket-signin">
+        <a href="{{ path('app_login') }}" class="agenda-event__signin">Sign in to buy a ticket</a>
+      </p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="event-preview__actions">
+    {% if isPast %}
+      <p class="event-preview__ticket-signin">{{ 'events_event_passed'|trans }}</p>
+    {% elseif isBooked %}
+      <div class="alert alert--success">
+        {{ 'events_booked'|trans }} &middot; <a href="{{ path('app_account') }}#bookings">{{ 'events_manage_booking'|trans }}</a>
+      </div>
+    {% elseif isFull %}
+      <div class="alert alert--warning">{{ 'events_full'|trans }}</div>
+    {% elseif not app.user %}
+      <a href="{{ path('app_login') }}" class="btn btn--teal">{{ 'events_sign_in_to_book'|trans }}</a>
+    {% elseif isRestricted %}
+      <div class="alert alert--warning">{{ 'events_not_eligible'|trans }}</div>
+    {% elseif blockedByMembershipOrCredit %}
+      <div class="alert alert--warning" style="margin-bottom:0.6rem;">{{ 'events_needs_membership_or_credit'|trans }}</div>
+      <a href="{{ path('app_shop') }}" class="btn btn--teal">{{ 'events_buy_membership_or_credit'|trans }}</a>
+    {% elseif canBook %}
+      {# Books the logged-in member directly — no dependents, no sale/payment, same as the full event page's own form. #}
+      <form method="post" action="{{ path('app_event_book', {id: event.id}) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
+        <input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">
+        <button type="submit" class="btn btn--teal">{{ needsMembershipOrCredit ? 'events_check_in'|trans : 'events_book_now'|trans }}</button>
+        {% if needsMembershipOrCredit %}
+          <p class="event-preview__booking-hint">
+            {% if activeMembershipTypeName %}
+              {{ 'events_member_no_payment'|trans({'%type%': activeMembershipTypeName}) }}
+            {% else %}
+              {{ 'events_credit_will_be_removed'|trans }}
+            {% endif %}
+          </p>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+{% endif %}

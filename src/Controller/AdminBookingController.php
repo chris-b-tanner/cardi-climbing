@@ -8,9 +8,9 @@ use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
+use App\Service\EventBookingCreditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -38,6 +38,7 @@ class AdminBookingController extends AbstractController
         ]);
     }
 
+    /** Always reached with a userId in the GET — from a member's contact page or an event's "+ Add attendee" contact picker. There's no member search here; check in someone else by starting from their own contact page. */
     #[Route('/new', name: 'app_admin_booking_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
@@ -46,9 +47,17 @@ class AdminBookingController extends AbstractController
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
         BookingMailer $bookingMailer,
+        EventBookingCreditService $eventBookingCreditService,
     ): Response {
+        $userId = (int) ($request->query->get('userId') ?: $request->request->get('userId', 0));
+        $user   = $userId ? $userRepository->find($userId) : null;
+
+        if (!$user instanceof User) {
+            $this->addFlash('error', 'Choose a member to check in from their contact page.');
+            return $this->redirectToRoute('app_admin_bookings');
+        }
+
         $error = null;
-        $user  = null;
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('admin_booking_new', $request->request->get('_csrf_token'))) {
@@ -57,10 +66,16 @@ class AdminBookingController extends AbstractController
             }
 
             $event = $eventRepository->find((int) $request->request->get('eventId'));
-            $user  = $userRepository->find((int) $request->request->get('userId'));
 
-            if (!$event || !$user) {
-                $error = 'Please select both an event and a member.';
+            if (!$event) {
+                $error = 'Please select an event.';
+            }
+
+            // Only events without tickets are checked in directly here — an event with tickets is
+            // booked by selling one instead (via the shop/cart), so this closes off a way to bypass
+            // that sale even if the dropdown (already filtered) were tampered with.
+            if (!$error && $eventRepository->hasAnyTicketProduct($event)) {
+                $error = 'This event is sold via tickets — check members in by selling a ticket instead.';
             }
 
             $occurrenceDate = null;
@@ -102,14 +117,20 @@ class AdminBookingController extends AbstractController
                 $error = 'This event is full.';
             }
 
+            $needsCredit = false;
+            if (!$error) {
+                try {
+                    $needsCredit = $eventBookingCreditService->requiresCredit($event, $user);
+                } catch (\InvalidArgumentException $e) {
+                    $error = $e->getMessage();
+                }
+            }
+
             if (!$error) {
                 $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
                 if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING], true)) {
                     $status = Attendee::STATUS_CONFIRMED;
                 }
-
-                $priceRaw = trim($request->request->get('price', ''));
-                $paidRaw  = trim($request->request->get('paidAmount', ''));
 
                 /** @var User $admin */
                 $admin = $this->getUser();
@@ -119,18 +140,21 @@ class AdminBookingController extends AbstractController
                 $attendee->setUser($user);
                 $attendee->setOccurrenceDate($storedOccurrenceDate);
                 $attendee->setStatus($status);
-                $attendee->setPrice($priceRaw !== '' ? number_format((float) $priceRaw, 2, '.', '') : null);
-                $attendee->setPaidAmount($paidRaw !== '' ? number_format((float) $paidRaw, 2, '.', '') : '0.00');
                 $attendee->setAddedBy($admin);
 
                 $em->persist($attendee);
+
+                if ($needsCredit) {
+                    $eventBookingCreditService->spendCredit($user, $event, $attendee);
+                }
+
                 $em->flush();
 
                 if ($request->request->has('sendEmail') && $user->getEmail()) {
                     $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
                 }
 
-                $this->addFlash('success', 'Booking created.');
+                $this->addFlash('success', 'Member checked in.');
                 $showParams = ['id' => $event->getId()];
                 if ($storedOccurrenceDate) {
                     $showParams['date'] = $storedOccurrenceDate->format('Y-m-d');
@@ -141,16 +165,9 @@ class AdminBookingController extends AbstractController
 
         $selectedEventId = (int) $request->query->get('eventId', $request->request->get('eventId', 0));
 
-        if ($user === null) {
-            $userId = (int) $request->query->get('userId', 0);
-            if ($userId) {
-                $user = $userRepository->find($userId);
-            }
-        }
-
         return $this->render('admin/bookings/new.html.twig', [
             'error'           => $error,
-            'events'          => $eventRepository->findAllOrdered(),
+            'events'          => $eventRepository->findWithoutTicketsOrdered(),
             'selectedEventId' => $selectedEventId,
             'selectedMember'  => $user,
         ]);
@@ -173,12 +190,7 @@ class AdminBookingController extends AbstractController
             }
 
             if (!$error) {
-                $priceRaw = trim($request->request->get('price', ''));
-                $paidRaw  = trim($request->request->get('paidAmount', ''));
-
                 $attendee->setStatus($status);
-                $attendee->setPrice($priceRaw !== '' ? number_format((float) $priceRaw, 2, '.', '') : null);
-                $attendee->setPaidAmount($paidRaw !== '' ? number_format((float) $paidRaw, 2, '.', '') : '0.00');
 
                 $em->flush();
 
@@ -272,25 +284,4 @@ class AdminBookingController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $userId]);
     }
 
-    #[Route('/member-search', name: 'app_admin_booking_member_search')]
-    public function memberSearch(Request $request, UserRepository $userRepository): JsonResponse
-    {
-        $query = trim($request->query->get('q', ''));
-
-        if (mb_strlen($query) < 2) {
-            return $this->json([]);
-        }
-
-        $members = $userRepository->search($query, null, 20);
-
-        return $this->json(array_map(static function (User $user) {
-            $displayName = trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? ''));
-            $name        = $displayName ?: ($user->getEmail() ?: 'Member #' . $user->getId());
-
-            return [
-                'id'    => $user->getId(),
-                'label' => $user->getEmail() ? $name . ' — ' . $user->getEmail() : $name,
-            ];
-        }, $members));
-    }
 }

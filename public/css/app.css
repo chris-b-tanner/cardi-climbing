@@ -816,6 +816,11 @@ p + p { margin-top: 1rem; }
 }
 .week-day__empty { font-size: 0.78rem; color: var(--muted); }
 
+@media (min-width: 641px) {
+  .week-day__events { padding: 0.4rem; }
+  .agenda-event { padding: 0.5rem 0.6rem; }
+}
+
 @media (max-width: 640px) {
   .week-day-tabs { display: flex; }
   .week-view { display: block; border: none; background: none; }
@@ -888,6 +893,56 @@ p + p { margin-top: 1rem; }
 .agenda-event__signin {
   font-size: 0.78rem; font-weight: 600; color: var(--teal-dk);
   text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ── Event preview modal ──────────────────────────────── */
+.event-preview-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+}
+.event-preview-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+.event-preview-modal__box {
+  position: relative; z-index: 1; width: min(560px, 100%);
+  max-height: calc(100vh - 3rem); overflow-y: auto;
+  background: var(--white); border-radius: 4px;
+  padding: 2rem; box-shadow: 0 12px 36px rgba(0,0,0,0.2);
+}
+.event-preview-modal__close {
+  position: absolute; top: 0.85rem; right: 0.85rem;
+  width: 2rem; height: 2rem; border: none; background: none;
+  font-size: 1.5rem; line-height: 1; color: var(--muted); cursor: pointer;
+}
+.event-preview-modal__close:hover { color: var(--black); }
+.event-preview__title {
+  font-family: var(--f-head); font-size: 1.4rem; font-weight: 700;
+  text-transform: uppercase; line-height: 1.15;
+  margin-bottom: 1rem; padding-right: 2rem;
+}
+.event-preview__actions { margin-top: 1.5rem; }
+.event-preview__booking-hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+.event-preview__tickets { margin-top: 1.5rem; }
+.event-preview__cart-notice {
+  background: #f0fdfa; border: 1px solid #99f6e4; color: var(--teal-dk);
+  border-radius: 6px; padding: 0.6rem 0.85rem; margin-bottom: 1rem; font-size: 0.85rem;
+}
+.event-preview__cart-notice a { color: var(--teal-dk); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; margin-left: 0.3rem; }
+.event-preview__tickets-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.6rem;
+}
+.event-preview__ticket {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.7rem 0; border-bottom: 1px solid var(--border);
+}
+.event-preview__ticket:last-child { border-bottom: none; }
+.event-preview__ticket-info { display: flex; flex-direction: column; gap: 0.15rem; }
+.event-preview__ticket-name { font-weight: 600; color: var(--black); font-size: 0.9rem; }
+.event-preview__ticket-price { font-size: 0.82rem; color: var(--teal-dk); font-weight: 600; }
+.event-preview__ticket-form { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.event-preview__ticket-select {
+  padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.82rem; font-family: inherit; color: var(--black); background: var(--white);
 }
 
 /* ── Booking confirmation ─────────────────────────────── */

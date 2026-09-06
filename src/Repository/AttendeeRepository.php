@@ -51,6 +51,23 @@ class AttendeeRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    /** How many non-cancelled bookings this member has on this specific occurrence (or, for a one-off event, the event itself) — e.g. several anonymous seats booked under them in one qty>1 line. */
+    public function countActiveForUserOccurrence(Event $event, User $user, ?\DateTimeImmutable $occurrenceDate): int
+    {
+        $qb = $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->where('a.event = :event')
+            ->andWhere('a.user = :user')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('event', $event)
+            ->setParameter('user', $user)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED);
+
+        $this->whereOccurrence($qb, $occurrenceDate);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     /**
      * All non-cancelled bookings for the given events whose occurrence falls within the
      * given range, for batch-computing per-occurrence counts/booked-state in one query

@@ -9,8 +9,11 @@ use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
+use App\Repository\ProductRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
+use App\Service\CartService;
+use App\Service\EventBookingCreditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -128,6 +131,51 @@ class EventController extends AbstractController
         return $this->render('event/show.html.twig', $view);
     }
 
+    /**
+     * The preview modal shown from the calendar before landing on the full event page — everything
+     * the full page shows except the booking form itself, which the modal replaces with a single
+     * "book now" / "log in to book" button (not yet wired up to anything — that's the cart, to come).
+     */
+    #[Route('/events/{id}/preview', name: 'app_event_preview', requirements: ['id' => '\d+'])]
+    public function preview(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, CartService $cartService): Response
+    {
+        if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
+            throw $this->createNotFoundException('Event not found.');
+        }
+
+        $today          = new \DateTimeImmutable('today');
+        $requestedDate  = $this->parseDate($request->query->get('date', ''));
+        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
+
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        $stats = [
+            'count'        => $event->getMaxAttendees() !== null
+                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
+                : 0,
+            'bookedByUser' => false,
+        ];
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats);
+        $view['eventTicketProducts'] = $eventTicketProducts = $productRepository->findActiveEventTickets($event);
+
+        $cartTicketCount = 0;
+        if ($user !== null) {
+            foreach ($cartService->getLines($user) as $line) {
+                if (in_array($line['product'], $eventTicketProducts, true) && $line['occurrenceDate'] == $storedOccurrenceDate) {
+                    $cartTicketCount++;
+                }
+            }
+        }
+        $view['cartTicketCount'] = $cartTicketCount;
+        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
+
+        return $this->render('event/_preview.html.twig', $view);
+    }
+
     #[Route('/events/{id}/book', name: 'app_event_book', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
     public function book(
@@ -136,6 +184,7 @@ class EventController extends AbstractController
         EntityManagerInterface $em,
         AttendeeRepository $attendeeRepository,
         BookingMailer $bookingMailer,
+        EventBookingCreditService $eventBookingCreditService,
     ): Response {
         if (!$this->isCsrfTokenValid('book_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -158,7 +207,7 @@ class EventController extends AbstractController
 
         $staffingRequirement = $this->resolveStaffingRequirement($event, $user, $request->request->get('staffingRequirementId', ''), $em);
 
-        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $staffingRequirement);
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService, $staffingRequirement);
 
         if (is_string($result)) {
             $this->addFlash('error', $result);
@@ -187,6 +236,7 @@ class EventController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         BookingMailer $bookingMailer,
         Security $security,
+        EventBookingCreditService $eventBookingCreditService,
     ): Response {
         if (!$this->isCsrfTokenValid('book_guest_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -254,7 +304,7 @@ class EventController extends AbstractController
 
         $security->login($user);
 
-        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em);
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService);
 
         if (is_string($result)) {
             $this->addFlash('error', $result);
@@ -362,6 +412,7 @@ class EventController extends AbstractController
         \DateTimeImmutable $occurrenceDate,
         AttendeeRepository $attendeeRepository,
         EntityManagerInterface $em,
+        EventBookingCreditService $eventBookingCreditService,
         ?EventStaffingRequirement $staffingRequirement = null,
     ): Attendee|string {
         if (!$event->allowsUser($user)) {
@@ -380,6 +431,12 @@ class EventController extends AbstractController
             return 'Sorry, this event is fully booked.';
         }
 
+        try {
+            $needsCredit = $eventBookingCreditService->requiresCredit($event, $user);
+        } catch (\InvalidArgumentException $e) {
+            return $e->getMessage();
+        }
+
         $attendee = new Attendee();
         $attendee->setEvent($event);
         $attendee->setUser($user);
@@ -394,6 +451,11 @@ class EventController extends AbstractController
         }
 
         $em->persist($attendee);
+
+        if ($needsCredit) {
+            $eventBookingCreditService->spendCredit($user, $event, $attendee);
+        }
+
         $em->flush();
 
         return $attendee;
@@ -415,21 +477,37 @@ class EventController extends AbstractController
         $isBooked     = $user ? $stats['bookedByUser'] : false;
         $isRestricted = $user ? !$event->allowsUser($user) : false;
 
+        $needsMembershipOrCredit     = $event->requiresMembershipOrCredit();
+        $blockedByMembershipOrCredit = $needsMembershipOrCredit && $user !== null && !$user->canCoverMembershipOrCreditBooking();
+
+        // Only set when an active membership is what covers this booking — lets the template tell
+        // "no payment needed" (membership) apart from "a credit will be spent" (no membership).
+        $activeMembership = null;
+        if ($needsMembershipOrCredit && $user !== null) {
+            $membership = $user->getEffectiveMembership();
+            if ($membership !== null && $membership->isCurrentlyActive()) {
+                $activeMembership = $membership;
+            }
+        }
+
         // A draft is only ever reachable here as a published event, or as a team/admin preview
         // (show()/index() already gate that) — so team/admin can book onto it like any other
         // event, e.g. to put themselves on duty and build out the rota before publishing.
         $canBookUnpublished = !$event->isPublished() && $this->isGranted('ROLE_TEAM');
 
         return [
-            'event'        => $event,
-            'date'         => $date,
-            'isPast'       => $isPast,
-            'isFull'       => $isFull,
-            'spotsLeft'    => $spotsLeft,
-            'isBooked'     => $isBooked,
-            'isRestricted' => $isRestricted,
-            'isDraft'      => !$event->isPublished(),
-            'canBook'      => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted,
+            'event'                       => $event,
+            'date'                        => $date,
+            'isPast'                      => $isPast,
+            'isFull'                      => $isFull,
+            'spotsLeft'                   => $spotsLeft,
+            'isBooked'                    => $isBooked,
+            'isRestricted'                => $isRestricted,
+            'needsMembershipOrCredit'     => $needsMembershipOrCredit,
+            'blockedByMembershipOrCredit' => $blockedByMembershipOrCredit,
+            'activeMembershipTypeName'    => $activeMembership?->getMembershipType()->getName(),
+            'isDraft'                     => !$event->isPublished(),
+            'canBook'                     => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$blockedByMembershipOrCredit,
         ];
     }
 

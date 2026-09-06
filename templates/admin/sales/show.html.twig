@@ -102,7 +102,14 @@
           {% for row in order.rows %}
             <tr>
               <td>
-                {{ row.product.name }}{% if row.product.variantValue %}<br><small class="admin-table__muted">{{ row.product.variantValue }}</small>{% endif %}
+                {% set rowEventTicketProduct = row.product.eventTicketProduct %}
+                {% if rowEventTicketProduct %}
+                  <i class="bi bi-calendar3"></i>
+                  <a href="{{ path('app_admin_event_show', rowEventTicketProduct.event.isRecurring ? {id: rowEventTicketProduct.event.id, date: row.occurrenceDate|date('Y-m-d')} : {id: rowEventTicketProduct.event.id}) }}" class="admin-table__link">{{ row.product.name }}</a>
+                {% else %}
+                  {{ row.product.name }}
+                {% endif %}
+                {% if row.product.variantValue %}<br><small class="admin-table__muted">{{ row.product.variantValue }}</small>{% endif %}
                 {% if row.occurrenceDate %}<br><small class="admin-table__muted">{{ row.occurrenceDate|date('D d M Y') }}</small>{% endif %}
                 {% if row.product.requiresBeneficiary %}
                   <br><small class="admin-table__muted">
@@ -197,6 +204,26 @@
             £{{ payment.amount }} · {{ methodLabels[payment.method] ?? payment.method }} · {{ payment.statusLabel }}
           </div>
         {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="card" style="margin-top:1rem;font-size:0.8rem;color:var(--muted);">
+      Created {{ order.createdAt|date('d M Y, H:i') }}
+      {% if order.createdBy %}
+        by <a href="{{ path('app_admin_user_show', {id: order.createdBy.id}) }}" class="admin-table__link">{{ (order.createdBy.firstName ~ ' ' ~ order.createdBy.lastName)|trim ?: order.createdBy.email }}</a>
+      {% else %}
+        automatically (online payment)
+      {% endif %}
+    </div>
+
+    {% if order.status == 'draft' %}
+      <div class="card" style="margin-top:1rem;">
+        <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
+        <form method="post" action="{{ path('app_admin_sale_delete', {id: order.id}) }}"
+              onsubmit="return confirm('Permanently delete this order? This cannot be undone.');">
+          <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+          <button type="submit" class="btn btn--danger btn--sm">Delete order</button>
+        </form>
       </div>
     {% endif %}
   </div>

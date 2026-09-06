@@ -376,6 +376,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->getCurrentMembership() ?? $this->parent?->getCurrentMembership();
     }
 
+    /** Whether this member can cover a free, certification-restricted booking — via their own (or inherited) active membership, or a spare drop-in credit on their own account. */
+    public function canCoverMembershipOrCreditBooking(): bool
+    {
+        $membership = $this->getEffectiveMembership();
+        return ($membership !== null && $membership->isCurrentlyActive()) || $this->getCreditBalance() > 0;
+    }
+
     /** The member this one is a dependent of, if any. */
     public function getParent(): ?User { return $this->parent; }
     public function setParent(?User $parent): static { $this->parent = $parent; return $this; }

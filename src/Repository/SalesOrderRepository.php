@@ -25,4 +25,19 @@ class SalesOrderRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** @return SalesOrder[] */
+    public function search(string $query = ''): array
+    {
+        $qb = $this->createQueryBuilder('o')
+            ->innerJoin('o.user', 'u')->addSelect('u')
+            ->orderBy('o.createdAt', 'DESC');
+
+        if ($query !== '') {
+            $qb->andWhere('u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.email LIKE :q')
+               ->setParameter('q', '%' . $query . '%');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

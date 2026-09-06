@@ -1,9 +1,10 @@
 {% extends 'admin/base.html.twig' %}
-{% block title %}New booking{% endblock %}
+{% set memberName = (selectedMember.firstName ~ ' ' ~ selectedMember.lastName)|trim ?: selectedMember.email %}
+{% block title %}Check in : {{ memberName }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1>New booking</h1>
+  <h1>Check in / new booking : {{ memberName }}</h1>
   <a href="{{ path('app_admin_bookings') }}" class="btn btn--ghost btn--sm">← Cancel</a>
 </div>
 
@@ -13,61 +14,55 @@
 
 <form method="post" action="{{ path('app_admin_booking_new') }}" novalidate>
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_new') }}">
+  <input type="hidden" id="eventId" name="eventId" value="{{ selectedEventId ?: '' }}">
+  <input type="hidden" name="userId" value="{{ selectedMember.id }}">
 
   <div class="card">
-    <div class="form-group">
-      <label for="eventId">Event</label>
-      <select id="eventId" name="eventId" class="form-control" required>
-        <option value="">Select an event…</option>
-        {% for event in events %}
-          <option value="{{ event.id }}"
-                  data-recurring="{{ event.isRecurring ? '1' : '0' }}"
-                  data-date="{{ event.date|date('Y-m-d') }}"
-                  {% if event.id == selectedEventId %}selected{% endif %}>
-            {{ event.title }} — {{ event.date|date('d M Y') }}{{ event.isRecurring ? ' (recurring)' : '' }}
-          </option>
-        {% endfor %}
-      </select>
+    <div class="form-group" style="margin-bottom:0;">
+      <label>Event</label>
+      {% if events is empty %}
+        <p class="admin-table__muted">No events available to check members into directly.</p>
+      {% else %}
+        <div class="event-tile-grid">
+          {% for event in events %}
+            <button type="button" class="event-tile" data-event-id="{{ event.id }}"
+                    data-recurring="{{ event.isRecurring ? '1' : '0' }}"
+                    data-date="{{ event.date|date('Y-m-d') }}"
+                    data-recur-until="{{ event.recurUntil ? event.recurUntil|date('Y-m-d') : '' }}"
+                    data-recur-days="{{ event.recurDaysArray|join(',') }}">
+              <span class="event-tile__title">{{ event.title }}</span>
+              <span class="event-tile__meta">{{ event.date|date('d M Y') }}{{ event.isRecurring ? ' · recurring' : '' }}</span>
+            </button>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
-    <div class="form-group" id="occurrence-date-group" style="margin-bottom:0;">
-      <label for="occurrenceDate">Occurrence date</label>
-      <input type="date" id="occurrenceDate" name="occurrenceDate" class="form-control"
+
+    <div class="form-group" id="occurrence-date-group" style="display:none;margin-bottom:0;margin-top:1rem;">
+      <label>Occurrence date</label>
+      <div class="week-picker">
+        <div class="week-picker__nav">
+          <button type="button" id="week-prev" class="btn btn--ghost btn--sm">&lsaquo; Prev week</button>
+          <span id="week-label" class="week-picker__label"></span>
+          <button type="button" id="week-next" class="btn btn--ghost btn--sm">Next week &rsaquo;</button>
+        </div>
+        <div class="week-picker__days" id="week-days"></div>
+      </div>
+      <input type="hidden" id="occurrenceDate" name="occurrenceDate"
              value="{{ app.request.request.get('occurrenceDate') ?: app.request.query.get('occurrenceDate') }}">
-      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
-        Only needed for recurring events — must be a real occurrence date for the selected event.
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+        Pick the date to check this member in for.
       </p>
     </div>
   </div>
 
   <div class="card">
-    <div class="form-group" style="margin-bottom:0;position:relative;">
-      <label for="memberSearch">Member</label>
-      <input type="text" id="memberSearch" class="form-control" placeholder="Search by name or email…"
-             autocomplete="off"
-             value="{% if selectedMember %}{{ (selectedMember.firstName ~ ' ' ~ selectedMember.lastName)|trim ?: selectedMember.email }} — {{ selectedMember.email }}{% endif %}">
-      <input type="hidden" id="userId" name="userId" value="{{ selectedMember ? selectedMember.id : '' }}">
-      <div id="member-results" class="member-search-results"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="detail-grid">
-      <div class="form-group">
-        <label for="status">Status</label>
-        <select id="status" name="status" class="form-control">
-          <option value="confirmed">Confirmed</option>
-          <option value="pending">Pending</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="price">Price override (£)</label>
-        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
-               placeholder="Leave blank to use the event price">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="paidAmount">Paid amount (£)</label>
-        <input type="number" id="paidAmount" name="paidAmount" class="form-control" min="0" step="0.01" value="0.00">
-      </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="status">Status</label>
+      <select id="status" name="status" class="form-control">
+        <option value="confirmed">Confirmed</option>
+        <option value="pending">Pending</option>
+      </select>
     </div>
   </div>
 
@@ -80,89 +75,142 @@
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn--teal">Create booking</button>
+    <button type="submit" class="btn btn--teal">Check in</button>
     <a href="{{ path('app_admin_bookings') }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .event-tile-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.6rem;
+  }
+  .event-tile {
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+    gap: 0.25rem; width: 100%; min-height: 60px;
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.6rem 0.75rem; cursor: pointer; font-family: inherit;
+    text-align: left; transition: border-color 0.12s, background 0.12s;
+  }
+  .event-tile:hover { border-color: var(--teal); background: #f0fdfa; }
+  .event-tile.is-selected { border-color: var(--teal); background: #f0fdfa; box-shadow: 0 0 0 1px var(--teal); }
+  .event-tile__title { font-size: 0.875rem; font-weight: 600; color: var(--black); }
+  .event-tile__meta { font-size: 0.78rem; color: var(--muted); }
+
+  .week-picker { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
+  .week-picker__nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem; }
+  .week-picker__label { font-size: 0.875rem; font-weight: 500; }
+  .week-picker__days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; }
+  .week-day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.15rem; padding: 0.6rem 0.25rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--white);
+    cursor: pointer; font-family: inherit;
+  }
+  .week-day:hover:not(:disabled) { border-color: var(--teal); background: #f0fdfa; }
+  .week-day:disabled { opacity: 0.35; cursor: default; }
+  .week-day.is-selected { border-color: var(--teal); background: var(--teal); }
+  .week-day.is-selected .week-day__num, .week-day.is-selected .week-day__dow { color: #fff; }
+  .week-day__num { font-size: 0.95rem; font-weight: 600; color: var(--black); }
+  .week-day__dow { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+</style>
 <script>
-  const eventSelect = document.getElementById('eventId');
-  const dateGroup   = document.getElementById('occurrence-date-group');
-  const dateInput   = document.getElementById('occurrenceDate');
+  const eventTiles          = document.querySelectorAll('.event-tile');
+  const eventIdInput        = document.getElementById('eventId');
+  const occurrenceGroup      = document.getElementById('occurrence-date-group');
+  const occurrenceDateInput = document.getElementById('occurrenceDate');
+  const weekDays  = document.getElementById('week-days');
+  const weekLabel = document.getElementById('week-label');
+  const weekPrev  = document.getElementById('week-prev');
+  const weekNext  = document.getElementById('week-next');
 
-  function syncOccurrenceDate() {
-    const opt = eventSelect.options[eventSelect.selectedIndex];
-    const isRecurring = !!opt && opt.dataset.recurring === '1';
-    dateGroup.style.display = isRecurring ? 'block' : 'none';
-    if (opt && !isRecurring && opt.dataset.date) {
-      dateInput.value = opt.dataset.date;
-    }
+  let selectedEvent = null; // { date, recurUntil, recurDays: Set<int> }
+  let weekStart     = null; // Date, local midnight, Monday of the displayed week
+
+  function toISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
-  eventSelect.addEventListener('change', syncOccurrenceDate);
-  syncOccurrenceDate();
-
-  // ── Member search ─────────────────────────────────────────
-  const memberSearch  = document.getElementById('memberSearch');
-  const memberResults = document.getElementById('member-results');
-  const memberIdInput = document.getElementById('userId');
-  const memberSearchUrl = '{{ path('app_admin_booking_member_search') }}';
-  let memberDebounce;
-
-  function closeMemberResults() {
-    memberResults.classList.remove('is-open');
-    memberResults.innerHTML = '';
+  function mondayOf(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = (d.getDay() + 6) % 7; // 0 = Monday
+    d.setDate(d.getDate() - day);
+    return d;
   }
 
-  function clearMemberSelection() {
-    memberIdInput.value = '';
+  function isValidOccurrence(date) {
+    if (!selectedEvent) return false;
+    const iso = toISO(date);
+    if (iso < selectedEvent.date) return false;
+    if (selectedEvent.recurUntil && iso > selectedEvent.recurUntil) return false;
+    const isoDay = ((date.getDay() + 6) % 7) + 1; // 1 = Monday .. 7 = Sunday
+    return selectedEvent.recurDays.has(isoDay);
   }
 
-  memberSearch.addEventListener('input', () => {
-    clearMemberSelection();
-    clearTimeout(memberDebounce);
+  function renderWeek() {
+    weekDays.innerHTML = '';
 
-    const q = memberSearch.value.trim();
-    if (q.length < 2) {
-      closeMemberResults();
-      return;
-    }
+    const endOfWeek = new Date(weekStart);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    const opts = { day: 'numeric', month: 'short' };
+    weekLabel.textContent = `${weekStart.toLocaleDateString(undefined, opts)} – ${endOfWeek.toLocaleDateString(undefined, opts)}`;
 
-    memberDebounce = setTimeout(() => {
-      fetch(`${memberSearchUrl}?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(members => {
-          if (!members.length) {
-            memberResults.innerHTML = '<div class="member-search-empty">No members found</div>';
-            memberResults.classList.add('is-open');
-            return;
-          }
-          memberResults.innerHTML = members.map(m => `
-            <button type="button" class="member-search-item" data-id="${m.id}" data-label="${m.label.replace(/"/g, '&quot;')}">${m.label}</button>
-          `).join('');
-          memberResults.classList.add('is-open');
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + i);
+      const iso   = toISO(d);
+      const valid = isValidOccurrence(d);
+
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'week-day' + (iso === occurrenceDateInput.value ? ' is-selected' : '');
+      cell.disabled = !valid;
+      cell.innerHTML = `<span class="week-day__dow">${d.toLocaleDateString(undefined, { weekday: 'short' })}</span><span class="week-day__num">${d.getDate()}</span>`;
+      if (valid) {
+        cell.addEventListener('click', () => {
+          occurrenceDateInput.value = iso;
+          renderWeek();
         });
-    }, 250);
-  });
-
-  memberResults.addEventListener('click', (e) => {
-    const btn = e.target.closest('.member-search-item');
-    if (!btn) return;
-    memberIdInput.value = btn.dataset.id;
-    memberSearch.value = btn.dataset.label;
-    closeMemberResults();
-  });
-
-  memberSearch.addEventListener('blur', () => {
-    // Give the click on a result time to register before we validate/close.
-    setTimeout(() => {
-      if (!memberIdInput.value) {
-        memberSearch.value = '';
       }
-      closeMemberResults();
-    }, 150);
-  });
+      weekDays.appendChild(cell);
+    }
+  }
+
+  function selectEvent(tile, resetOccurrence) {
+    eventTiles.forEach(t => t.classList.toggle('is-selected', t === tile));
+    eventIdInput.value = tile.dataset.eventId;
+
+    if (tile.dataset.recurring === '1') {
+      selectedEvent = {
+        date: tile.dataset.date,
+        recurUntil: tile.dataset.recurUntil || null,
+        recurDays: new Set((tile.dataset.recurDays || '').split(',').filter(Boolean).map(Number)),
+      };
+      if (resetOccurrence) occurrenceDateInput.value = '';
+      weekStart = mondayOf(occurrenceDateInput.value ? new Date(occurrenceDateInput.value + 'T00:00:00') : new Date());
+      occurrenceGroup.style.display = 'block';
+      renderWeek();
+    } else {
+      selectedEvent = null;
+      occurrenceGroup.style.display = 'none';
+      occurrenceDateInput.value = tile.dataset.date;
+    }
+  }
+
+  eventTiles.forEach(tile => tile.addEventListener('click', () => selectEvent(tile, true)));
+  weekPrev.addEventListener('click', () => { weekStart.setDate(weekStart.getDate() - 7); renderWeek(); });
+  weekNext.addEventListener('click', () => { weekStart.setDate(weekStart.getDate() + 7); renderWeek(); });
+
+  // Re-render the previous selection after a validation error sends us back to this page.
+  if (eventIdInput.value) {
+    const preselected = document.querySelector(`.event-tile[data-event-id="${eventIdInput.value}"]`);
+    if (preselected) selectEvent(preselected, false);
+  }
 </script>
 {% endblock %}

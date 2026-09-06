@@ -28,10 +28,20 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AdminSalesController extends AbstractController
 {
     #[Route('', name: 'app_admin_sales')]
-    public function index(SalesOrderRepository $salesOrderRepository): Response
+    public function index(Request $request, SalesOrderRepository $salesOrderRepository): Response
     {
+        $query  = trim($request->query->get('q', ''));
+        $orders = $salesOrderRepository->search($query);
+
+        if ($request->isXmlHttpRequest()) {
+            return $this->render('admin/sales/_list.html.twig', [
+                'orders' => $orders,
+            ]);
+        }
+
         return $this->render('admin/sales/index.html.twig', [
-            'orders' => $salesOrderRepository->findAllOrdered(),
+            'orders'       => $orders,
+            'currentQuery' => $query,
         ]);
     }
 
@@ -72,8 +82,23 @@ class AdminSalesController extends AbstractController
         ]);
     }
 
+    /** Only a still-open draft can be deleted — a completed or cancelled order is kept as a financial record even if it has no payments (e.g. a free order). */
+    #[Route('/{id}/delete', name: 'app_admin_sale_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function delete(Request $request, SalesOrder $order, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $em->remove($order);
+        $em->flush();
+
+        $this->addFlash('success', 'Order deleted.');
+        return $this->redirectToRoute('app_admin_sales');
+    }
+
     #[Route('/{id}/rows', name: 'app_admin_sale_add_row', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function addRow(Request $request, SalesOrder $order, ProductRepository $productRepository, EntityManagerInterface $em): Response
+    public function addRow(Request $request, SalesOrder $order, ProductRepository $productRepository, SalesOrderService $salesOrderService, EntityManagerInterface $em): Response
     {
         if (!$this->assertOpenAndValid($request, $order)) {
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
@@ -90,7 +115,11 @@ class AdminSalesController extends AbstractController
         if ($eventTicketProduct !== null && $eventTicketProduct->getEvent()->isRecurring()) {
             $event = $eventTicketProduct->getEvent();
             $raw   = trim($request->request->get('occurrenceDate', ''));
-            $occurrenceDate = $raw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $raw) ?: null) : null;
+            // setTime(0, 0): createFromFormat() alone leaves the *current* time of day on fields
+            // the format doesn't specify, which would silently break the == comparison against
+            // existing rows' occurrenceDate (always midnight, via Doctrine's date_immutable column).
+            $parsedOccurrenceDate = $raw !== '' ? \DateTimeImmutable::createFromFormat('Y-m-d', $raw) : false;
+            $occurrenceDate = $parsedOccurrenceDate !== false ? $parsedOccurrenceDate->setTime(0, 0) : null;
 
             if ($occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
                 $this->addFlash('error', 'Choose a valid date for this event.');
@@ -102,7 +131,7 @@ class AdminSalesController extends AbstractController
             // One line per beneficiary (and occurrence, for an event ticket) — never merge qty here.
             // New rows always default to the order's own member; the only way to free up this slot
             // for another line is changing an existing row's beneficiary away from the order's member.
-            if ($this->hasConflictingRow($order, $product, $occurrenceDate, $order->getUser())) {
+            if ($salesOrderService->wouldConflictWithExisting($product, $occurrenceDate, $order->getUser(), $this->existingLines($order))) {
                 $this->addFlash('error', 'This member already has a line for this product. Change its beneficiary first if you want to add another.');
                 return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
             }
@@ -263,7 +292,7 @@ class AdminSalesController extends AbstractController
 
     /** Points a row at an existing member as its beneficiary. */
     #[Route('/{id}/beneficiary', name: 'app_admin_sale_set_beneficiary', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function setBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, EntityManagerInterface $em): Response
+    public function setBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, SalesOrderService $salesOrderService, EntityManagerInterface $em): Response
     {
         if (!$this->assertOpenAndValid($request, $order)) {
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
@@ -281,7 +310,7 @@ class AdminSalesController extends AbstractController
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
-        if ($this->hasConflictingRow($order, $row->getProduct(), $row->getOccurrenceDate(), $beneficiary, $row)) {
+        if ($salesOrderService->wouldConflictWithExisting($row->getProduct(), $row->getOccurrenceDate(), $beneficiary, $this->existingLines($order, $row))) {
             $this->addFlash('error', 'That member already has a line for this product.');
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
@@ -445,19 +474,16 @@ class AdminSalesController extends AbstractController
     }
 
     /** Whether some other row in the order already has this exact (product, occurrence, beneficiary) combination. */
-    private function hasConflictingRow(SalesOrder $order, Product $product, ?\DateTimeImmutable $occurrenceDate, User $beneficiary, ?SalesOrderRow $exclude = null): bool
+    /** @return array<array{0: Product, 1: ?\DateTimeImmutable, 2: User}> */
+    private function existingLines(SalesOrder $order, ?SalesOrderRow $exclude = null): array
     {
-        foreach ($order->getRows() as $candidate) {
-            if ($candidate === $exclude) {
+        $lines = [];
+        foreach ($order->getRows() as $row) {
+            if ($row === $exclude) {
                 continue;
             }
-            if ($candidate->getProduct() === $product
-                && $candidate->getOccurrenceDate() == $occurrenceDate
-                && $candidate->getEffectiveBeneficiary() === $beneficiary
-            ) {
-                return true;
-            }
+            $lines[] = [$row->getProduct(), $row->getOccurrenceDate(), $row->getEffectiveBeneficiary()];
         }
-        return false;
+        return $lines;
     }
 }

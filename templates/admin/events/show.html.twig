@@ -1,6 +1,44 @@
 {% extends 'admin/base.html.twig' %}
 {% block title %}{{ event.title }}{% endblock %}
 
+{% macro attendee_table(attendees) %}
+  {% if attendees is empty %}
+    <p class="tag-badge--none">No one booked yet.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Status</th>
+            <th>Price</th>
+            <th>Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attendee in attendees %}
+            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+            <tr>
+              <td>
+                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
+                  {{ displayName ?: attendee.user.email }}
+                </a>
+                {% if attendee.isStaffing %}
+                  <br><span style="font-size:0.72rem;color:var(--muted);">{{ attendee.staffingRequirement.certification.name }} &middot; {{ attendee.staffingStatusLabel }}</span>
+                {% endif %}
+              </td>
+              <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
+              <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
+              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="page-header">
   <h1>
@@ -24,7 +62,15 @@
   <div class="detail-grid">
     <div>
       <div class="card__label">Time</div>
-      <div class="card__value">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</div>
+      <div class="card__value">
+        {{ event.timeFrom }}&ndash;{{ event.timeTo }}
+        {% if event.isRecurring %}
+          {% set weekdayNames = {1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun'} %}
+          <br><span style="font-size:0.85rem;color:var(--muted);">
+            Repeats {{ event.recurDaysArray|map(d => weekdayNames[d])|join(', ') }}
+          </span>
+        {% endif %}
+      </div>
     </div>
     <div>
       <div class="card__label">Location</div>
@@ -212,44 +258,50 @@
           <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email attendees</a>
         {% endif %}
       {% endif %}
-      <a href="{{ path('app_admin_booking_new', event.isRecurring ? {eventId: event.id, occurrenceDate: occurrenceDate|date('Y-m-d')} : {eventId: event.id}) }}" class="btn btn--teal btn--sm">+ Add attendee</a>
+      {% if eventTicketProducts is empty %}
+        <button type="button" id="event-attendee-add-trigger" class="btn btn--teal btn--sm">+ Add attendee</button>
+      {% endif %}
     </div>
   </div>
 
-  {% if attendees is empty %}
-    <p class="tag-badge--none">No one booked{% if event.isRecurring %} onto this date{% endif %} yet.</p>
+  {% if eventTicketProducts is empty %}
+    {{ _self.attendee_table(attendees) }}
+    {% include 'admin/_contact_picker_modal.html.twig' %}
   {% else %}
-    <div class="table-scroll">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Status</th>
-            <th>Price</th>
-            <th>Paid</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for attendee in attendees %}
-            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
-            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
-            <tr>
-              <td>
-                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
-                  {{ displayName ?: attendee.user.email }}
-                </a>
-                {% if attendee.isStaffing %}
-                  <br><span style="font-size:0.72rem;color:var(--muted);">{{ attendee.staffingRequirement.certification.name }} &middot; {{ attendee.staffingStatusLabel }}</span>
-                {% endif %}
-              </td>
-              <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
-              <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
-              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="pos-tabs" id="attendee-tabs">
+      {% for product in eventTicketProducts %}
+        <button type="button" class="pos-tab" data-tab="{{ product.id }}">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %} &mdash; £{{ product.price }}</button>
+      {% endfor %}
+      <button type="button" class="pos-tab" data-tab="free">Free</button>
     </div>
+
+    {% for product in eventTicketProducts %}
+      <div class="tab-panel" data-tab-panel="{{ product.id }}" style="display:none;">
+        <div style="text-align:right;margin-bottom:0.75rem;">
+          {% if is_granted('ROLE_ADMIN') %}
+            <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit ticket</a>
+          {% endif %}
+          <button type="button" class="btn btn--teal btn--sm attendee-add-trigger" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}">+ Add attendee</button>
+        </div>
+        {{ _self.attendee_table(attendeesByTab[product.id]) }}
+      </div>
+    {% endfor %}
+
+    <div class="tab-panel" data-tab-panel="free" style="display:none;">
+      <div style="text-align:right;margin-bottom:0.75rem;">
+        <button type="button" class="btn btn--teal btn--sm attendee-add-trigger" data-product-id="" data-product-name="">+ Add attendee</button>
+      </div>
+      {{ _self.attendee_table(attendeesByTab['free']) }}
+    </div>
+
+    <form id="attendee-contact-form" method="post" action="{{ path('app_admin_event_add_attendee_contact', {id: event.id}) }}" style="display:none;">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_add_attendee_' ~ event.id) }}">
+      <input type="hidden" name="userId" id="attendee-contact-userId">
+      <input type="hidden" name="productId" id="attendee-contact-productId">
+      {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
+    </form>
+
+    {% include 'admin/_contact_picker_modal.html.twig' %}
   {% endif %}
 </div>
 
@@ -261,4 +313,58 @@
 <style>
   .occurrence-picker { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 </style>
+{% if eventTicketProducts is empty %}
+<script>
+  const eventAttendeeAddTrigger = document.getElementById('event-attendee-add-trigger');
+  if (eventAttendeeAddTrigger) {
+    eventAttendeeAddTrigger.addEventListener('click', () => {
+      ContactPicker.open({
+        title: 'Add attendee',
+        onChoose: function (userId) {
+          const params = new URLSearchParams({ eventId: '{{ event.id }}', userId: userId });
+          {% if event.isRecurring %}params.set('occurrenceDate', '{{ occurrenceDate|date('Y-m-d') }}');{% endif %}
+          window.location.href = '{{ path('app_admin_booking_new') }}?' + params.toString();
+        },
+      });
+    });
+  }
+</script>
+{% endif %}
+{% if eventTicketProducts is not empty %}
+<script>
+  const attendeeTabs   = document.querySelectorAll('#attendee-tabs .pos-tab');
+  const attendeePanels = document.querySelectorAll('.tab-panel[data-tab-panel]');
+
+  function selectAttendeeTab(tab) {
+    attendeeTabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tab));
+    attendeePanels.forEach(p => p.style.display = p.dataset.tabPanel === tab ? '' : 'none');
+  }
+
+  attendeeTabs.forEach(t => t.addEventListener('click', () => selectAttendeeTab(t.dataset.tab)));
+
+  // Default to the first tab that actually has attendees in it.
+  let defaultAttendeeTab = attendeeTabs[0] ? attendeeTabs[0].dataset.tab : null;
+  for (const tab of attendeeTabs) {
+    const panel = document.querySelector(`.tab-panel[data-tab-panel="${tab.dataset.tab}"]`);
+    if (panel && panel.querySelector('tbody tr')) {
+      defaultAttendeeTab = tab.dataset.tab;
+      break;
+    }
+  }
+  if (defaultAttendeeTab) selectAttendeeTab(defaultAttendeeTab);
+
+  document.querySelectorAll('.attendee-add-trigger').forEach(btn => {
+    btn.addEventListener('click', () => {
+      ContactPicker.open({
+        title: btn.dataset.productName ? 'Add attendee — ' + btn.dataset.productName : 'Add attendee — Free',
+        onChoose: function (userId) {
+          document.getElementById('attendee-contact-userId').value = userId;
+          document.getElementById('attendee-contact-productId').value = btn.dataset.productId || '';
+          document.getElementById('attendee-contact-form').requestSubmit();
+        },
+      });
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

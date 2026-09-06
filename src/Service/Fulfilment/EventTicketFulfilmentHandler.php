@@ -28,14 +28,19 @@ class EventTicketFulfilmentHandler implements FulfilmentHandlerInterface
             throw new \LogicException(sprintf('Event ticket row for recurring event #%d has no occurrence date to book.', $event->getId()));
         }
 
-        $attendee = new Attendee();
-        $attendee->setEvent($event);
-        $attendee->setUser($row->getEffectiveBeneficiary());
-        $attendee->setOccurrenceDate($event->isRecurring() ? $row->getOccurrenceDate() : null);
-        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
-        $attendee->setSalesOrderRow($row);
-        $attendee->setPaidAmount($row->getChargedPrice());
+        // One Attendee per seat — a row's qty is only ever >1 for an unrestricted event (see
+        // SalesOrderService::assertValidRows()), where extra seats are anonymous places under the
+        // same buyer rather than named/certified individuals.
+        for ($i = 0; $i < $row->getQty(); $i++) {
+            $attendee = new Attendee();
+            $attendee->setEvent($event);
+            $attendee->setUser($row->getEffectiveBeneficiary());
+            $attendee->setOccurrenceDate($event->isRecurring() ? $row->getOccurrenceDate() : null);
+            $attendee->setStatus(Attendee::STATUS_CONFIRMED);
+            $attendee->setSalesOrderRow($row);
+            $attendee->setPaidAmount($row->getChargedPrice());
 
-        $this->em->persist($attendee);
+            $this->em->persist($attendee);
+        }
     }
 }

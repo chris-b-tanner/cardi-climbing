@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Event;
+use App\Entity\EventTicketProduct;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -23,6 +24,27 @@ class EventRepository extends ServiceEntityRepository
             ->orderBy('e.date', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Events sold with no ticket product — the only ones an admin can check a member directly
+     * onto, since an event with tickets is booked by selling one instead (via the shop/cart).
+     *
+     * @return Event[]
+     */
+    public function findWithoutTicketsOrdered(): array
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.id NOT IN (SELECT IDENTITY(etp.event) FROM ' . EventTicketProduct::class . ' etp)')
+            ->orderBy('e.date', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** Whether {event} has any ticket product at all (active or not) — see findWithoutTicketsOrdered(). */
+    public function hasAnyTicketProduct(Event $event): bool
+    {
+        return $this->getEntityManager()->getRepository(EventTicketProduct::class)->findOneBy(['event' => $event]) !== null;
     }
 
     /** @return Event[] */
