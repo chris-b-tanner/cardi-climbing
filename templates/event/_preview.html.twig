@@ -71,47 +71,51 @@
       </div>
     {% endif %}
 
-    {% if app.user and isRestricted %}
-      <div class="alert alert--warning" style="margin-bottom:0.9rem;">
-        {{ 'events_not_eligible'|trans }}
-        {% if event.restrictions is not empty %}
-          &mdash; requires
-          {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor -%}
-        {% endif %}
-        {% if app.user.dependents is empty %}
-          . Tickets for this event aren't available to you.
-        {% else %}
-          . You can still book one for a dependent who holds it.
-        {% endif %}
-      </div>
-    {% endif %}
-
-    <div class="event-preview__tickets-title">Tickets</div>
-    {% if canShowTicketForms %}
-      {% for product in eventTicketProducts %}
-        <div class="event-preview__ticket">
-          <div class="event-preview__ticket-info">
-            <span class="event-preview__ticket-name">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</span>
-            <span class="event-preview__ticket-price">£{{ product.price }}</span>
-          </div>
-          <form method="post" action="{{ path('app_shop_add') }}" class="event-preview__ticket-form">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
-            <input type="hidden" name="productId" value="{{ product.id }}">
-            {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">{% endif %}
-            <select name="beneficiaryId" class="event-preview__ticket-select">
-              {% if not isRestricted %}<option value="">Myself</option>{% endif %}
-              {% for dependent in app.user.dependents %}
-                <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
-          </form>
+    {% if isPast %}
+      <p class="event-preview__ticket-signin">{{ 'events_event_passed'|trans }}</p>
+    {% else %}
+      {% if app.user and isRestricted %}
+        <div class="alert alert--warning" style="margin-bottom:0.9rem;">
+          {{ 'events_not_eligible'|trans }}
+          {% if event.restrictions is not empty %}
+            &mdash; requires
+            {%- for restriction in event.restrictions %} {{ restriction.name }}{% if not loop.last %},{% endif %}{% endfor -%}
+          {% endif %}
+          {% if app.user.dependents is empty %}
+            . Tickets for this event aren't available to you.
+          {% else %}
+            . You can still book one for a dependent who holds it.
+          {% endif %}
         </div>
-      {% endfor %}
-    {% elseif not app.user %}
-      <p class="event-preview__ticket-signin">
-        <a href="{{ path('app_login') }}" class="agenda-event__signin">Sign in to buy a ticket</a>
-      </p>
+      {% endif %}
+
+      <div class="event-preview__tickets-title">Tickets</div>
+      {% if canShowTicketForms %}
+        {% for product in eventTicketProducts %}
+          <div class="event-preview__ticket">
+            <div class="event-preview__ticket-info">
+              <span class="event-preview__ticket-name">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</span>
+              <span class="event-preview__ticket-price">£{{ product.price }}</span>
+            </div>
+            <form method="post" action="{{ path('app_shop_add') }}" class="event-preview__ticket-form">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
+              <input type="hidden" name="productId" value="{{ product.id }}">
+              {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">{% endif %}
+              <select name="beneficiaryId" class="event-preview__ticket-select">
+                {% if not isRestricted %}<option value="">Myself</option>{% endif %}
+                {% for dependent in app.user.dependents %}
+                  <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
+            </form>
+          </div>
+        {% endfor %}
+      {% elseif not app.user %}
+        <p class="event-preview__ticket-signin">
+          <a href="{{ path('app_login') }}" class="agenda-event__signin">Sign in to buy a ticket</a>
+        </p>
+      {% endif %}
     {% endif %}
   </div>
 {% else %}

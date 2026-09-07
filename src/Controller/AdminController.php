@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Certification;
+use App\Entity\Membership;
 use App\Entity\Note;
 use App\Entity\Payment;
 use App\Entity\Refund;
@@ -766,6 +767,28 @@ class AdminController extends AbstractController
         $record = $em->getRepository(UserCertification::class)->find($recordId);
 
         return ($record && $record->getUser() === $user) ? $record : null;
+    }
+
+    #[Route('/users/{id}/membership/cancel', name: 'app_admin_user_membership_cancel', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function cancelMembership(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        $membership = $user->getCurrentMembership();
+        if (!$membership) {
+            $this->addFlash('error', 'This member has no membership to cancel.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if (!$this->isCsrfTokenValid('cancel_membership_' . $membership->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $membership->setStatus(Membership::STATUS_CANCELLED);
+        $em->flush();
+
+        $this->addFlash('success', 'Membership cancelled.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
     /** Issue a (possibly partial) refund against a succeeded payment. Admin only. */

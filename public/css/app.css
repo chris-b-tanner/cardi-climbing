@@ -756,6 +756,16 @@ p + p { margin-top: 1rem; }
 }
 .calendar-nav__datepicker:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
 
+.calendar-search { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.calendar-search__input {
+  flex: 1 1 240px; min-width: 0;
+  border: 1px solid var(--border); background: var(--white);
+  padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.9rem; color: var(--black);
+}
+.calendar-search__input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+.calendar-search__clear { font-size: 0.82rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.calendar-search__clear:hover { color: var(--black); }
+
 /* ── Week-day tabs (mobile day switcher) ─────────────────── */
 .week-day-tabs {
   display: none;

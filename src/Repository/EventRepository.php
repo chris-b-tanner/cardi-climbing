@@ -62,15 +62,48 @@ class EventRepository extends ServiceEntityRepository
     }
 
     /**
+     * Published events matching {query} by title that still have at least one occurrence today or
+     * later — for the public calendar's search box, which finds an event by name regardless of
+     * which week is currently being browsed rather than filtering within just one week.
+     *
+     * $includeDrafts lets team/admin also match unpublished events, same as findPublishedOverlapping().
+     *
+     * @return Event[]
+     */
+    public function searchUpcoming(string $query, \DateTimeImmutable $today, bool $includeDrafts = false): array
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->leftJoin('e.restrictions', 'r')->addSelect('r')
+            ->where('e.title LIKE :q')
+            ->andWhere('
+                (e.isRecurring = false AND e.date >= :today)
+                OR
+                (e.isRecurring = true AND (e.recurUntil IS NULL OR e.recurUntil >= :today))
+            ')
+            ->setParameter('q', '%' . $query . '%')
+            ->setParameter('today', $today)
+            ->orderBy('e.date', 'ASC');
+
+        if (!$includeDrafts) {
+            $qb->andWhere('e.status = :published')->setParameter('published', Event::STATUS_PUBLISHED);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Events whose date (or, for recurring events, whose recurrence window) overlaps the given
      * range. Callers expand recurring rows into occurrences themselves via Event::isValidForDate().
      *
      * $includeDrafts lets team/admin viewers preview unpublished events on the public calendar
      * (e.g. to set up staffing requirements before publishing) — everyone else only sees published ones.
      *
+     * $titleQuery, when given, restricts to events whose title matches — the calendar's search box
+     * filters the week grid down to matching events rather than switching to a different layout.
+     *
      * @return Event[]
      */
-    public function findPublishedOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd, bool $includeDrafts = false): array
+    public function findPublishedOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd, bool $includeDrafts = false, string $titleQuery = ''): array
     {
         $qb = $this->createQueryBuilder('e')
             ->leftJoin('e.restrictions', 'r')->addSelect('r')
@@ -86,6 +119,10 @@ class EventRepository extends ServiceEntityRepository
 
         if (!$includeDrafts) {
             $qb->andWhere('e.status = :published')->setParameter('published', Event::STATUS_PUBLISHED);
+        }
+
+        if ($titleQuery !== '') {
+            $qb->andWhere('e.title LIKE :titleQuery')->setParameter('titleQuery', '%' . $titleQuery . '%');
         }
 
         return $qb->getQuery()->getResult();

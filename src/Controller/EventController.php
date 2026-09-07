@@ -28,15 +28,30 @@ class EventController extends AbstractController
     #[Route('/events', name: 'app_events')]
     public function index(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
     {
-        $anchor    = $this->parseDate($request->query->get('date', '')) ?? new \DateTimeImmutable('today');
-        $weekStart = $anchor->modify('monday this week');
-        $weekEnd   = $weekStart->modify('+6 days');
-
-        $events = $eventRepository->findPublishedOverlapping($weekStart, $weekEnd, $this->isGranted('ROLE_TEAM'));
-
         /** @var User|null $user */
         $user  = $this->getUser();
         $today = new \DateTimeImmutable('today');
+
+        // Searching by title filters which events populate the week grid rather than switching to
+        // a different layout — a plain GET form (rather than AJAX) so it's deep-linkable and works
+        // without JS, consistent with the week/date navigation already using plain links.
+        $searchQuery   = trim($request->query->get('q', ''));
+        $requestedDate = $this->parseDate($request->query->get('date', ''));
+
+        if ($requestedDate !== null) {
+            $anchor = $requestedDate;
+        } elseif ($searchQuery !== '') {
+            // No explicit date given alongside a search — jump straight to the week of the
+            // earliest upcoming match instead of showing an empty grid for the current week.
+            $anchor = $this->findAnchorDateForSearch($searchQuery, $today, $eventRepository);
+        } else {
+            $anchor = $today;
+        }
+
+        $weekStart = $anchor->modify('monday this week');
+        $weekEnd   = $weekStart->modify('+6 days');
+
+        $events = $eventRepository->findPublishedOverlapping($weekStart, $weekEnd, $this->isGranted('ROLE_TEAM'), $searchQuery);
 
         // Fetch every booking for these events across the whole week in one query, then
         // derive per-occurrence counts/booked-state from it in memory — avoids running a
@@ -68,7 +83,7 @@ class EventController extends AbstractController
 
                 if ($event->isValidForDate($day)) {
                     $stats = $occurrenceStats[$this->occurrenceKey($event, $day)] ?? ['count' => 0, 'bookedByUser' => false];
-                    $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $today, $stats);
+                    $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $stats);
                 }
             }
 
@@ -78,13 +93,25 @@ class EventController extends AbstractController
         }
 
         return $this->render('event/calendar.html.twig', [
-            'weekStart' => $weekStart,
-            'weekEnd'   => $weekEnd,
-            'days'      => $days,
-            'prevWeek'  => $weekStart->modify('-7 days')->format('Y-m-d'),
-            'nextWeek'  => $weekStart->modify('+7 days')->format('Y-m-d'),
-            'today'     => $today,
+            'weekStart'   => $weekStart,
+            'weekEnd'     => $weekEnd,
+            'days'        => $days,
+            'prevWeek'    => $weekStart->modify('-7 days')->format('Y-m-d'),
+            'nextWeek'    => $weekStart->modify('+7 days')->format('Y-m-d'),
+            'today'       => $today,
+            'searchQuery' => $searchQuery,
         ]);
+    }
+
+    /** The earliest upcoming occurrence date of the first title match, or today if nothing matches — so a search with no explicit date jumps straight to a week that actually shows something. */
+    private function findAnchorDateForSearch(string $query, \DateTimeImmutable $today, EventRepository $eventRepository): \DateTimeImmutable
+    {
+        $matches = $eventRepository->searchUpcoming($query, $today, $this->isGranted('ROLE_TEAM'));
+        if ($matches === []) {
+            return $today;
+        }
+
+        return $this->resolveOccurrenceDate($matches[0], null, $today);
     }
 
     /**
@@ -116,7 +143,7 @@ class EventController extends AbstractController
             'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
         ];
 
-        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats);
+        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
         $view['accountConflict'] = (bool) $request->query->get('accountConflict');
 
         // Which of this event's staffing requirements the member is qualified to volunteer for —
@@ -159,7 +186,7 @@ class EventController extends AbstractController
         /** @var User|null $user */
         $user = $this->getUser();
 
-        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $today, $stats);
+        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
         $view['eventTicketProducts'] = $eventTicketProducts = $productRepository->findActiveEventTickets($event);
 
         $cartTicketCount = 0;
@@ -462,9 +489,12 @@ class EventController extends AbstractController
     }
 
     /** @param array{count: int, bookedByUser: bool} $stats */
-    private function buildOccurrenceView(Event $event, \DateTimeImmutable $date, ?User $user, \DateTimeImmutable $today, array $stats): array
+    private function buildOccurrenceView(Event $event, \DateTimeImmutable $date, ?User $user, array $stats): array
     {
-        $isPast = $date < $today;
+        // Past means fully ended, not just "started" — an occurrence that's under way right now
+        // (or hasn't reached its end time yet today) still shows the booking/ticket form.
+        $occurrenceEnd = \DateTimeImmutable::createFromFormat('Y-m-d H:i', $date->format('Y-m-d') . ' ' . $event->getTimeTo());
+        $isPast        = $occurrenceEnd !== false && $occurrenceEnd < new \DateTimeImmutable();
 
         $isFull    = false;
         $spotsLeft = null;

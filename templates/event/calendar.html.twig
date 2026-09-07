@@ -11,13 +11,22 @@
 
 <section class="section section--off">
   <div class="wrap">
+    <form method="get" action="{{ path('app_events') }}" class="calendar-search" role="search">
+      <input type="search" name="q" value="{{ searchQuery }}" class="calendar-search__input"
+             placeholder="{{ 'events_search_placeholder'|trans }}" aria-label="{{ 'events_search_placeholder'|trans }}">
+      <button type="submit" class="btn btn--outline btn--sm">{{ 'events_search'|trans }}</button>
+      {% if searchQuery %}
+        <a href="{{ path('app_events', {date: weekStart|date('Y-m-d')}) }}" class="calendar-search__clear">{{ 'events_search_clear'|trans }}</a>
+      {% endif %}
+    </form>
+
     <nav class="calendar-nav" aria-label="Week">
-      <a href="{{ path('app_events', {date: prevWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_prev_week'|trans }}">&lsaquo;</a>
+      <a href="{{ path('app_events', searchQuery ? {date: prevWeek, q: searchQuery} : {date: prevWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_prev_week'|trans }}">&lsaquo;</a>
       <h2 class="calendar-nav__title">
         <span class="calendar-nav__title-full">{{ weekStart|date('j M') }}&ndash;{{ weekEnd|date('j M Y') }}</span>
         <span class="calendar-nav__title-short">{{ weekStart|date('j M') }}&ndash;{{ weekEnd|date('j M') }}</span>
       </h2>
-      <a href="{{ path('app_events', {date: nextWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_next_week'|trans }}">&rsaquo;</a>
+      <a href="{{ path('app_events', searchQuery ? {date: nextWeek, q: searchQuery} : {date: nextWeek}) }}" class="calendar-nav__link" aria-label="{{ 'events_next_week'|trans }}">&rsaquo;</a>
       <input type="date" id="week-date-picker" class="calendar-nav__datepicker"
              value="{{ weekStart|date('Y-m-d') }}" aria-label="{{ 'events_jump_to_date'|trans }}">
     </nav>
@@ -43,7 +52,7 @@
           </div>
           <div class="week-day__events">
             {% if day.events is empty %}
-              <p class="week-day__empty">{{ 'events_empty'|trans }}</p>
+              <p class="week-day__empty">{{ searchQuery ? 'events_search_empty'|trans : 'events_empty'|trans }}</p>
             {% else %}
               {% for occ in day.events %}
                 {% set event = occ.event %}
@@ -101,7 +110,11 @@
 {{ parent() }}
 <script>
   document.getElementById('week-date-picker').addEventListener('change', function () {
-    if (this.value) window.location.href = '{{ path('app_events') }}?date=' + this.value;
+    if (!this.value) return;
+    const searchQuery = {{ searchQuery|json_encode|raw }};
+    const params = new URLSearchParams({ date: this.value });
+    if (searchQuery) params.set('q', searchQuery);
+    window.location.href = '{{ path('app_events') }}?' + params.toString();
   });
 
   // Mobile: the week is still rendered in full, but only one day column is shown at a time,

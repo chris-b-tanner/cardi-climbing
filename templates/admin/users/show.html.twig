@@ -141,6 +141,49 @@
   </div>
 </div>
 
+{% set ownMembership = user.currentMembership %}
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Membership</div>
+  {% if ownMembership %}
+    {% set pillClass = ownMembership.status == 'active' ? ' status-pill--published' : ' status-pill--pending' %}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.6rem;">
+      <span style="font-size:0.9375rem;">{{ ownMembership.membershipType.name }}</span>
+      <span class="status-pill{{ pillClass }}">{{ ownMembership.statusLabel }}</span>
+    </div>
+    <div class="detail-grid">
+      <div>
+        <div class="card__label">Created</div>
+        <div class="card__value">{{ ownMembership.createdAt|date('d M Y') }}</div>
+      </div>
+      <div>
+        <div class="card__label">Expires</div>
+        <div class="card__value">{{ ownMembership.expiresAt ? ownMembership.expiresAt|date('d M Y') : 'Never' }}</div>
+      </div>
+    </div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-top:0.6rem;">
+      £{{ ownMembership.price }}{% if ownMembership.paidAmount != '0.00' %} · Paid £{{ ownMembership.paidAmount }}{% endif %}
+      {%- if ownMembership.autoRenew %} · Auto-renews{% endif %}
+    </p>
+    {% if is_granted('ROLE_ADMIN') %}
+      <form method="post" action="{{ path('app_admin_user_membership_cancel', {id: user.id}) }}" style="margin-top:0.75rem;"
+            onsubmit="return confirm('Cancel this membership?');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('cancel_membership_' ~ ownMembership.id) }}">
+        <button type="submit" class="btn btn--danger btn--sm">Cancel membership</button>
+      </form>
+    {% endif %}
+  {% elseif user.parent and user.parent.currentMembership %}
+    {% set inherited = user.parent.currentMembership %}
+    {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
+    <p style="font-size:0.875rem;">
+      Inherits <strong>{{ inherited.membershipType.name }}</strong> from
+      <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
+      <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
+    </p>
+  {% else %}
+    <p style="color:var(--muted);font-size:0.875rem;">No membership on record.</p>
+  {% endif %}
+</div>
+
 {% if user.addressLine1 or user.town or user.postcode %}
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Address</div>
