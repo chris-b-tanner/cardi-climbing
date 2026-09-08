@@ -20,7 +20,7 @@
       </thead>
       <tbody>
         {% for record in records %}
-          {% set displayName = (record.user.firstName ~ ' ' ~ record.user.lastName)|trim %}
+          {% set displayName = record.user.displayName %}
           {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
           <tr>
             <td>

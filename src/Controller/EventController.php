@@ -5,17 +5,16 @@ namespace App\Controller;
 use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\EventStaffingRequirement;
-use App\Entity\Note;
 use App\Entity\Product;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\ProductRepository;
-use App\Repository\UserRepository;
 use App\Service\BookingMailer;
 use App\Service\CartService;
 use App\Service\DoorAccessService;
 use App\Service\EventBookingCreditService;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -268,7 +267,7 @@ class EventController extends AbstractController
         Event $event,
         EntityManagerInterface $em,
         AttendeeRepository $attendeeRepository,
-        UserRepository $userRepository,
+        UserService $userService,
         UserPasswordHasherInterface $passwordHasher,
         BookingMailer $bookingMailer,
         Security $security,
@@ -310,7 +309,7 @@ class EventController extends AbstractController
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $existingUser = $userRepository->findOneBy(['email' => $email]);
+        $existingUser = $userService->findExistingByEmail($email);
 
         if ($existingUser) {
             if (!$passwordHasher->isPasswordValid($existingUser, $password)) {
@@ -322,6 +321,9 @@ class EventController extends AbstractController
                 $user->setOptIn(true);
             }
         } else {
+            // Not routed through UserService::createContact() — that's for "quick contact, no
+            // real login yet" cases, whereas this is genuine self-registration with a real,
+            // member-chosen password (logged into immediately below).
             $user = new User();
             $user->setEmail($email);
             $user->setFirstName($firstName);
@@ -332,10 +334,7 @@ class EventController extends AbstractController
             $em->persist($user);
             $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
-            $note = new Note();
-            $note->setNoteable($user);
-            $note->setContent('Contact added via event booking: "' . $event->getTitle() . '".');
-            $em->persist($note);
+            $userService->addNote($user, 'Contact added via event booking: "' . $event->getTitle() . '".');
         }
 
         $em->flush();

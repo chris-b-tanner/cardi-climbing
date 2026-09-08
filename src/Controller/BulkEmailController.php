@@ -189,7 +189,7 @@ class BulkEmailController extends AbstractController
                 count($skipped) === 1 ? '' : 's',
                 count($skipped) === 1 ? 'was' : 'were',
                 implode(', ', array_map(
-                    static fn(User $u) => (trim(($u->getFirstName() ?? '') . ' ' . ($u->getLastName() ?? ''))) . ' (#' . $u->getId() . ')',
+                    static fn(User $u) => $u->getDisplayName() . ' (#' . $u->getId() . ')',
                     $skipped,
                 )),
             ));

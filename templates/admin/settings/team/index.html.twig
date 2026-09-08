@@ -27,7 +27,7 @@
         </thead>
         <tbody>
           {% for member in team %}
-            {% set displayName = (member.firstName ~ ' ' ~ member.lastName)|trim %}
+            {% set displayName = member.displayName %}
             {% set memberIsAdmin = 'ROLE_ADMIN' in member.roles %}
             <tr>
               <td>

@@ -116,7 +116,7 @@
                     <select id="beneficiary-{{ product.id }}" name="beneficiaryId">
                       <option value="">Myself</option>
                       {% for dependent in app.user.dependents %}
-                        <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+                        <option value="{{ dependent.id }}">{{ dependent.displayName }}</option>
                       {% endfor %}
                     </select>
                   {% else %}

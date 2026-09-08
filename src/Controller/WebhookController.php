@@ -2,14 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\Note;
-use App\Entity\User;
-use App\Repository\UserRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\UserService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class WebhookController extends AbstractController
@@ -22,9 +18,7 @@ class WebhookController extends AbstractController
     public function inbound(
         Request $request,
         string $secret,
-        UserRepository $userRepository,
-        EntityManagerInterface $em,
-        UserPasswordHasherInterface $hasher,
+        UserService $userService,
     ): JsonResponse {
         if (!hash_equals($this->webhookSecret, $secret)) {
             return new JsonResponse(['error' => 'Unauthorized'], 401);
@@ -50,16 +44,12 @@ class WebhookController extends AbstractController
             return new JsonResponse(['error' => 'No valid sender email in payload'], 422);
         }
 
-        $user     = $userRepository->findByAnyEmail($fromEmail);
+        $user     = $userService->findExistingByEmail($fromEmail);
         $textBody = trim($payload['TextBody'] ?? '');
 
         if ($user !== null) {
             if ($textBody !== '') {
-                $note = new Note();
-                $note->setNoteable($user);
-                $note->setContent($textBody);
-                $em->persist($note);
-                $em->flush();
+                $userService->addNote($user, $textBody);
             }
             return new JsonResponse(['status' => 'noted', 'id' => $user->getId()]);
         }
@@ -73,28 +63,16 @@ class WebhookController extends AbstractController
             $lastName  = null;
         }
 
-        $user = new User();
-        $user->setEmail($fromEmail);
-        $user->setFirstName($firstName);
-        $user->setLastName($lastName);
-        $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
-
-        $em->persist($user);
-        $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
-
-        $sourceNote = new Note();
-        $sourceNote->setNoteable($user);
-        $sourceNote->setContent('Contact added via inbound email from ' . $fromEmail . '.');
-        $em->persist($sourceNote);
+        $user = $userService->createContact(
+            email: $fromEmail,
+            firstName: $firstName,
+            lastName: $lastName,
+            noteContent: 'Contact added via inbound email from ' . $fromEmail . '.',
+        );
 
         if ($textBody !== '') {
-            $note = new Note();
-            $note->setNoteable($user);
-            $note->setContent($textBody);
-            $em->persist($note);
+            $userService->addNote($user, $textBody);
         }
-
-        $em->flush();
 
         return new JsonResponse(['status' => 'created', 'id' => $user->getId()]);
     }

@@ -1,6 +1,6 @@
 {% extends 'admin/base.html.twig' %}
 
-{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% set displayName = user.displayName %}
 {% block title %}#{{ user.id }} {{ displayName ?: user.email }}{% endblock %}
 {% block og_title %}{{ displayName ?: user.email }} — Y Wal{% endblock %}
 {% block og_description %}{{ displayName ?: user.email }}{% if user.email %} · {{ user.email }}{% endif %}{% endblock %}
@@ -56,7 +56,7 @@
   <div class="duplicate-warning">
     <span class="duplicate-warning__icon"><i class="bi bi-archive-fill"></i></span>
     <span>
-      This member was archived on {{ user.deletedAt|date('j M Y, H:i') }}{% if user.deletedBy %} by {{ (user.deletedBy.firstName ~ ' ' ~ user.deletedBy.lastName)|trim ?: user.deletedBy.email }}{% endif %}.
+      This member was archived on {{ user.deletedAt|date('j M Y, H:i') }}{% if user.deletedBy %} by {{ user.deletedBy.displayName }}{% endif %}.
       Their personal details have been removed; their booking and payment history is kept below.
     </span>
   </div>
@@ -168,7 +168,7 @@
   <div class="card__label" style="margin-bottom:0.6rem;">Family</div>
   <div class="card__value">
     {% for member in user.family %}
-      {% set memberName = (member.firstName ~ ' ' ~ member.lastName)|trim ?: member.email %}
+      {% set memberName = member.displayName %}
       {% set isParent = member == user.familyParent %}
       {% if member == user %}
         <span{% if isParent %} style="font-weight:700;"{% endif %}>{{ memberName }}</span>
@@ -290,7 +290,7 @@
     {% else %}
       {% if user.parent and user.parent.currentMembership %}
         {% set inherited = user.parent.currentMembership %}
-        {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
+        {% set parentName = user.parent.displayName %}
         <p style="font-size:0.875rem;margin-bottom:0.75rem;">
           Inherits <strong>{{ inherited.membershipType.name }}</strong> from
           <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
@@ -486,7 +486,7 @@
                 <td class="admin-table__muted">{{ entry.reason|capitalize }}</td>
                 <td class="admin-table__muted">{{ entry.note ?: '—' }}</td>
                 <td class="admin-table__muted">
-                  {{ entry.createdBy ? ((entry.createdBy.firstName ~ ' ' ~ entry.createdBy.lastName)|trim ?: entry.createdBy.email) : 'System' }}
+                  {{ entry.createdBy ? (entry.createdBy.displayName) : 'System' }}
                 </td>
               </tr>
             {% endfor %}

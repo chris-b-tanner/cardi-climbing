@@ -16,6 +16,7 @@ use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -23,7 +24,6 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -70,9 +70,7 @@ class AdminController extends AbstractController
     #[Route('/users/new', name: 'app_admin_user_new', methods: ['GET', 'POST'])]
     public function newUser(
         Request $request,
-        EntityManagerInterface $em,
-        UserPasswordHasherInterface $hasher,
-        UserRepository $userRepository,
+        UserService $userService,
     ): Response {
         $error = null;
 
@@ -86,34 +84,22 @@ class AdminController extends AbstractController
             $dobRaw = trim($request->request->get('dateOfBirth', ''));
             $dob    = $dobRaw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $dobRaw) ?: null) : null;
 
-            if ($email !== null && $userRepository->findOneBy(['email' => $email])) {
+            if ($email !== null && $userService->findExistingByEmail($email)) {
                 $error = 'A member with that email address already exists.';
             } else {
-                $user = new User();
-                $user->setEmail($email);
-                $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
-                $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
-                $user->setPhone(trim($request->request->get('phone', '')) ?: null);
-                $user->setDateOfBirth($dob);
-                $user->setOptIn($request->request->has('optIn'));
-
-                // No login for this contact until they set a password via "forgot password" — requires an email on file.
-                $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(32))));
-
-                $em->persist($user);
-                $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
-
                 /** @var User $admin */
                 $admin = $this->getUser();
-                $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
 
-                $note = new Note();
-                $note->setNoteable($user);
-                $note->setContent('Contact added manually by ' . $adminName . '.');
-                $note->setAddedBy($admin);
-                $em->persist($note);
-
-                $em->flush();
+                $user = $userService->createContact(
+                    email: $email,
+                    firstName: trim($request->request->get('firstName', '')),
+                    lastName: trim($request->request->get('lastName', '')),
+                    noteContent: 'Contact added manually by ' . $admin->getDisplayName() . '.',
+                    addedBy: $admin,
+                    dateOfBirth: $dob,
+                    phone: trim($request->request->get('phone', '')),
+                    optIn: $request->request->has('optIn'),
+                );
 
                 $this->addFlash('success', 'Member created.');
                 return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
@@ -251,8 +237,7 @@ class AdminController extends AbstractController
         $candidates = $userRepository->searchPotentialDependents($user, $query, 20);
 
         return $this->json(array_map(static function (User $candidate) {
-            $displayName = trim(($candidate->getFirstName() ?? '') . ' ' . ($candidate->getLastName() ?? ''));
-            $name        = $displayName ?: ($candidate->getEmail() ?: 'Member #' . $candidate->getId());
+            $name = $candidate->getDisplayName();
 
             return [
                 'id'    => $candidate->getId(),

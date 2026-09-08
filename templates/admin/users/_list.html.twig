@@ -26,7 +26,7 @@
       </thead>
       <tbody>
         {% for user in users %}
-          {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+          {% set displayName = user.displayName %}
           <tr>
             {% if context != 'new_sale' and is_granted('ROLE_ADMIN') %}
               <td class="admin-table__check">
@@ -42,7 +42,7 @@
               </a>
               {% if user.parent %}
                 <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}#family" class="family-icon"
-                   title="Dependent of {{ (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email }}"><i class="bi bi-people-fill"></i></a>
+                   title="Dependent of {{ user.parent.displayName }}"><i class="bi bi-people-fill"></i></a>
               {% elseif user.id in parentIds %}
                 <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
                    title="Has dependents"><i class="bi bi-people-fill"></i></a>

@@ -20,7 +20,7 @@
       </thead>
       <tbody>
         {% for order in orders %}
-          {% set displayName = (order.user.firstName ~ ' ' ~ order.user.lastName)|trim %}
+          {% set displayName = order.user.displayName %}
           {% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
           <tr>
             <td class="admin-table__muted">#{{ order.id }}</td>

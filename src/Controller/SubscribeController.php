@@ -2,9 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Note;
-use App\Entity\User;
-use App\Repository\UserRepository;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -13,7 +11,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class SubscribeController extends AbstractController
@@ -26,9 +23,8 @@ class SubscribeController extends AbstractController
     #[Route('/subscribe', name: 'app_subscribe', methods: ['POST'])]
     public function subscribe(
         Request $request,
-        UserRepository $userRepository,
+        UserService $userService,
         EntityManagerInterface $em,
-        UserPasswordHasherInterface $hasher,
         MailerInterface $mailer,
     ): Response {
         if (!$this->isCsrfTokenValid('subscribe', $request->request->get('_csrf_token'))) {
@@ -45,21 +41,18 @@ class SubscribeController extends AbstractController
             return $this->redirectToRoute('app_home');
         }
 
-        $user = $userRepository->findOneBy(['email' => $email]);
+        $user = $userService->findExistingByEmail($email);
 
         $isNew = !$user;
 
         if ($isNew) {
-            $user = new User();
-            $user->setEmail($email);
-            $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
-            $em->persist($user);
-            $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
-
-            $note = new Note();
-            $note->setNoteable($user);
-            $note->setContent('Contact added via website subscription form.');
-            $em->persist($note);
+            $user = $userService->createContact(
+                email: $email,
+                firstName: $firstName,
+                lastName: $lastName,
+                noteContent: 'Contact added via website subscription form.',
+                optIn: true,
+            );
         }
 
         if ($firstName) {

@@ -1,7 +1,7 @@
 {% extends 'admin/base.html.twig' %}
 {% block title %}Edit booking{% endblock %}
 
-{% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+{% set displayName = attendee.user.displayName %}
 
 {% block content %}
 <div class="page-header">
@@ -80,7 +80,7 @@
           {% if attendee.checkedInAt %}
             {{ attendee.checkedInAt|date('d M Y, H:i') }}
             {% if attendee.checkedInMethod == 'manual' and attendee.checkedInBy %}
-              &middot; by {{ (attendee.checkedInBy.firstName ~ ' ' ~ attendee.checkedInBy.lastName)|trim ?: attendee.checkedInBy.email }}
+              &middot; by {{ attendee.checkedInBy.displayName }}
             {% elseif attendee.checkedInMethod == 'door_pin' %}
               &middot; via door PIN
             {% endif %}

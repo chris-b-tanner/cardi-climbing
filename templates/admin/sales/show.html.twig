@@ -1,5 +1,5 @@
 {% extends 'admin/base.html.twig' %}
-{% set memberName = (order.user.firstName ~ ' ' ~ order.user.lastName)|trim ?: (order.user.email ?: 'Member #' ~ order.user.id) %}
+{% set memberName = order.user.displayName %}
 {% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
 {% set pendingCardPayment = null %}
 {% for payment in order.payments %}
@@ -114,7 +114,7 @@
                 {% if row.product.requiresBeneficiary %}
                   <br><small class="admin-table__muted">
                     For: {% if row.beneficiaryMember %}
-                      {{ (row.beneficiaryMember.firstName ~ ' ' ~ row.beneficiaryMember.lastName)|trim ?: row.beneficiaryMember.email }}
+                      {{ row.beneficiaryMember.displayName }}
                     {% else %}
                       {{ memberName }}
                     {% endif %}
@@ -230,7 +230,7 @@
     <div class="card" style="margin-top:1rem;font-size:0.8rem;color:var(--muted);">
       Created {{ order.createdAt|date('d M Y, H:i') }}
       {% if order.createdBy %}
-        by <a href="{{ path('app_admin_user_show', {id: order.createdBy.id}) }}" class="admin-table__link">{{ (order.createdBy.firstName ~ ' ' ~ order.createdBy.lastName)|trim ?: order.createdBy.email }}</a>
+        by <a href="{{ path('app_admin_user_show', {id: order.createdBy.id}) }}" class="admin-table__link">{{ order.createdBy.displayName }}</a>
       {% else %}
         automatically (online payment)
       {% endif %}

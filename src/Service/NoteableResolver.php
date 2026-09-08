@@ -44,9 +44,8 @@ class NoteableResolver
             return ['label' => 'Member #' . $id . ' (deleted)', 'url' => null];
         }
 
-        $name = trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail();
         return [
-            'label' => $name,
+            'label' => $user->getDisplayName(),
             'url'   => $this->urlGenerator->generate('app_admin_user_show', ['id' => $id]),
         ];
     }
@@ -58,9 +57,8 @@ class NoteableResolver
             return ['label' => 'Booking #' . $id . ' (deleted)', 'url' => null];
         }
 
-        $name = trim(($attendee->getUser()->getFirstName() ?? '') . ' ' . ($attendee->getUser()->getLastName() ?? '')) ?: $attendee->getUser()->getEmail();
         return [
-            'label' => $name . ' — ' . $attendee->getEvent()->getTitle(),
+            'label' => $attendee->getUser()->getDisplayName() . ' — ' . $attendee->getEvent()->getTitle(),
             'url'   => $this->urlGenerator->generate('app_admin_booking_edit', ['id' => $id]),
         ];
     }

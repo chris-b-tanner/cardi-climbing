@@ -115,7 +115,7 @@
                   {% if not isRestricted and (not ticketMembershipType or app.user.hasActiveMembershipType(ticketMembershipType)) %}<option value="">Myself</option>{% endif %}
                   {% for dependent in app.user.dependents %}
                     {% if not ticketMembershipType or dependent.hasActiveMembershipType(ticketMembershipType) %}
-                      <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+                      <option value="{{ dependent.id }}">{{ dependent.displayName }}</option>
                     {% endif %}
                   {% endfor %}
                 </select>

@@ -1,6 +1,6 @@
 {% extends 'admin/base.html.twig' %}
 
-{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% set displayName = user.displayName %}
 {% block title %}Edit — {{ displayName ?: user.email }}{% endblock %}
 
 {% block content %}
@@ -145,7 +145,7 @@
     {% if user.parent %}
       <p style="color:var(--muted);font-size:0.875rem;">
         {{ displayName ?: user.email }} is a dependent of
-        <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal-dk);font-weight:600;">{{ (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email }}</a>,
+        <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal-dk);font-weight:600;">{{ user.parent.displayName }}</a>,
         so can't have dependents of their own.
       </p>
     {% elseif not user.email %}
@@ -156,7 +156,7 @@
       <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0.6rem;">Search for the members who are dependents of {{ displayName ?: user.email }}. A member can only be the dependent of one parent.</p>
       <div id="dependent-chips" style="display:flex;flex-wrap:wrap;gap:0.4rem;{% if user.dependents is not empty %}margin-bottom:0.75rem;{% endif %}">
         {% for dependent in user.dependents %}
-          {% set dependentName = (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email %}
+          {% set dependentName = dependent.displayName %}
           <span class="tag-badge dependent-chip" data-id="{{ dependent.id }}" style="display:inline-flex;align-items:center;gap:0.35rem;">
             <input type="hidden" name="dependents[]" value="{{ dependent.id }}">
             {{ dependentName }}

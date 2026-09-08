@@ -17,7 +17,7 @@
         </thead>
         <tbody>
           {% for attendee in attendees %}
-            {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+            {% set displayName = attendee.user.displayName %}
             {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
             <tr>
               <td>
@@ -187,7 +187,7 @@
           {% for a in approvedForReq %}
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
               <a href="{{ path('app_admin_user_show', {id: a.user.id}) }}" class="admin-table__link" style="font-size:0.85rem;">
-                {{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}
+                {{ a.user.displayName }}
               </a>
               <form method="post" action="{{ path('app_admin_booking_staffing_remove', {id: a.id}) }}"
                     onsubmit="return confirm('Take this member off duty?');">
@@ -205,7 +205,7 @@
           {% for a in pendingForReq %}
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.3rem;">
               <a href="{{ path('app_admin_user_show', {id: a.user.id}) }}" class="admin-table__link" style="font-size:0.85rem;">
-                {{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}
+                {{ a.user.displayName }}
               </a>
               <div class="btn-row">
                 <form method="post" action="{{ path('app_admin_booking_staffing_approve', {id: a.id}) }}">
@@ -224,7 +224,7 @@
 
       {% if declinedForReq is not empty %}
         <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
-          Declined: {% for a in declinedForReq %}{{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}{% if not loop.last %}, {% endif %}{% endfor %}
+          Declined: {% for a in declinedForReq %}{{ a.user.displayName }}{% if not loop.last %}, {% endif %}{% endfor %}
         </p>
       {% endif %}
 
@@ -237,7 +237,7 @@
           {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
           <select name="attendeeId" class="form-control" style="max-width:220px;">
             {% for a in eligible %}
-              <option value="{{ a.id }}">{{ (a.user.firstName ~ ' ' ~ a.user.lastName)|trim ?: a.user.email }}</option>
+              <option value="{{ a.id }}">{{ a.user.displayName }}</option>
             {% endfor %}
           </select>
           <button type="submit" class="btn btn--ghost btn--sm">Put on duty</button>

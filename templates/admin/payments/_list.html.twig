@@ -21,7 +21,7 @@
       </thead>
       <tbody>
         {% for payment in payments %}
-          {% set displayName = (payment.user.firstName ~ ' ' ~ payment.user.lastName)|trim %}
+          {% set displayName = payment.user.displayName %}
           {% set pillClass = payment.status == 'succeeded' ? ' status-pill--published' : (payment.status == 'failed' ? ' status-pill--cancelled' : (payment.status in ['refunded', 'partially_refunded'] ? ' status-pill--pending' : '')) %}
           <tr>
             <td class="admin-table__muted">{{ payment.createdAt|date('d M Y, H:i') }}</td>

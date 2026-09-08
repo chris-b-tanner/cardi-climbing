@@ -14,12 +14,12 @@ use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\SalesOrderService;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -292,8 +292,7 @@ class AdminSalesController extends AbstractController
         }
 
         return $this->json(array_map(function (User $candidate) {
-            $displayName = trim(($candidate->getFirstName() ?? '') . ' ' . ($candidate->getLastName() ?? ''));
-            $name        = $displayName ?: ($candidate->getEmail() ?: 'Member #' . $candidate->getId());
+            $name = $candidate->getDisplayName();
 
             return [
                 'id'    => $candidate->getId(),
@@ -368,7 +367,7 @@ class AdminSalesController extends AbstractController
 
     /** Creates a new member on the fly (optionally as the order member's dependent) and uses them as a row's beneficiary. */
     #[Route('/{id}/beneficiary/new', name: 'app_admin_sale_create_beneficiary', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function createBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, UserPasswordHasherInterface $hasher, EntityManagerInterface $em): Response
+    public function createBeneficiary(Request $request, SalesOrder $order, UserService $userService, EntityManagerInterface $em): Response
     {
         if (!$this->assertOpenAndValid($request, $order)) {
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
@@ -391,35 +390,23 @@ class AdminSalesController extends AbstractController
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
-        if ($email !== null && $userRepository->findOneBy(['email' => $email])) {
+        if ($email !== null && $userService->findExistingByEmail($email)) {
             $this->addFlash('error', 'A member with that email address already exists.');
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
-        $beneficiary = new User();
-        $beneficiary->setFirstName($firstName);
-        $beneficiary->setLastName($lastName ?: null);
-        $beneficiary->setEmail($email);
-        $beneficiary->setDateOfBirth($dateOfBirth);
-        // No login for this contact until they set a password via "forgot password" — requires an email on file.
-        $beneficiary->setPassword($hasher->hashPassword($beneficiary, bin2hex(random_bytes(32))));
-
-        if ($request->request->has('makeDependent')) {
-            $beneficiary->setParent($order->getUser());
-        }
-
-        $em->persist($beneficiary);
-        $em->flush(); // assigns $beneficiary's id — needed before a Note can reference it via noteableId
-
         /** @var User $admin */
-        $admin     = $this->getUser();
-        $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
+        $admin = $this->getUser();
 
-        $note = new Note();
-        $note->setNoteable($beneficiary);
-        $note->setContent('Added as a beneficiary on Sale #' . $order->getId() . ' by ' . $adminName . '.');
-        $note->setAddedBy($admin);
-        $em->persist($note);
+        $beneficiary = $userService->createContact(
+            email: $email,
+            firstName: $firstName,
+            lastName: $lastName,
+            noteContent: 'Added as a beneficiary on Sale #' . $order->getId() . ' by ' . $admin->getDisplayName() . '.',
+            addedBy: $admin,
+            parent: $request->request->has('makeDependent') ? $order->getUser() : null,
+            dateOfBirth: $dateOfBirth,
+        );
 
         $row->setBeneficiaryMember($beneficiary);
         $em->flush();

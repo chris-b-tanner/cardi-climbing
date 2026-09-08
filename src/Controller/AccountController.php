@@ -139,7 +139,7 @@ class AccountController extends AbstractController
         if ($missingProfileFields) {
             $message = $holder === $user
                 ? 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.'
-                : 'Ask an admin to add the following to ' . (trim(($holder->getFirstName() ?? '') . ' ' . ($holder->getLastName() ?? '')) ?: 'this member') . "'s profile before completing this certification: " . implode(', ', $missingProfileFields) . '.';
+                : 'Ask an admin to add the following to ' . $holder->getDisplayName() . "'s profile before completing this certification: " . implode(', ', $missingProfileFields) . '.';
             $this->addFlash('error', $message);
         }
 

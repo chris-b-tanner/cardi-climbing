@@ -129,7 +129,7 @@ class DoorSimController extends AbstractController
 
             return [
                 'attendee_id'       => $attendee->getId(),
-                'user'              => trim(($attendee->getUser()->getFirstName() ?? '') . ' ' . ($attendee->getUser()->getLastName() ?? '')),
+                'user'              => $attendee->getUser()->getDisplayName(),
                 'attendee_status'   => $attendee->getStatus(),
                 'pin_status'        => $attendee->getPinStatus(),
                 'event_title'       => $event->getTitle(),

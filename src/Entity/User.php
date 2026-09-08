@@ -214,6 +214,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** "First Last", falling back to the email, or a generic label if there's neither (an archived member has both scrubbed). */
+    public function getDisplayName(): string
+    {
+        return trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? ''))
+            ?: ($this->email ?: 'Member #' . $this->id);
+    }
+
     public function getCompany(): ?string
     {
         return $this->company;

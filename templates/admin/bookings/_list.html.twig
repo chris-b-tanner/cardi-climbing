@@ -20,7 +20,7 @@
       </thead>
       <tbody>
         {% for attendee in attendees %}
-          {% set displayName = (attendee.user.firstName ~ ' ' ~ attendee.user.lastName)|trim %}
+          {% set displayName = attendee.user.displayName %}
           {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
           <tr>
             <td>

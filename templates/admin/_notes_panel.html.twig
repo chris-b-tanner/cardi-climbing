@@ -25,15 +25,15 @@
         <p style="font-size:0.75rem;color:var(--muted);">
           {{ note.createdAt|date('j M Y, H:i') }}
           {% if note.addedBy %}
-            · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
+            · {{ note.addedBy.displayName }}
           {% else %}
             · System
           {% endif %}
           {% if note.pinned and note.pinnedBy %}
-            · Pinned by {{ (note.pinnedBy.firstName ~ ' ' ~ note.pinnedBy.lastName)|trim ?: note.pinnedBy.email }}
+            · Pinned by {{ note.pinnedBy.displayName }}
           {% endif %}
           {% if note.completed %}
-            · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ (note.completedBy.firstName ~ ' ' ~ note.completedBy.lastName)|trim ?: note.completedBy.email }}{% endif %}
+            · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ note.completedBy.displayName }}{% endif %}
           {% endif %}
           · <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}" style="display:inline;">
               <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">

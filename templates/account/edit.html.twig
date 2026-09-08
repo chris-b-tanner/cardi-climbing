@@ -231,7 +231,7 @@
           <div class="field" style="margin-bottom:0;">
             {% for dependent in user.dependents %}
               <div style="font-size:0.9375rem;color:#1a1a1a;{% if not loop.last %}margin-bottom:0.4rem;{% endif %}">
-                {{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}
+                {{ dependent.displayName }}
               </div>
             {% endfor %}
           </div>

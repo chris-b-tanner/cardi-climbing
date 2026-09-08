@@ -39,8 +39,7 @@ class AdminTeamController extends AbstractController
         $user->setRoles([User::ROLE_MEMBER]);
         $em->flush();
 
-        $displayName = trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail();
-        $this->addFlash('success', $displayName . ' is no longer on the team. They can still sign in as a member.');
+        $this->addFlash('success', $user->getDisplayName() . ' is no longer on the team. They can still sign in as a member.');
 
         return $this->redirectToRoute('app_admin_settings_team');
     }

@@ -202,7 +202,7 @@
                     {% endif %}
                   </td>
                   <td class="admin-table__muted">
-                    {{ movement.createdBy ? ((movement.createdBy.firstName ~ ' ' ~ movement.createdBy.lastName)|trim ?: movement.createdBy.email) : 'System' }}
+                    {{ movement.createdBy ? (movement.createdBy.displayName) : 'System' }}
                   </td>
                 </tr>
               {% endfor %}

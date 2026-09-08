@@ -18,7 +18,7 @@
 
   <div class="merge-cards">
     {% for user in users %}
-      {% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+      {% set displayName = user.displayName %}
       <label class="merge-card" for="pick_{{ user.id }}">
         <input type="radio" name="primary" id="pick_{{ user.id }}" value="{{ user.id }}"
                class="merge-radio" {% if loop.first %}checked{% endif %}>

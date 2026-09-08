@@ -1,6 +1,6 @@
 {% extends 'admin/base.html.twig' %}
 
-{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% set displayName = user.displayName %}
 {% block title %}Add certification — {{ displayName ?: user.email }}{% endblock %}
 
 {% block content %}

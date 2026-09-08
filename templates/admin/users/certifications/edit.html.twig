@@ -1,6 +1,6 @@
 {% extends 'admin/base.html.twig' %}
 
-{% set displayName = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+{% set displayName = user.displayName %}
 {% block title %}{{ record.certification.name }} — {{ displayName ?: user.email }}{% endblock %}
 
 {% block content %}
@@ -35,7 +35,7 @@
       <div class="card__value">
         {{ record.startedAt|date('d M Y') }}
         {% if record.startedBy %}
-          &middot; {{ (record.startedBy.firstName ~ ' ' ~ record.startedBy.lastName)|trim ?: record.startedBy.email }}
+          &middot; {{ record.startedBy.displayName }}
         {% endif %}
       </div>
     </div>
@@ -45,7 +45,7 @@
         <div class="card__value">
           {{ record.completedAt|date('d M Y') }}
           {% if record.completedBy %}
-            &middot; {{ (record.completedBy.firstName ~ ' ' ~ record.completedBy.lastName)|trim ?: record.completedBy.email }}
+            &middot; {{ record.completedBy.displayName }}
           {% endif %}
         </div>
       </div>
@@ -56,7 +56,7 @@
         <div class="card__value">
           {{ record.approvedAt|date('d M Y') }}
           {% if record.approvedBy %}
-            &middot; {{ (record.approvedBy.firstName ~ ' ' ~ record.approvedBy.lastName)|trim ?: record.approvedBy.email }}
+            &middot; {{ record.approvedBy.displayName }}
           {% endif %}
         </div>
       </div>
@@ -67,7 +67,7 @@
         <div class="card__value">
           {{ record.cancelledAt|date('d M Y') }}
           {% if record.cancelledBy %}
-            &middot; {{ (record.cancelledBy.firstName ~ ' ' ~ record.cancelledBy.lastName)|trim ?: record.cancelledBy.email }}
+            &middot; {{ record.cancelledBy.displayName }}
           {% endif %}
         </div>
       </div>

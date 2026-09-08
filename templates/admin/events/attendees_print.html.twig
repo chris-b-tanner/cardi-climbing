@@ -67,7 +67,7 @@
       <tbody>
         {% for attendee in attendees %}
           {% set user = attendee.user %}
-          {% set name = (user.firstName ~ ' ' ~ user.lastName)|trim %}
+          {% set name = user.displayName %}
           <tr>
             <td>{{ name ?: '—' }}</td>
             <td>{{ user.email ?: '—' }}</td>
