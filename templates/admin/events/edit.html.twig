@@ -63,15 +63,10 @@
         <label for="timeTo">Time to</label>
         <input type="time" id="timeTo" name="timeTo" class="form-control" value="{{ event.timeTo }}" required>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0;">
         <label for="maxAttendees">Max attendees</label>
         <input type="number" id="maxAttendees" name="maxAttendees" class="form-control" min="1"
                value="{{ event.maxAttendees }}" placeholder="Leave blank for unlimited">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="price">Price (£)</label>
-        <input type="number" id="price" name="price" class="form-control" min="0" step="0.01"
-               value="{{ event.price }}" placeholder="Leave blank if free">
       </div>
     </div>
     <div class="form-group" style="margin-bottom:0;margin-top:1rem;">
@@ -130,6 +125,28 @@
         {% endfor %}
       </div>
     {% endif %}
+  </div>
+
+  <div class="card">
+    <label>Access methods</label>
+    <p style="font-size:0.78rem;color:var(--muted);margin:0.2rem 0 0.75rem;">
+      How a seat on this event is obtained — a member only needs to satisfy one of the selected methods. Leave all unchecked for free, open booking.
+    </p>
+    {% set eventAccessMethods = event.accessMethodsArray %}
+    <div class="tag-grid">
+      <input type="checkbox" id="access_ticket" name="accessMethods[]" value="ticket" class="tag-check"
+             {% if 'ticket' in eventAccessMethods %}checked{% endif %}>
+      <label for="access_ticket" class="tag-check-label">Ticket</label>
+      <input type="checkbox" id="access_credit" name="accessMethods[]" value="credit" class="tag-check"
+             {% if 'credit' in eventAccessMethods %}checked{% endif %}>
+      <label for="access_credit" class="tag-check-label">Credit</label>
+      <input type="checkbox" id="access_membership" name="accessMethods[]" value="membership" class="tag-check"
+             {% if 'membership' in eventAccessMethods %}checked{% endif %}>
+      <label for="access_membership" class="tag-check-label">Membership</label>
+    </div>
+    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;">
+      Ticket means this event is sold via a linked ticket product — create or edit it separately under Settings &rarr; Products; checking this box alone doesn't create one.
+    </p>
   </div>
 
   <div class="card">

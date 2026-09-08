@@ -74,10 +74,10 @@ class AdminBookingController extends AbstractController
                 $error = 'Please select an event.';
             }
 
-            // Only events without tickets are checked in directly here — an event with tickets is
-            // booked by selling one instead (via the shop/cart), so this closes off a way to bypass
-            // that sale even if the dropdown (already filtered) were tampered with.
-            if (!$error && $eventRepository->hasAnyTicketProduct($event)) {
+            // Only events that don't accept a ticket are checked in directly here — a ticket-accepting
+            // event is booked by selling one instead (via the shop/cart), so this closes off a way to
+            // bypass that sale even if the dropdown (already filtered) were tampered with.
+            if (!$error && $event->acceptsTicket()) {
                 $error = 'This event is sold via tickets — check members in by selling a ticket instead.';
             }
 
@@ -143,7 +143,7 @@ class AdminBookingController extends AbstractController
         $weekStart = $today->modify('monday this week');
         $weekEnd   = $weekStart->modify('+6 days');
 
-        $weekEvents = $eventRepository->findWithoutTicketsOverlapping($weekStart, $weekEnd);
+        $weekEvents = $eventRepository->findWithoutTicketAccessOverlapping($weekStart, $weekEnd);
 
         // Batch-load this week's bookings once, then derive per-occurrence counts/booked-state in
         // memory — same approach as the public calendar, avoids a query per occurrence shown.
@@ -185,6 +185,7 @@ class AdminBookingController extends AbstractController
                         'bookedByUser'    => $stats['bookedByUser'],
                         'isRestricted'    => !$weekEvent->allowsUser($user),
                         'isCheckInWindow' => $this->isCheckInWindow($weekEvent, $day),
+                        'accessMessage'   => $this->accessBlockedMessage($weekEvent, $user),
                     ];
                 }
 
@@ -225,11 +226,13 @@ class AdminBookingController extends AbstractController
                 if ($status === Attendee::STATUS_CANCELLED) {
                     $bookingService->cancelBooking($attendee);
                 } else {
-                    $bookingService->reinstateBooking($attendee, $status);
+                    $error = $bookingService->reinstateBooking($attendee, $status);
                 }
 
-                $this->addFlash('success', 'Booking updated.');
-                return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+                if (!$error) {
+                    $this->addFlash('success', 'Booking updated.');
+                    return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+                }
             }
         }
 
@@ -288,6 +291,25 @@ class AdminBookingController extends AbstractController
 
         $this->addFlash('success', $successMessage);
         return $this->redirectToEventShow($attendee);
+    }
+
+    /**
+     * Why {user} can't be checked in for free onto {event} via its accepted access methods, or
+     * null if they can (or the event doesn't gate on credit/membership at all). A ticket-accepting
+     * event never reaches here — findWithoutTicketAccessOverlapping() already excludes those, since
+     * they're checked in by selling a ticket instead.
+     */
+    private function accessBlockedMessage(Event $event, User $user): ?string
+    {
+        if (!$event->hasAccessRestriction() || $user->canCoverMembershipOrCreditBooking($event)) {
+            return null;
+        }
+
+        return match (true) {
+            $event->acceptsCredit() && $event->acceptsMembership() => 'Needs credit or membership',
+            $event->acceptsCredit()                                => 'No credit',
+            default                                                => 'No membership',
+        };
     }
 
     /** Whether {date}'s occurrence of {event} is already running, or about to start within 15 minutes — the threshold for treating a check-in as a real, right-now attendance rather than a future booking. Also true once the session has ended; there's no "too late" cutoff here, only "too early". */

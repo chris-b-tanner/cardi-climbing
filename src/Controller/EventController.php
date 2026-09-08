@@ -486,22 +486,41 @@ class EventController extends AbstractController
         $isBooked     = $user ? $stats['bookedByUser'] : false;
         $isRestricted = $user ? !$event->allowsUser($user) : false;
 
-        $needsMembershipOrCredit     = $event->requiresMembershipOrCredit();
-        $blockedByMembershipOrCredit = $needsMembershipOrCredit && $user !== null && !$user->canCoverMembershipOrCreditBooking();
+        // Whether membership/credit already covers a free seat — checked against only the access
+        // methods the event actually accepts, since either one on its own is now a valid, complete
+        // route (see Event::acceptsMembership()/acceptsCredit()).
+        $coveredByMembership = false;
+        $coveredByCredit     = false;
+        if ($user !== null) {
+            if ($event->acceptsMembership()) {
+                $membership          = $user->getEffectiveMembership();
+                $coveredByMembership = $membership !== null && $membership->isCurrentlyActive();
+            }
+            if (!$coveredByMembership && $event->acceptsCredit()) {
+                $coveredByCredit = $user->getCreditBalance() > 0;
+            }
+        }
+
+        // Whether this event is a membership/credit-gated event at all — a property of the event
+        // itself, not of whether this particular user already satisfies it. Drives the direct-book
+        // button's "Check in" (something is being verified/spent) vs "Book now" wording even when
+        // the user is covered for free by their membership.
+        $needsMembershipOrCredit = $event->acceptsCredit() || $event->acceptsMembership();
+
+        // Open booking (no access method selected) is always free; otherwise membership/credit
+        // cover is the free route. If neither applies but a ticket is also accepted, the ticket
+        // purchase route takes over instead of a hard block.
+        $canBookFree                 = !$event->hasAccessRestriction() || $coveredByMembership || $coveredByCredit;
+        $needsTicket                 = !$canBookFree && $event->acceptsTicket();
+        $blockedByMembershipOrCredit = !$canBookFree && !$needsTicket;
 
         // A certification-restricted event needs a way to reach the booker in an emergency —
-        // checked here regardless of price, unlike the membership/credit gate above.
+        // checked here regardless of access method, same as before.
         $blockedByMissingEmergencyContact = !$event->getRestrictions()->isEmpty() && $user !== null && !$user->hasCompleteEmergencyContact();
 
         // Only set when an active membership is what covers this booking — lets the template tell
         // "no payment needed" (membership) apart from "a credit will be spent" (no membership).
-        $activeMembership = null;
-        if ($needsMembershipOrCredit && $user !== null) {
-            $membership = $user->getEffectiveMembership();
-            if ($membership !== null && $membership->isCurrentlyActive()) {
-                $activeMembership = $membership;
-            }
-        }
+        $activeMembership = $coveredByMembership ? $user->getEffectiveMembership() : null;
 
         // A draft is only ever reachable here as a published event, or as a team/admin preview
         // (show()/index() already gate that) — so team/admin can book onto it like any other
@@ -517,11 +536,12 @@ class EventController extends AbstractController
             'isBooked'                         => $isBooked,
             'isRestricted'                     => $isRestricted,
             'needsMembershipOrCredit'          => $needsMembershipOrCredit,
+            'needsTicket'                      => $needsTicket,
             'blockedByMembershipOrCredit'      => $blockedByMembershipOrCredit,
             'blockedByMissingEmergencyContact' => $blockedByMissingEmergencyContact,
             'activeMembershipTypeName'         => $activeMembership?->getMembershipType()->getName(),
             'isDraft'                          => !$event->isPublished(),
-            'canBook'                          => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$blockedByMembershipOrCredit && !$blockedByMissingEmergencyContact,
+            'canBook'                          => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$needsTicket && !$blockedByMembershipOrCredit && !$blockedByMissingEmergencyContact,
         ];
     }
 

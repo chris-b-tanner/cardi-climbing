@@ -153,10 +153,10 @@ class Attendee
         return $this->status === self::STATUS_CANCELLED;
     }
 
-    /** This attendee's price: the linked sale's charged price if bought via a SalesOrderRow, otherwise the price override, otherwise the event's price. */
+    /** This attendee's price: the linked sale's charged price if bought via a SalesOrderRow, otherwise the price override, otherwise free. */
     public function getEffectivePrice(): ?string
     {
-        return $this->salesOrderRow?->getChargedPrice() ?? $this->price ?? $this->event->getPrice();
+        return $this->salesOrderRow?->getChargedPrice() ?? $this->price;
     }
 
     public function getPrice(): ?string

@@ -13,8 +13,10 @@
 {% set csrfToken = csrf_token('admin_sale_' ~ order.id) %}
 
 <div class="page-header">
-  <h1>Sale #{{ order.id }} — <a href="{{ path('app_admin_user_show', {id: order.user.id}) }}" class="admin-table__link">{{ memberName }}</a> <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></h1>
-  <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Sales</a>
+  <h1>
+    <a href="{{ path('app_admin_sales') }}" class="page-header__crumb">Sales</a> &raquo;
+    Sale #{{ order.id }} — <a href="{{ path('app_admin_user_show', {id: order.user.id}) }}" class="admin-table__link">{{ memberName }}</a> <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span>
+  </h1>
 </div>
 
 <div class="member-columns{{ order.status != 'draft' ? ' member-columns--single' : '' }}">

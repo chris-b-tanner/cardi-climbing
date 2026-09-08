@@ -23,6 +23,10 @@ class Event
     public const STATUS_DRAFT     = 'draft';
     public const STATUS_PUBLISHED = 'published';
 
+    public const ACCESS_TICKET     = 'ticket';
+    public const ACCESS_CREDIT     = 'credit';
+    public const ACCESS_MEMBERSHIP = 'membership';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -52,9 +56,6 @@ class Event
     #[ORM\Column(nullable: true)]
     private ?int $maxAttendees = null;
 
-    #[ORM\Column(type: Types::DECIMAL, precision: 8, scale: 2, nullable: true)]
-    private ?string $price = null;
-
     #[ORM\Column(length: 255)]
     private string $location;
 
@@ -77,6 +78,18 @@ class Event
     /** Comma-separated ISO weekdays (1=Monday..7=Sunday), e.g. "1,3,5" */
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $recurDays = null;
+
+    /**
+     * Comma-separated subset of ACCESS_* values — how a seat on this event can be obtained.
+     * Empty/null means open, free booking with no gate at all. Each accepted method is an
+     * independent route in: a ticket purchase, a spare drop-in credit, or an active membership —
+     * satisfying any one of the accepted methods is enough (see acceptsTicket()/acceptsCredit()/
+     * acceptsMembership()). This is orthogonal to $restrictions (which certifications may attend
+     * at all) — an open event can still require a credit, and a certification-restricted event
+     * can still be free-for-all-comers if no access method is selected.
+     */
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $accessMethods = null;
 
     /** Members must hold at least one of these certifications to book. Empty = open to all. */
     #[ORM\ManyToMany(targetEntity: Certification::class, inversedBy: 'events')]
@@ -210,17 +223,6 @@ class Event
         return $this;
     }
 
-    public function getPrice(): ?string
-    {
-        return $this->price;
-    }
-
-    public function setPrice(?string $price): static
-    {
-        $this->price = $price;
-        return $this;
-    }
-
     public function getLocation(): string
     {
         return $this->location;
@@ -320,6 +322,42 @@ class Event
         return $this;
     }
 
+    /** @return string[] subset of ACCESS_* values */
+    public function getAccessMethodsArray(): array
+    {
+        return $this->accessMethods !== null && $this->accessMethods !== ''
+            ? explode(',', $this->accessMethods)
+            : [];
+    }
+
+    /** @param string[] $methods subset of ACCESS_* values */
+    public function setAccessMethodsArray(array $methods): static
+    {
+        $this->accessMethods = $methods ? implode(',', $methods) : null;
+        return $this;
+    }
+
+    public function acceptsTicket(): bool
+    {
+        return in_array(self::ACCESS_TICKET, $this->getAccessMethodsArray(), true);
+    }
+
+    public function acceptsCredit(): bool
+    {
+        return in_array(self::ACCESS_CREDIT, $this->getAccessMethodsArray(), true);
+    }
+
+    public function acceptsMembership(): bool
+    {
+        return in_array(self::ACCESS_MEMBERSHIP, $this->getAccessMethodsArray(), true);
+    }
+
+    /** Whether any access method is required to book at all — false means open, free booking. */
+    public function hasAccessRestriction(): bool
+    {
+        return $this->accessMethods !== null && $this->accessMethods !== '';
+    }
+
     /** Whether this event (recurring or not) has an occurrence on the given date. */
     public function isValidForDate(\DateTimeInterface $date): bool
     {
@@ -373,12 +411,6 @@ class Event
         }
 
         return false;
-    }
-
-    /** A free event still restricted to a certification needs the booker to have an active membership or a spare credit — there's no ticket sale here to actually pay for the seat. */
-    public function requiresMembershipOrCredit(): bool
-    {
-        return $this->price === null && !$this->restrictions->isEmpty();
     }
 
     public function getAttendees(): Collection

@@ -67,7 +67,7 @@
   </div>
 {% endif %}
 
-{% if eventTicketProducts is not empty %}
+{% if needsTicket %}
   {% set canShowTicketForms = app.user and (not isRestricted or app.user.dependents is not empty) %}
   <div class="event-preview__tickets">
     {% if cartTicketCount is defined and cartTicketCount > 0 %}
@@ -96,7 +96,9 @@
       {% endif %}
 
       <div class="event-preview__tickets-title">Tickets</div>
-      {% if canShowTicketForms %}
+      {% if eventTicketProducts is empty %}
+        <p class="event-preview__ticket-signin">No ticket is available for this event yet — please check back later.</p>
+      {% elseif canShowTicketForms %}
         {% for product in eventTicketProducts %}
           {% set ticketMembershipType = product.eventTicketProduct.membershipType %}
           {% set ticketAccessible = ticketAccess[product.id] ?? true %}

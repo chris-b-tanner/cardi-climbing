@@ -3,7 +3,6 @@
 namespace App\Repository;
 
 use App\Entity\Event;
-use App\Entity\EventTicketProduct;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -27,17 +26,17 @@ class EventRepository extends ServiceEntityRepository
     }
 
     /**
-     * Events sold with no ticket product — the only ones an admin can check a member directly
-     * onto, since an event with tickets is booked by selling one instead (via the shop/cart) —
-     * whose date, or for a recurring event whose recurrence window, overlaps the given range.
-     * No published-only filter: an admin can check a member into a draft event too.
+     * Events that don't accept a ticket as an access method — the only ones an admin can check a
+     * member directly onto, since a ticket-accepting event is booked by selling one instead (via
+     * the shop/cart) — whose date, or for a recurring event whose recurrence window, overlaps the
+     * given range. No published-only filter: an admin can check a member into a draft event too.
      *
      * @return Event[]
      */
-    public function findWithoutTicketsOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
+    public function findWithoutTicketAccessOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
     {
         return $this->createQueryBuilder('e')
-            ->where('e.id NOT IN (SELECT IDENTITY(etp.event) FROM ' . EventTicketProduct::class . ' etp)')
+            ->where("(e.accessMethods IS NULL OR e.accessMethods NOT LIKE '%" . Event::ACCESS_TICKET . "%')")
             ->andWhere('
                 (e.isRecurring = false AND e.date BETWEEN :start AND :end)
                 OR
@@ -49,31 +48,6 @@ class EventRepository extends ServiceEntityRepository
             ->addOrderBy('e.timeFrom', 'ASC')
             ->getQuery()
             ->getResult();
-    }
-
-    /** Whether {event} has any ticket product at all (active or not) — see findWithoutTicketsOverlapping(). */
-    public function hasAnyTicketProduct(Event $event): bool
-    {
-        return $this->getEntityManager()->getRepository(EventTicketProduct::class)->findOneBy(['event' => $event]) !== null;
-    }
-
-    /** IDs, among {events}, of those with at least one ticket product (active or not) — batched for a list view instead of one hasAnyTicketProduct() query per row. */
-    public function idsWithAnyTicketProduct(array $events): array
-    {
-        if (!$events) {
-            return [];
-        }
-
-        $rows = $this->getEntityManager()->createQueryBuilder()
-            ->select('IDENTITY(etp.event) AS eventId')
-            ->distinct()
-            ->from(EventTicketProduct::class, 'etp')
-            ->where('etp.event IN (:events)')
-            ->setParameter('events', $events)
-            ->getQuery()
-            ->getScalarResult();
-
-        return array_map('intval', array_column($rows, 'eventId'));
     }
 
     /** @return Event[] */

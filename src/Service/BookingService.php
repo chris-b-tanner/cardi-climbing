@@ -59,6 +59,10 @@ class BookingService
             return 'This member has no emergency contact details on file — add them before booking onto a certification-restricted event.';
         }
 
+        if ($event->acceptsTicket() && !$event->acceptsCredit() && !$event->acceptsMembership()) {
+            return 'This event is booked by purchasing a ticket, not booked directly.';
+        }
+
         $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
 
         if ($this->attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
@@ -118,11 +122,28 @@ class BookingService
         $this->em->flush();
     }
 
-    /** Moves {attendee} to {status} (confirmed/pending) — the other side of cancelBooking(), e.g. un-cancelling a booking. Issues a door PIN if the event is self-access and it doesn't already have an active one. */
-    public function reinstateBooking(Attendee $attendee, string $status): void
+    /**
+     * Moves {attendee} to {status} (confirmed/pending) — the other side of cancelBooking(), e.g.
+     * un-cancelling a booking. Issues a door PIN if the event is self-access and it doesn't already
+     * have an active one. Returns an error message instead of reinstating if doing so would push a
+     * capped event over its max attendees — only checked when {attendee} is currently cancelled,
+     * since switching an already-active booking between confirmed/pending doesn't add a new seat.
+     */
+    public function reinstateBooking(Attendee $attendee, string $status): ?string
     {
+        $event = $attendee->getEvent();
+
+        if ($attendee->isCancelled()
+            && $event->getMaxAttendees() !== null
+            && $this->attendeeRepository->countActiveForOccurrence($event, $attendee->getOccurrenceDate()) >= $event->getMaxAttendees()
+        ) {
+            return 'Sorry, this event is fully booked — there is no spare place to reinstate this booking into.';
+        }
+
         $attendee->setStatus($status);
         $this->doorAccessService->generatePinIfNeeded($attendee);
         $this->em->flush();
+
+        return null;
     }
 }

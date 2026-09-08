@@ -14,8 +14,8 @@
           <th>Event</th>
           <th>Date</th>
           <th>Status</th>
-          <th>Price</th>
-          <th>Paid</th>
+          <th>Checked in</th>
+          <th>Method</th>
         </tr>
       </thead>
       <tbody>
@@ -37,8 +37,12 @@
             <td>
               <span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span>
             </td>
-            <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
-            <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+            <td class="admin-table__muted">
+              {{ attendee.isCheckedIn ? attendee.checkedInAt|date('d M Y, H:i') : '—' }}
+            </td>
+            <td class="admin-table__muted">
+              {{ attendee.isCheckedIn ? (attendee.checkedInMethod == 'door_pin' ? 'Door PIN' : 'Manual') : '—' }}
+            </td>
           </tr>
         {% endfor %}
       </tbody>

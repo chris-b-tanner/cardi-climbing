@@ -42,18 +42,25 @@
 {% block content %}
 <div class="page-header">
   <h1>
+    <a href="{{ path('app_admin_events') }}" class="page-header__crumb">Events</a> &raquo;
     {{ event.title }} - {{ (event.isRecurring ? occurrenceDate : event.date)|date('d M Y') }}
     <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
           {{ event.isPublished ? 'Published' : 'Draft' }}
         </span>
   </h1>
-  <div class="btn-row">
-    <a href="{{ path('app_admin_events') }}" class="btn btn--ghost btn--sm">← Events</a>
-    {% if is_granted('ROLE_ADMIN') %}
+  {% if is_granted('ROLE_ADMIN') %}
+    <div class="btn-row">
       <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="btn btn--teal btn--sm">Edit</a>
-    {% endif %}
-  </div>
+    </div>
+  {% endif %}
 </div>
+
+{% if event.acceptsTicket and eventTicketProducts is empty %}
+  <div class="flash flash--error">
+    This event accepts "Ticket" as an access method, but no ticket product is linked to it yet —
+    <a href="{{ path('app_admin_settings_products') }}">create one</a> so members can actually buy a seat.
+  </div>
+{% endif %}
 
 <div class="member-columns">
 <div class="member-col-left">
@@ -75,10 +82,6 @@
     <div>
       <div class="card__label">Location</div>
       <div class="card__value">{{ event.location }}</div>
-    </div>
-    <div>
-      <div class="card__label">Price</div>
-      <div class="card__value">{{ event.price ? '£' ~ event.price : 'Free' }}</div>
     </div>
     <div>
       <div class="card__label">Max attendees</div>
@@ -125,6 +128,17 @@
     {% endfor %}
   </div>
 {% endif %}
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.5rem;">Access</div>
+  {% if event.hasAccessRestriction %}
+    {% if event.acceptsTicket %}<span class="tag-badge">Ticket</span>{% endif %}
+    {% if event.acceptsCredit %}<span class="tag-badge">Credit</span>{% endif %}
+    {% if event.acceptsMembership %}<span class="tag-badge">Membership</span>{% endif %}
+  {% else %}
+    <span class="tag-badge--none">Free</span>
+  {% endif %}
+</div>
 
 {% if event.isRecurring %}
   <div class="card">

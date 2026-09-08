@@ -14,6 +14,7 @@
           <th>Date</th>
           <th>Time</th>
           <th>Location</th>
+          <th>Access</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -28,9 +29,6 @@
               {% if event.restrictions is not empty %}
                 <i class="bi bi-shield-check" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Restricted to: {% for c in event.restrictions %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}"></i>
               {% endif %}
-              {% if event.id in ticketedEventIds %}
-                <i class="bi bi-box-seam" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Linked to ticket product(s)"></i>
-              {% endif %}
             </td>
             <td class="admin-table__muted">
               {% if event.isRecurring %}
@@ -41,6 +39,15 @@
             </td>
             <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>
             <td class="admin-table__muted">{{ event.location }}</td>
+            <td>
+              {% if event.hasAccessRestriction %}
+                {% if event.acceptsTicket %}<span class="tag-badge">Ticket</span>{% endif %}
+                {% if event.acceptsCredit %}<span class="tag-badge">Credit</span>{% endif %}
+                {% if event.acceptsMembership %}<span class="tag-badge">Membership</span>{% endif %}
+              {% else %}
+                <span class="tag-badge--none">Free</span>
+              {% endif %}
+            </td>
             <td>
               <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
                 {{ event.isPublished ? 'Published' : 'Draft' }}

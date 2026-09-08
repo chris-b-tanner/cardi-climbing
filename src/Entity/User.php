@@ -407,11 +407,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $membership !== null && $membership->isCurrentlyActive() && $membership->getMembershipType() === $membershipType;
     }
 
-    /** Whether this member can cover a free, certification-restricted booking — via their own (or inherited) active membership, or a spare drop-in credit on their own account. */
-    public function canCoverMembershipOrCreditBooking(): bool
+    /** Whether this member can cover a free booking on {event} via whichever of membership/credit it actually accepts — their own (or inherited) active membership, or a spare drop-in credit on their own account. */
+    public function canCoverMembershipOrCreditBooking(Event $event): bool
     {
-        $membership = $this->getEffectiveMembership();
-        return ($membership !== null && $membership->isCurrentlyActive()) || $this->getCreditBalance() > 0;
+        if ($event->acceptsMembership()) {
+            $membership = $this->getEffectiveMembership();
+            if ($membership !== null && $membership->isCurrentlyActive()) {
+                return true;
+            }
+        }
+
+        return $event->acceptsCredit() && $this->getCreditBalance() > 0;
     }
 
     /** The member this one is a dependent of, if any. */

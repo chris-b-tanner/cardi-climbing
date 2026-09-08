@@ -28,19 +28,16 @@ class AdminEventController extends AbstractController
     {
         $query  = trim($request->query->get('q', ''));
         $events = $eventRepository->search($query);
-        $ticketedEventIds = $eventRepository->idsWithAnyTicketProduct($events);
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/events/_list.html.twig', [
-                'events'           => $events,
-                'ticketedEventIds' => $ticketedEventIds,
+                'events' => $events,
             ]);
         }
 
         return $this->render('admin/events/index.html.twig', [
-            'events'           => $events,
-            'currentQuery'     => $query,
-            'ticketedEventIds' => $ticketedEventIds,
+            'events'       => $events,
+            'currentQuery' => $query,
         ]);
     }
 
@@ -415,7 +412,9 @@ class AdminEventController extends AbstractController
         }
 
         $maxAttendeesRaw = trim($request->request->get('maxAttendees', ''));
-        $priceRaw        = trim($request->request->get('price', ''));
+
+        $allowedAccessMethods = [Event::ACCESS_TICKET, Event::ACCESS_CREDIT, Event::ACCESS_MEMBERSHIP];
+        $accessMethods        = array_values(array_intersect($request->request->all('accessMethods'), $allowedAccessMethods));
 
         $event->setTitle($title);
         $event->setDescription(trim($request->request->get('description', '')) ?: null);
@@ -426,7 +425,7 @@ class AdminEventController extends AbstractController
         $event->setLocation($location);
         $event->setExternalUrl(trim($request->request->get('externalUrl', '')) ?: null);
         $event->setMaxAttendees($maxAttendeesRaw !== '' ? (int) $maxAttendeesRaw : null);
-        $event->setPrice($priceRaw !== '' ? number_format((float) $priceRaw, 2, '.', '') : null);
+        $event->setAccessMethodsArray($accessMethods);
         $event->setStatus($request->request->has('published') ? Event::STATUS_PUBLISHED : Event::STATUS_DRAFT);
 
         $event->setIsRecurring($isRecurring);

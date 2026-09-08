@@ -48,11 +48,11 @@
             <p class="checkin-empty">No events</p>
           {% else %}
             {% for occ in day.events %}
-              <button type="button" class="checkin-event{{ (occ.isFull or occ.bookedByUser) ? ' is-disabled' : '' }}{{ occ.isRestricted ? ' checkin-event--restricted' : '' }}"
+              <button type="button" class="checkin-event{{ (occ.isFull or occ.bookedByUser or occ.accessMessage) ? ' is-disabled' : '' }}{{ occ.isRestricted ? ' checkin-event--restricted' : '' }}"
                       data-event-id="{{ occ.event.id }}"
                       data-occurrence-date="{{ occ.date|date('Y-m-d') }}"
                       data-checkin-window="{{ occ.isCheckInWindow ? '1' : '0' }}"
-                      {% if occ.isFull or occ.bookedByUser or occ.isRestricted %}disabled{% endif %}>
+                      {% if occ.isFull or occ.bookedByUser or occ.isRestricted or occ.accessMessage %}disabled{% endif %}>
                 <div class="checkin-event__time">{{ occ.event.timeFrom }}&ndash;{{ occ.event.timeTo }}</div>
                 <div class="checkin-event__title">{{ occ.event.title }}</div>
                 {% if occ.bookedByUser %}
@@ -61,6 +61,8 @@
                   {% for certification in occ.event.restrictions %}
                     <div class="checkin-event__cert"><i class="bi bi-shield-check"></i> {{ certification.name }}</div>
                   {% endfor %}
+                {% elseif occ.accessMessage %}
+                  <div class="checkin-event__meta">{{ occ.accessMessage }}</div>
                 {% elseif occ.isFull %}
                   <div class="checkin-event__meta">Full</div>
                 {% elseif occ.spotsLeft is not null %}
