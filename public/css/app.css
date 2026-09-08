@@ -499,8 +499,14 @@ p + p { margin-top: 1rem; }
   gap: 2rem;
 }
 .way { border-top: 3px solid var(--teal); padding-top: 1.5rem; }
-.way h3 { color: var(--black); margin-bottom: 0.5rem; }
+.way--filled { border-top-color: var(--border); }
+.way h3 { color: var(--black); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .way p   { font-size: 0.9rem; }
+.way__badge {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); background: var(--lichen); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.15rem 0.55rem;
+}
 
 /* ── Signup ─────────────────────────────────────────── */
 .signup { background: var(--teal); padding: 5rem 0; }
