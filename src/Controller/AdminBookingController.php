@@ -10,6 +10,7 @@ use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
+use App\Service\DoorAccessService;
 use App\Service\EventBookingCreditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,7 +41,7 @@ class AdminBookingController extends AbstractController
         ]);
     }
 
-    /** Always reached with a userId in the GET — from a member's contact page or an event's "+ Add attendee" contact picker. There's no member search here; check in someone else by starting from their own contact page. */
+    /** Always reached with a userId in the GET — from a member's contact page. There's no member search here; check in someone else by starting from their own contact page. */
     #[Route('/new', name: 'app_admin_booking_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
@@ -50,6 +51,7 @@ class AdminBookingController extends AbstractController
         AttendeeRepository $attendeeRepository,
         BookingMailer $bookingMailer,
         EventBookingCreditService $eventBookingCreditService,
+        DoorAccessService $doorAccessService,
     ): Response {
         $userId = (int) ($request->query->get('userId') ?: $request->request->get('userId', 0));
         $user   = $userId ? $userRepository->find($userId) : null;
@@ -154,10 +156,12 @@ class AdminBookingController extends AbstractController
                     $eventBookingCreditService->spendCredit($user, $event, $attendee);
                 }
 
+                $doorAccessService->generatePinIfNeeded($attendee);
+
                 $em->flush();
 
                 if ($request->request->has('sendEmail') && $user->getEmail()) {
-                    $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
+                    $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $attendee->getPin());
                 }
 
                 $this->addFlash('success', 'Member checked in.');
@@ -237,7 +241,7 @@ class AdminBookingController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository): Response
+    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository, DoorAccessService $doorAccessService): Response
     {
         $error = null;
 
@@ -255,6 +259,12 @@ class AdminBookingController extends AbstractController
             if (!$error) {
                 $attendee->setStatus($status);
 
+                if ($status === Attendee::STATUS_CANCELLED) {
+                    $doorAccessService->revokePin($attendee);
+                } else {
+                    $doorAccessService->generatePinIfNeeded($attendee);
+                }
+
                 $em->flush();
 
                 $this->addFlash('success', 'Booking updated.');
@@ -263,9 +273,11 @@ class AdminBookingController extends AbstractController
         }
 
         return $this->render('admin/bookings/edit.html.twig', [
-            'attendee' => $attendee,
-            'error'    => $error,
-            'notes'    => $noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()),
+            'attendee'   => $attendee,
+            'error'      => $error,
+            'notes'      => $noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()),
+            'validFrom'  => $attendee->getEvent()->isSelfAccess() ? $doorAccessService->computeValidFrom($attendee) : null,
+            'validUntil' => $attendee->getEvent()->isSelfAccess() ? $doorAccessService->computeValidUntil($attendee) : null,
         ]);
     }
 

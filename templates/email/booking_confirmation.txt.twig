@@ -10,6 +10,10 @@ Time:     {{ event.timeFrom }}–{{ event.timeTo }}
 Location: {{ event.location }}
 Price:    Free
 
+{% if pin %}
+Your door PIN: {{ pin }} (only valid for this session)
+
+{% endif %}
 {% if event.description %}
 {{ event.description }}
 

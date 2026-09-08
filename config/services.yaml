@@ -13,6 +13,8 @@ services:
             string $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
             string $stripePublishableKey: '%env(STRIPE_PUBLISHABLE_KEY)%'
             string $stripeTerminalReaderId: '%env(STRIPE_TERMINAL_READER_ID)%'
+            string $doorApiKey: '%env(DOOR_API_KEY)%'
+            string $doorSimSecret: '%env(DOOR_SIM_SECRET)%'
 
     _instanceof:
         App\Service\Fulfilment\FulfilmentHandlerInterface:

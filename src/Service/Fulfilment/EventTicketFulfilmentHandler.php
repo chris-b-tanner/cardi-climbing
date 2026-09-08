@@ -5,6 +5,7 @@ namespace App\Service\Fulfilment;
 use App\Entity\Attendee;
 use App\Entity\Product;
 use App\Entity\SalesOrderRow;
+use App\Service\DoorAccessService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -13,7 +14,10 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 class EventTicketFulfilmentHandler implements FulfilmentHandlerInterface
 {
-    public function __construct(private readonly EntityManagerInterface $em) {}
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly DoorAccessService $doorAccessService,
+    ) {}
 
     public function supports(string $productType): bool
     {
@@ -39,6 +43,8 @@ class EventTicketFulfilmentHandler implements FulfilmentHandlerInterface
             $attendee->setStatus(Attendee::STATUS_CONFIRMED);
             $attendee->setSalesOrderRow($row);
             $attendee->setPaidAmount($row->getChargedPrice());
+
+            $this->doorAccessService->generatePinIfNeeded($attendee);
 
             $this->em->persist($attendee);
         }

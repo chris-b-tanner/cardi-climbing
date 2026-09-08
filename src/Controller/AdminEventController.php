@@ -29,16 +29,19 @@ class AdminEventController extends AbstractController
     {
         $query  = trim($request->query->get('q', ''));
         $events = $eventRepository->search($query);
+        $ticketedEventIds = $eventRepository->idsWithAnyTicketProduct($events);
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/events/_list.html.twig', [
-                'events' => $events,
+                'events'           => $events,
+                'ticketedEventIds' => $ticketedEventIds,
             ]);
         }
 
         return $this->render('admin/events/index.html.twig', [
-            'events'       => $events,
-            'currentQuery' => $query,
+            'events'           => $events,
+            'currentQuery'     => $query,
+            'ticketedEventIds' => $ticketedEventIds,
         ]);
     }
 
@@ -430,6 +433,7 @@ class AdminEventController extends AbstractController
         $event->setIsRecurring($isRecurring);
         $event->setRecurUntil($isRecurring ? $recurUntil : null);
         $event->setRecurDaysArray($isRecurring ? array_map('intval', $request->request->all('recurDays')) : []);
+        $event->setIsSelfAccess($request->request->has('isSelfAccess'));
 
         $submittedCertIds = array_map('intval', $request->request->all('restrictions'));
         foreach ($event->getRestrictions()->toArray() as $certification) {

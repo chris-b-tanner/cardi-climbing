@@ -67,6 +67,10 @@ class Event
     #[ORM\Column]
     private bool $isRecurring = false;
 
+    /** Whether attendees of this event get a self-access door PIN (see DoorAccessService). */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isSelfAccess = false;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $recurUntil = null;
 
@@ -172,6 +176,29 @@ class Event
         return $this;
     }
 
+    /**
+     * Combines {$date} — this event's own date for a one-off, or a specific occurrence's date for
+     * a recurring event — with a "HH:MM" time (timeFrom/timeTo) into an absolute UTC instant.
+     *
+     * timeFrom/timeTo are entered and displayed as UK wall-clock time (an admin typing "18:00"
+     * means 6pm in Cardigan, not 6pm UTC), so this has to read them as Europe/London and convert,
+     * not treat them as already being UTC — PHP's tz database resolves the right BST/GMT offset
+     * for the given date automatically. Always pass the specific occurrence's date here, never
+     * this event's own `date` for a recurring event's later occurrences — otherwise every
+     * occurrence silently keeps whichever offset was in effect when the series started, instead
+     * of the one that actually applies on its own date, once the series crosses a DST change.
+     */
+    public function combineDateAndTime(\DateTimeImmutable $date, string $time): \DateTimeImmutable
+    {
+        $local = \DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i',
+            $date->format('Y-m-d') . ' ' . $time,
+            new \DateTimeZone('Europe/London'),
+        );
+
+        return $local->setTimezone(new \DateTimeZone('UTC'));
+    }
+
     public function getMaxAttendees(): ?int
     {
         return $this->maxAttendees;
@@ -240,6 +267,17 @@ class Event
     public function setIsRecurring(bool $isRecurring): static
     {
         $this->isRecurring = $isRecurring;
+        return $this;
+    }
+
+    public function isSelfAccess(): bool
+    {
+        return $this->isSelfAccess;
+    }
+
+    public function setIsSelfAccess(bool $isSelfAccess): static
+    {
+        $this->isSelfAccess = $isSelfAccess;
         return $this;
     }
 

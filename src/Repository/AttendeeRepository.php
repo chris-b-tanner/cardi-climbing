@@ -228,6 +228,44 @@ class AttendeeRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /** Whether an attendee currently holds this exact PIN as their active door credential — used to avoid issuing duplicates. */
+    public function pinIsActive(string $pin): bool
+    {
+        return $this->count(['pin' => $pin, 'pinStatus' => Attendee::PIN_STATUS_ACTIVE]) > 0;
+    }
+
+    /** Every booking (any status) ever issued this exact PIN — debug-only lookup for the door simulator, ignoring the active/near-future filtering findActivePinAttendees() applies. */
+    public function findByPinAnyStatus(string $pin): array
+    {
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
+            ->innerJoin('a.user', 'u')->addSelect('u')
+            ->where('a.pin = :pin')
+            ->setParameter('pin', $pin)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Every non-cancelled, PIN-bearing booking with an active door credential — the candidate pool
+     * a door's credential sync filters down to its own near-future window. Small enough in practice
+     * (one climbing wall, one door) to filter the actual time window in memory rather than in SQL,
+     * since valid_from/valid_until are derived from the event's schedule, not stored columns.
+     *
+     * @return Attendee[]
+     */
+    public function findActivePinAttendees(): array
+    {
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
+            ->where('a.pinStatus = :active')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('active', Attendee::PIN_STATUS_ACTIVE)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->getQuery()
+            ->getResult();
+    }
+
     private function whereOccurrence(QueryBuilder $qb, ?\DateTimeImmutable $occurrenceDate): void
     {
         if ($occurrenceDate !== null) {

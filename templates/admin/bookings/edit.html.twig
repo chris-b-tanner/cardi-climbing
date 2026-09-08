@@ -56,6 +56,58 @@
   </div>
 </form>
 
+{% if attendee.event.isSelfAccess %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.75rem;">Door access</div>
+    <div class="detail-grid">
+      <div>
+        <div class="card__label">PIN</div>
+        <div class="card__value" id="door-access-pin" style="font-family:monospace;font-size:1.1rem;">{{ attendee.pin ?: '—' }}</div>
+      </div>
+      <div>
+        <div class="card__label">PIN status</div>
+        <div class="card__value" id="door-access-pin-status">{{ attendee.pinStatus ? attendee.pinStatus|capitalize : '—' }}</div>
+      </div>
+      {% if validFrom and validUntil %}
+        <div>
+          <div class="card__label">Valid</div>
+          <div class="card__value">{{ validFrom|date('d M Y, H:i') }} – {{ validUntil|date('H:i') }}</div>
+        </div>
+      {% endif %}
+      <div>
+        <div class="card__label">Checked in</div>
+        <div class="card__value" id="door-access-checked-in">
+          {% if attendee.checkedInAt %}
+            {{ attendee.checkedInAt|date('d M Y, H:i') }}
+            {% if attendee.checkedInMethod == 'manual' and attendee.checkedInBy %}
+              &middot; by {{ (attendee.checkedInBy.firstName ~ ' ' ~ attendee.checkedInBy.lastName)|trim ?: attendee.checkedInBy.email }}
+            {% elseif attendee.checkedInMethod == 'door_pin' %}
+              &middot; via door PIN
+            {% endif %}
+          {% else %}
+            Not yet
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div id="door-access-error" class="flash flash--error" style="display:none;margin-top:1rem;"></div>
+
+    <div class="btn-row" style="margin-top:1rem;">
+      {% if not attendee.checkedIn %}
+        <button type="button" id="door-access-checkin" class="btn btn--teal btn--sm"
+                data-url="{{ path('app_api_attendee_check_in', {id: attendee.id}) }}"
+                data-csrf="{{ csrf_token('attendee_check_in_' ~ attendee.id) }}">Check in now</button>
+      {% endif %}
+      {% if attendee.pin %}
+        <button type="button" id="door-access-regenerate" class="btn btn--ghost btn--sm"
+                data-url="{{ path('app_api_attendee_regenerate_pin', {id: attendee.id}) }}"
+                data-csrf="{{ csrf_token('attendee_regenerate_pin_' ~ attendee.id) }}">Regenerate PIN</button>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
 <div class="card" style="margin-top:1.5rem;">
   <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
   {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'attendee', noteableId: attendee.id} %}
@@ -75,4 +127,43 @@
     </form>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if attendee.event.isSelfAccess %}
+<script>
+  function doorAccessCall(button) {
+    const errorBox = document.getElementById('door-access-error');
+    errorBox.style.display = 'none';
+    button.disabled = true;
+
+    fetch(button.dataset.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _csrf_token: button.dataset.csrf }),
+    })
+      .then(r => r.json().then(data => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          errorBox.textContent = data.error || 'Something went wrong.';
+          errorBox.style.display = 'block';
+          button.disabled = false;
+          return;
+        }
+        window.location.reload();
+      })
+      .catch(() => {
+        errorBox.textContent = 'Something went wrong.';
+        errorBox.style.display = 'block';
+        button.disabled = false;
+      });
+  }
+
+  const doorAccessCheckin    = document.getElementById('door-access-checkin');
+  const doorAccessRegenerate = document.getElementById('door-access-regenerate');
+
+  if (doorAccessCheckin)    doorAccessCheckin.addEventListener('click', () => doorAccessCall(doorAccessCheckin));
+  if (doorAccessRegenerate) doorAccessRegenerate.addEventListener('click', () => doorAccessCall(doorAccessRegenerate));
+</script>
+{% endif %}
 {% endblock %}

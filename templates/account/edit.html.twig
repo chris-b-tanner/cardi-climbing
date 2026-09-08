@@ -266,6 +266,9 @@
               {% if attendee.isStaffing %}
                 <br>Staffing ({{ attendee.staffingRequirement.certification.name }}): {{ attendee.staffingStatusLabel }}
               {% endif %}
+              {% if event.isSelfAccess and attendee.pin and attendee.status != 'cancelled' %}
+                <br>Door PIN: <strong style="font-family:monospace;letter-spacing:0.1em;">{{ attendee.pin }}</strong>
+              {% endif %}
             </div>
             {% if attendee.status != 'cancelled' and effectiveDate >= today %}
               <form method="post" action="{{ path('app_event_cancel', {id: event.id}) }}" class="item-card__actions">

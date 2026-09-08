@@ -14,6 +14,7 @@ use App\Repository\ProductRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
 use App\Service\CartService;
+use App\Service\DoorAccessService;
 use App\Service\EventBookingCreditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -219,6 +220,7 @@ class EventController extends AbstractController
         AttendeeRepository $attendeeRepository,
         BookingMailer $bookingMailer,
         EventBookingCreditService $eventBookingCreditService,
+        DoorAccessService $doorAccessService,
     ): Response {
         if (!$this->isCsrfTokenValid('book_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -241,14 +243,14 @@ class EventController extends AbstractController
 
         $staffingRequirement = $this->resolveStaffingRequirement($event, $user, $request->request->get('staffingRequirementId', ''), $em);
 
-        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService, $staffingRequirement);
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService, $doorAccessService, $staffingRequirement);
 
         if (is_string($result)) {
             $this->addFlash('error', $result);
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
 
         return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
     }
@@ -271,6 +273,7 @@ class EventController extends AbstractController
         BookingMailer $bookingMailer,
         Security $security,
         EventBookingCreditService $eventBookingCreditService,
+        DoorAccessService $doorAccessService,
     ): Response {
         if (!$this->isCsrfTokenValid('book_guest_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -339,14 +342,14 @@ class EventController extends AbstractController
 
         $security->login($user);
 
-        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService);
+        $result = $this->tryCreateBooking($event, $user, $occurrenceDate, $attendeeRepository, $em, $eventBookingCreditService, $doorAccessService);
 
         if (is_string($result)) {
             $this->addFlash('error', $result);
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
 
         return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
     }
@@ -371,6 +374,7 @@ class EventController extends AbstractController
         Event $event,
         EntityManagerInterface $em,
         AttendeeRepository $attendeeRepository,
+        DoorAccessService $doorAccessService,
     ): Response {
         if (!$this->isCsrfTokenValid('cancel_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -393,6 +397,7 @@ class EventController extends AbstractController
         }
 
         $attendee->setStatus(Attendee::STATUS_CANCELLED);
+        $doorAccessService->revokePin($attendee);
         $em->flush();
 
         $this->addFlash('success', 'Your booking has been cancelled.');
@@ -448,6 +453,7 @@ class EventController extends AbstractController
         AttendeeRepository $attendeeRepository,
         EntityManagerInterface $em,
         EventBookingCreditService $eventBookingCreditService,
+        DoorAccessService $doorAccessService,
         ?EventStaffingRequirement $staffingRequirement = null,
     ): Attendee|string {
         if (!$event->allowsUser($user)) {
@@ -495,6 +501,8 @@ class EventController extends AbstractController
             $eventBookingCreditService->spendCredit($user, $event, $attendee);
         }
 
+        $doorAccessService->generatePinIfNeeded($attendee);
+
         $em->flush();
 
         return $attendee;
@@ -535,8 +543,9 @@ class EventController extends AbstractController
     {
         // Past means fully ended, not just "started" — an occurrence that's under way right now
         // (or hasn't reached its end time yet today) still shows the booking/ticket form.
-        $occurrenceEnd = \DateTimeImmutable::createFromFormat('Y-m-d H:i', $date->format('Y-m-d') . ' ' . $event->getTimeTo());
-        $isPast        = $occurrenceEnd !== false && $occurrenceEnd < new \DateTimeImmutable();
+        // combineDateAndTime() reads timeTo as UK wall-clock and converts to UTC (not literal
+        // UTC) so this stays correct across a DST change, same as the door-access API.
+        $isPast = $event->combineDateAndTime($date, $event->getTimeTo()) < new \DateTimeImmutable();
 
         $isFull    = false;
         $spotsLeft = null;

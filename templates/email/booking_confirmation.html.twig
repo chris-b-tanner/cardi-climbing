@@ -37,6 +37,18 @@
     </tr>
   </table>
 
+  {% if pin %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;border:2px solid #1e4f41;">
+      <tr>
+        <td style="padding:16px;text-align:center;">
+          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#9a9895;margin:0 0 6px;">Your door PIN</p>
+          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;letter-spacing:0.2em;color:#141414;margin:0;">{{ pin }}</p>
+          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;margin:6px 0 0;">Only valid for this session.</p>
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
   {% if event.description %}
     <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 28px;">
       {{ event.description }}

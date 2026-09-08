@@ -22,6 +22,14 @@
       </div>
     </div>
 
+    {% if event.isSelfAccess and attendee.pin %}
+      <div class="booking-confirm-card">
+        <h2 class="booking-confirm-card__title">Your door PIN</h2>
+        <p style="font-family:monospace;font-size:2rem;letter-spacing:0.15em;margin:0.5rem 0;">{{ attendee.pin }}</p>
+        <p class="booking-confirm-card__meta">Enter this on the door keypad to let yourself in. It only works for this session — a few minutes either side of the times above.</p>
+      </div>
+    {% endif %}
+
     <br>
     <p>We've sent a confirmation email to <strong>{{ attendee.user.email }}</strong> with all the details.</p>
     <br>

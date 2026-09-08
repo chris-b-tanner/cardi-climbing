@@ -54,6 +54,7 @@ class SubscribeController extends AbstractController
             $user->setEmail($email);
             $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
             $em->persist($user);
+            $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
             $note = new Note();
             $note->setNoteable($user);

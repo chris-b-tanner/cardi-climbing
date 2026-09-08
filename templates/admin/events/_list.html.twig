@@ -23,6 +23,15 @@
           <tr>
             <td>
               <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
+              {% if event.isSelfAccess %}
+                <i class="bi bi-lock-fill" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Self access (door PIN)"></i>
+              {% endif %}
+              {% if event.restrictions is not empty %}
+                <i class="bi bi-shield-check" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Restricted to: {% for c in event.restrictions %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}"></i>
+              {% endif %}
+              {% if event.id in ticketedEventIds %}
+                <i class="bi bi-box-seam" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Linked to ticket product(s)"></i>
+              {% endif %}
             </td>
             <td class="admin-table__muted">{{ event.date|date('d M Y') }}</td>
             <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>

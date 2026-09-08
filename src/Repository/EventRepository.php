@@ -57,6 +57,25 @@ class EventRepository extends ServiceEntityRepository
         return $this->getEntityManager()->getRepository(EventTicketProduct::class)->findOneBy(['event' => $event]) !== null;
     }
 
+    /** IDs, among {events}, of those with at least one ticket product (active or not) — batched for a list view instead of one hasAnyTicketProduct() query per row. */
+    public function idsWithAnyTicketProduct(array $events): array
+    {
+        if (!$events) {
+            return [];
+        }
+
+        $rows = $this->getEntityManager()->createQueryBuilder()
+            ->select('IDENTITY(etp.event) AS eventId')
+            ->distinct()
+            ->from(EventTicketProduct::class, 'etp')
+            ->where('etp.event IN (:events)')
+            ->setParameter('events', $events)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map('intval', array_column($rows, 'eventId'));
+    }
+
     /** @return Event[] */
     public function search(string $query = ''): array
     {

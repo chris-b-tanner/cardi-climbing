@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Door keypad simulator — Y Wal</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    min-height: 100%;
+    background: #0f1512;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  .layout {
+    min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    gap: 1.5rem; flex-wrap: wrap; padding: 3.5rem 1rem 2rem;
+  }
+  .notice {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #b0bd80; color: #141414; text-align: center;
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 0.4rem; z-index: 10;
+  }
+  .unit {
+    background: #1c2420; border: 1px solid #33403a; border-radius: 18px;
+    padding: 1.75rem 1.5rem 2rem; width: 300px; max-width: calc(100vw - 2rem);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .brand {
+    text-align: center; color: #6b7a70; font-size: 0.65rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1rem;
+  }
+  .screen {
+    background: #05100a; border-radius: 8px; padding: 1rem;
+    min-height: 3.5rem; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1.25rem; border: 1px solid #253028;
+  }
+  .screen__dots { display: flex; gap: 0.6rem; }
+  .screen__dot {
+    width: 0.85rem; height: 0.85rem; border-radius: 50%; border: 2px solid #3d4d44;
+    background: transparent; transition: background 0.1s, border-color 0.1s;
+  }
+  .screen__dot.filled { background: #b0bd80; border-color: #b0bd80; }
+  .screen__message {
+    font-size: 0.95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    text-align: center;
+  }
+  .screen__message--granted { color: #7ee787; }
+  .screen__message--denied  { color: #ff7b72; }
+  .screen__message--locked  { color: #ffb454; font-size: 0.8rem; }
+
+  .keys {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem;
+  }
+  .key {
+    background: #26312b; color: #e8ede9; border: 1px solid #384540;
+    border-radius: 10px; font-size: 1.3rem; font-weight: 600;
+    padding: 1rem 0; cursor: pointer; user-select: none;
+    transition: background 0.1s, transform 0.05s;
+  }
+  .key:active { background: #384540; transform: scale(0.96); }
+  .key--fn { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9fb0a6; }
+  .key:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-led {
+    width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #3d4d44;
+    display: inline-block; margin-right: 0.4rem; vertical-align: middle;
+    transition: background 0.15s;
+  }
+  .status-led.granted { background: #7ee787; }
+  .status-led.denied  { background: #ff7b72; }
+
+  .footer-note {
+    text-align: center; color: #4d5951; font-size: 0.65rem; margin-top: 1.25rem; line-height: 1.5;
+  }
+
+  .debug-panel {
+    background: #10151f; border: 1px solid #2a3444; border-radius: 12px;
+    width: 420px; max-width: calc(100vw - 2rem);
+    padding: 1rem 1.1rem; color: #b9c4d4;
+    font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.72rem; line-height: 1.6;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .debug-panel h2 {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #7ee787; margin-bottom: 0.6rem; font-family: inherit;
+  }
+  .debug-panel .row { margin-bottom: 0.9rem; }
+  .debug-panel .note {
+    background: #241a0f; border: 1px solid #4a3418; color: #ffb454;
+    border-radius: 6px; padding: 0.5rem 0.6rem; margin-bottom: 0.9rem;
+  }
+  .debug-panel table { width: 100%; border-collapse: collapse; margin-bottom: 0.6rem; }
+  .debug-panel th, .debug-panel td {
+    text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid #1f2836; white-space: nowrap;
+  }
+  .debug-panel th { color: #6b7a90; font-weight: 600; }
+  .debug-panel .yes { color: #7ee787; }
+  .debug-panel .no  { color: #ff7b72; }
+  .debug-panel .empty { color: #6b7a90; font-style: italic; }
+  .debug-panel .placeholder { color: #6b7a90; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="notice">UAT simulator — not the physical door{% if debug %} — DEBUG MODE{% endif %}</div>
+
+<div class="layout">
+<div class="unit">
+  <div class="brand"><span class="status-led" id="led"></span>Y Wal self-access</div>
+
+  <div class="screen" id="screen">
+    <div class="screen__dots" id="dots">
+      <div class="screen__dot"></div>
+      <div class="screen__dot"></div>
+      <div class="screen__dot"></div>
+      <div class="screen__dot"></div>
+      <div class="screen__dot"></div>
+      <div class="screen__dot"></div>
+    </div>
+  </div>
+
+  <div class="keys" id="keys">
+    <button class="key" data-digit="1">1</button>
+    <button class="key" data-digit="2">2</button>
+    <button class="key" data-digit="3">3</button>
+    <button class="key" data-digit="4">4</button>
+    <button class="key" data-digit="5">5</button>
+    <button class="key" data-digit="6">6</button>
+    <button class="key" data-digit="7">7</button>
+    <button class="key" data-digit="8">8</button>
+    <button class="key" data-digit="9">9</button>
+    <button class="key key--fn" id="key-clear">Clear</button>
+    <button class="key" data-digit="0">0</button>
+    <button class="key key--fn" id="key-enter">Enter</button>
+  </div>
+
+  <p class="footer-note">Enter the 6-digit PIN from a booking confirmation.<br>Using a real PIN here checks that booking in for real.</p>
+</div>
+
+{% if debug %}
+<div class="debug-panel" id="debug-panel">
+  <h2>Debug</h2>
+  <p class="placeholder">Enter a PIN to see the server's view of it.</p>
+</div>
+{% endif %}
+</div>
+
+<script>
+(function () {
+  const attemptUrl = {{ path('app_door_sim_attempt', {secret: secret})|json_encode|raw }};
+  const debugMode  = {{ debug ? 'true' : 'false' }};
+
+  const dotsEl      = document.getElementById('dots');
+  const screenEl    = document.getElementById('screen');
+  const keysEl      = document.getElementById('keys');
+  const ledEl       = document.getElementById('led');
+  const debugPanel  = document.getElementById('debug-panel');
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  function renderDebug(pin, debug) {
+    if (!debugPanel || !debug) return;
+
+    let html = '<h2>Debug</h2>';
+    html += '<div class="row"><strong>Entered PIN:</strong> ' + escapeHtml(pin) + '<br>';
+    html += '<strong>Server time (UTC):</strong> ' + escapeHtml(debug.server_time_utc) + '<br>';
+    html += '<strong>Server PHP timezone:</strong> ' + escapeHtml(debug.server_php_timezone) + '</div>';
+    html += '<div class="note">' + escapeHtml(debug.note) + '</div>';
+
+    html += '<div class="row"><strong>Active/near-future candidates for this door (' + debug.candidates.length + '):</strong>';
+    if (debug.candidates.length) {
+      html += '<table><tr><th>id</th><th>pin</th><th>valid_from</th><th>valid_until</th><th>pin match</th><th>in window</th></tr>';
+      debug.candidates.forEach(c => {
+        html += '<tr><td>' + c.credential_id + '</td><td>' + escapeHtml(c.pin) + '</td><td>' + escapeHtml(c.valid_from) + '</td><td>' + escapeHtml(c.valid_until) + '</td>'
+          + '<td class="' + (c.matches_pin ? 'yes">yes' : 'no">no') + '</td>'
+          + '<td class="' + (c.now_in_window ? 'yes">yes' : 'no">no') + '</td></tr>';
+      });
+      html += '</table>';
+    } else {
+      html += '<p class="empty">No active, near-future credentials found for this door at all.</p>';
+    }
+    html += '</div>';
+
+    html += '<div class="row"><strong>Every booking ever issued this exact PIN (' + debug.pin_lookup.length + '):</strong>';
+    if (debug.pin_lookup.length) {
+      debug.pin_lookup.forEach(p => {
+        html += '<div style="margin:0.4rem 0 0.7rem;padding:0.4rem 0.5rem;border:1px solid #1f2836;border-radius:6px;">'
+          + 'attendee #' + p.attendee_id + ' — ' + escapeHtml(p.user) + '<br>'
+          + 'event: ' + escapeHtml(p.event_title) + ' (self_access=' + p.event_is_self_access + ')<br>'
+          + 'attendee status: ' + escapeHtml(p.attendee_status) + ' &middot; pin status: ' + escapeHtml(p.pin_status) + '<br>'
+          + 'event date: ' + escapeHtml(p.event_date) + (p.occurrence_date ? ' (occurrence ' + escapeHtml(p.occurrence_date) + ')' : '') + '<br>'
+          + 'event time: ' + escapeHtml(p.event_time_from) + '&ndash;' + escapeHtml(p.event_time_to) + '<br>'
+          + 'computed valid_from (UTC): ' + escapeHtml(p.valid_from_utc) + '<br>'
+          + 'computed valid_until (UTC): ' + escapeHtml(p.valid_until_utc)
+          + '</div>';
+      });
+    } else {
+      html += '<p class="empty">No attendee row anywhere has this PIN.</p>';
+    }
+    html += '</div>';
+
+    debugPanel.innerHTML = html;
+  }
+
+  let entered = '';
+  let fails = 0;
+  let locked = false;
+
+  function renderDots() {
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+      const d = document.createElement('div');
+      d.className = 'screen__dot' + (i < entered.length ? ' filled' : '');
+      dotsEl.appendChild(d);
+    }
+    screenEl.innerHTML = '';
+    screenEl.appendChild(dotsEl);
+  }
+
+  function setKeysDisabled(disabled) {
+    keysEl.querySelectorAll('button').forEach(b => b.disabled = disabled);
+  }
+
+  function showMessage(text, cls) {
+    screenEl.innerHTML = '<div class="screen__message ' + cls + '">' + text + '</div>';
+  }
+
+  function flashLed(cls) {
+    ledEl.className = 'status-led ' + cls;
+    setTimeout(() => { ledEl.className = 'status-led'; }, 1500);
+  }
+
+  function reset() {
+    entered = '';
+    renderDots();
+  }
+
+  function lockout() {
+    locked = true;
+    setKeysDisabled(true);
+    let remaining = 30;
+    showMessage('Locked out — ' + remaining + 's', 'screen__message--locked');
+    const timer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(timer);
+        locked = false;
+        fails = 0;
+        setKeysDisabled(false);
+        reset();
+        return;
+      }
+      showMessage('Locked out — ' + remaining + 's', 'screen__message--locked');
+    }, 1000);
+  }
+
+  function submit() {
+    setKeysDisabled(true);
+    const attemptedPin = entered;
+
+    fetch(attemptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: attemptedPin, debug: debugMode }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        renderDebug(attemptedPin, data.debug);
+
+        if (data.result === 'granted') {
+          fails = 0;
+          flashLed('granted');
+          showMessage((data.name ? 'Welcome, ' + data.name : 'Access granted'), 'screen__message--granted');
+          setTimeout(() => { setKeysDisabled(false); reset(); }, 4000);
+        } else {
+          fails++;
+          flashLed('denied');
+          showMessage('Access denied', 'screen__message--denied');
+          setTimeout(() => {
+            if (fails >= 5) {
+              lockout();
+            } else {
+              setKeysDisabled(false);
+              reset();
+            }
+          }, 1500);
+        }
+      })
+      .catch(() => {
+        showMessage('Connection error', 'screen__message--denied');
+        setTimeout(() => { setKeysDisabled(false); reset(); }, 1500);
+      });
+  }
+
+  keysEl.addEventListener('click', (e) => {
+    if (locked) return;
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    if (btn.id === 'key-clear') {
+      reset();
+      return;
+    }
+
+    if (btn.id === 'key-enter') {
+      if (entered.length === 6) submit();
+      return;
+    }
+
+    if (btn.dataset.digit !== undefined && entered.length < 6) {
+      entered += btn.dataset.digit;
+      renderDots();
+      if (entered.length === 6) submit();
+    }
+  });
+
+  renderDots();
+})();
+</script>
+
+</body>
+</html>
