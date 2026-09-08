@@ -56,7 +56,7 @@ class SubscribeController extends AbstractController
             $em->persist($user);
 
             $note = new Note();
-            $note->setUser($user);
+            $note->setNoteable($user);
             $note->setContent('Contact added via website subscription form.');
             $em->persist($note);
         }

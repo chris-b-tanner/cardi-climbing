@@ -18,6 +18,13 @@
       <div class="card__value">{{ displayName ?: user.email }}</div>
     </div>
     <div>
+      <div class="card__label">Notification email</div>
+      <div class="card__value">
+        {{ user.certificationNotificationEmail ?: '—' }}
+        {% if user.parent %}<span style="color:var(--muted);font-size:0.8rem;"> (parent's — {{ displayName ?: 'this member' }} has no login of their own)</span>{% endif %}
+      </div>
+    </div>
+    <div>
       <div class="card__label">Status</div>
       <div class="card__value">
         <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
@@ -106,8 +113,12 @@
   <div class="card" style="margin-top:1.5rem;">
     <div class="card__label" style="margin-bottom:0.6rem;">Awaiting completion</div>
     <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
-      This induction has been started. The member has been emailed a link to log into their account and
-      complete the declarations and signature themselves from the Certifications tab.
+      This induction has been started.
+      {% if user.parent %}
+        Their parent has been emailed a link to log into their own account and complete the declarations and signature on {{ displayName ?: 'this member' }}'s behalf.
+      {% else %}
+        The member has been emailed a link to log into their account and complete the declarations and signature themselves from the Certifications tab.
+      {% endif %}
     </p>
     <form method="post" action="{{ path('app_admin_user_certification_resend', {id: user.id, recordId: record.id}) }}">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('resend_certification_' ~ record.id) }}">

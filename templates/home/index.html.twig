@@ -4,6 +4,14 @@
 {% set subSuccess = app.flashes('subscribe_success') %}
 {% set subError   = app.flashes('subscribe_error') %}
 
+{# ── Survey banner ─────────────────────────────────────── #}
+<div class="survey-banner survey-banner--top">
+  <div class="wrap survey-banner__inner">
+    <p class="survey-banner__text">Help shape Y Wal — tell us what you want from the climbing wall.</p>
+    <a href="/survey" class="btn btn--dark-grey btn--sm">Take the survey</a>
+  </div>
+</div>
+
 {# ── Hero ──────────────────────────────────────────────── #}
 <section class="hero" id="home">
   <div class="wrap">
@@ -280,6 +288,14 @@
         </form>
       {% endif %}
     </div>
+  </div>
+</div>
+
+{# ── Survey banner (bottom) ────────────────────────────── #}
+<div class="survey-banner">
+  <div class="wrap survey-banner__inner">
+    <p class="survey-banner__text">Help shape Y Wal — tell us what you want from the climbing wall.</p>
+    <a href="/survey" class="btn btn--dark-grey btn--sm">Take the survey</a>
   </div>
 </div>
 

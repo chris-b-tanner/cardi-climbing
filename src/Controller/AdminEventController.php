@@ -5,15 +5,13 @@ namespace App\Controller;
 use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\EventStaffingRequirement;
-use App\Entity\Product;
-use App\Entity\SalesOrder;
-use App\Entity\SalesOrderRow;
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\EventRepository;
+use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
-use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -89,7 +87,7 @@ class AdminEventController extends AbstractController
      * admins alike. For a recurring event, ?date= picks which occurrence's attendees are shown.
      */
     #[Route('/{id}', name: 'app_admin_event_show', requirements: ['id' => '\d+'])]
-    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository): Response
+    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, NoteRepository $noteRepository): Response
     {
         $occurrenceDate = null;
         $prevDate       = null;
@@ -130,109 +128,8 @@ class AdminEventController extends AbstractController
             'staffing'            => $staffing,
             'eventTicketProducts' => $eventTicketProducts,
             'attendeesByTab'      => $attendeesByTab,
+            'notes'               => $noteRepository->findForNoteable(Note::TYPE_EVENT, $event->getId()),
         ]);
-    }
-
-    /**
-     * Adds an attendee via the "choose a contact" modal on the attendees card. Passing {productId}
-     * (the ticket tab that was clicked) creates a SalesOrder with that ticket already added, landing
-     * on the sale so payment can be taken; no product (the "Free" tab) books the member directly,
-     * same validation as the full booking form.
-     */
-    #[Route('/{id}/attendees/add-contact', name: 'app_admin_event_add_attendee_contact', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function addAttendeeContact(
-        Request $request,
-        Event $event,
-        ProductRepository $productRepository,
-        UserRepository $userRepository,
-        AttendeeRepository $attendeeRepository,
-        EntityManagerInterface $em,
-    ): Response {
-        if (!$this->isCsrfTokenValid('admin_event_add_attendee_' . $event->getId(), $request->request->get('_csrf_token'))) {
-            $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
-        }
-
-        $user = $userRepository->find((int) $request->request->get('userId', 0));
-        if (!$user instanceof User) {
-            $this->addFlash('error', 'Choose a member.');
-            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
-        }
-
-        $occurrenceDate = null;
-        if ($event->isRecurring()) {
-            $raw            = trim($request->request->get('occurrenceDate', ''));
-            $occurrenceDate = $raw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $raw) ?: null) : null;
-
-            if ($occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
-                $this->addFlash('error', 'Choose a valid date for this event.');
-                return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
-            }
-        }
-
-        $showParams = ['id' => $event->getId()];
-        if ($occurrenceDate) {
-            $showParams['date'] = $occurrenceDate->format('Y-m-d');
-        }
-
-        if ($attendeeRepository->findActiveBooking($event, $user, $occurrenceDate)) {
-            $this->addFlash('error', 'This member is already booked onto this event.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
-        }
-        if (!$event->allowsUser($user)) {
-            $this->addFlash('error', 'This member does not hold the certification required for this event.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
-        }
-        if ($event->getMaxAttendees() !== null && $attendeeRepository->countActiveForOccurrence($event, $occurrenceDate) >= $event->getMaxAttendees()) {
-            $this->addFlash('error', 'This event is full.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
-        }
-
-        $productId = (int) $request->request->get('productId', 0);
-        $product   = $productId ? $productRepository->find($productId) : null;
-
-        /** @var User $admin */
-        $admin = $this->getUser();
-
-        if ($product instanceof Product) {
-            $eventTicketProduct = $product->getEventTicketProduct();
-            if (!$product->isActive() || !$eventTicketProduct || $eventTicketProduct->getEvent() !== $event) {
-                $this->addFlash('error', 'Choose a valid ticket.');
-                return $this->redirectToRoute('app_admin_event_show', $showParams);
-            }
-
-            $order = new SalesOrder();
-            $order->setUser($user);
-            $order->setCreatedBy($admin);
-            $em->persist($order);
-
-            $row = new SalesOrderRow();
-            $row->setProduct($product);
-            $row->setQty(1);
-            $row->setListPriceAtSale($product->getPrice());
-            $row->setChargedPrice($product->getPrice());
-            $row->setVatCodeAtSale($product->getVatCode());
-            $row->setOccurrenceDate($occurrenceDate);
-            $order->addRow($row);
-            $em->persist($row);
-
-            $em->flush();
-
-            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
-        }
-
-        $attendee = new Attendee();
-        $attendee->setEvent($event);
-        $attendee->setUser($user);
-        $attendee->setOccurrenceDate($occurrenceDate);
-        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
-        $attendee->setAddedBy($admin);
-
-        $em->persist($attendee);
-        $em->flush();
-
-        $this->addFlash('success', 'Attendee added.');
-        return $this->redirectToRoute('app_admin_event_show', $showParams);
     }
 
     /** A print-friendly page listing this occurrence's non-cancelled attendees — name, email, and membership number. */
@@ -451,11 +348,21 @@ class AdminEventController extends AbstractController
 
     #[Route('/{id}/delete', name: 'app_admin_event_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function delete(Request $request, Event $event, EntityManagerInterface $em): Response
+    public function delete(Request $request, Event $event, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         if (!$this->isCsrfTokenValid('delete_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
             return $this->redirectToRoute('app_home');
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_EVENT, $event->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_EVENT, $event->getId()) as $note) {
+            $em->remove($note);
         }
 
         $em->remove($event);

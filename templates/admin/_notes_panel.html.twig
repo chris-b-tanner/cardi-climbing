@@ -1,0 +1,69 @@
+{#
+  Shared notes panel — included on the Member, Attendee (booking), Event, Product, and Order admin
+  pages. Expects `notes` (Note[], pinned first), `noteableType`, and `noteableId`.
+#}
+{% if notes is empty %}
+  <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
+{% else %}
+  <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
+    {% for note in notes %}
+      {% if note.pinned %}
+        <div style="background:#fefce8;border:1px solid #fde047;border-radius:var(--radius);padding:0.65rem 0.85rem;">
+      {% elseif note.completed %}
+        <div style="border-left:3px solid #16a34a;padding:0.5rem 0.75rem;">
+      {% else %}
+        <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
+      {% endif %}
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
+          <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
+          {% if note.pinned %}
+            <span class="status-pill status-pill--pinned" style="flex-shrink:0;">Pinned</span>
+          {% elseif note.completed %}
+            <span class="status-pill status-pill--published" style="flex-shrink:0;">Completed</span>
+          {% endif %}
+        </div>
+        <p style="font-size:0.75rem;color:var(--muted);">
+          {{ note.createdAt|date('j M Y, H:i') }}
+          {% if note.addedBy %}
+            · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
+          {% else %}
+            · System
+          {% endif %}
+          {% if note.pinned and note.pinnedBy %}
+            · Pinned by {{ (note.pinnedBy.firstName ~ ' ' ~ note.pinnedBy.lastName)|trim ?: note.pinnedBy.email }}
+          {% endif %}
+          {% if note.completed %}
+            · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ (note.completedBy.firstName ~ ' ' ~ note.completedBy.lastName)|trim ?: note.completedBy.email }}{% endif %}
+          {% endif %}
+          · <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}" style="display:inline;">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">
+              <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">{{ note.pinned ? 'Unpin' : 'Pin' }}</button>
+            </form>
+          {% if note.pinned %}
+            · <form method="post" action="{{ path('app_admin_note_complete', {id: note.id}) }}" style="display:inline;">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_complete_' ~ note.id) }}">
+                <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:#16a34a;text-decoration:underline;cursor:pointer;">Complete</button>
+              </form>
+          {% endif %}
+          {% if note.addedBy and note.addedBy == app.user %}
+            · <form method="post" action="{{ path('app_admin_note_delete', {id: note.id}) }}"
+                    style="display:inline;"
+                    onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_delete_' ~ note.id) }}">
+                <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete</button>
+              </form>
+          {% endif %}
+        </p>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
+  <div class="form-group" style="margin-bottom:0.5rem;">
+    <textarea name="content" class="form-control" rows="3"
+              placeholder="Add a note…" style="resize:vertical;"></textarea>
+  </div>
+  <button type="submit" class="btn btn--teal btn--sm">Add note</button>
+</form>

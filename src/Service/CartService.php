@@ -104,6 +104,11 @@ class CartService
                 throw new \InvalidArgumentException('The selected person doesn\'t hold the certification required for this event.');
             }
 
+            $ticketMembershipType = $eventTicketProduct->getMembershipType();
+            if ($ticketMembershipType !== null && !$beneficiary->hasActiveMembershipType($ticketMembershipType)) {
+                throw new \InvalidArgumentException('That ticket price is only available to ' . $ticketMembershipType->getName() . ' members.');
+            }
+
             if ($event->isRecurring()) {
                 $occurrenceDate = $this->parseOccurrenceDate($occurrenceDateRaw);
 

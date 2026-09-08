@@ -27,11 +27,6 @@
     </div>
     <div class="detail-grid">
       <div class="form-group">
-        <label for="price">Price (£)</label>
-        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0"
-               value="{{ app.request.request.get('price', '0.00') }}" required>
-      </div>
-      <div class="form-group">
         <label for="duration">Duration</label>
         <select id="duration" name="duration" class="form-control">
           {% set selectedDuration = app.request.request.get('duration', 'month') %}

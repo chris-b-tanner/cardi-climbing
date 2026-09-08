@@ -142,6 +142,11 @@
         <div class="alert alert--warning event-show__actions">
           {{ 'events_not_eligible'|trans }}
         </div>
+      {% elseif blockedByMissingEmergencyContact %}
+        <div class="alert alert--warning event-show__actions">
+          {{ 'events_needs_emergency_contact'|trans }}
+          <a href="{{ path('app_account', {_fragment: 'info'}) }}">{{ 'events_update_details'|trans }}</a>
+        </div>
       {% elseif blockedByMembershipOrCredit %}
         <div class="alert alert--warning event-show__actions">
           {{ 'events_needs_membership_or_credit'|trans }}

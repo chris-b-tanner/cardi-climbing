@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Note;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -35,14 +36,16 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
-            ->leftJoin('u.notes', 'n')
             ->leftJoin('u.parent', 'p')
             ->addSelect('t')
             ->addSelect('p');
 
         if ($query !== '') {
-            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.memo LIKE :q OR n.content LIKE :q')
+            // Notes have no Doctrine association to User (polymorphic noteableType/noteableId), so
+            // matching note content is a subquery rather than a join.
+            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.memo LIKE :q OR u.id IN (SELECT n.noteableId FROM ' . Note::class . ' n WHERE n.noteableType = :noteableType AND n.content LIKE :q)')
                ->setParameter('q', '%' . $query . '%')
+               ->setParameter('noteableType', Note::TYPE_MEMBER)
                ->distinct();
         }
 

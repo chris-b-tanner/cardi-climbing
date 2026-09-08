@@ -4,6 +4,12 @@
   {% if isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
 </h2>
 
+{% if is_granted('ROLE_ADMIN') %}
+  <p style="margin:0 0 1rem;">
+    <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="agenda-event__signin">Edit event</a>
+  </p>
+{% endif %}
+
 <div class="event-show__meta">
   <span class="event-show__meta-item">
     <svg class="event-show__meta-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
@@ -92,23 +98,30 @@
       <div class="event-preview__tickets-title">Tickets</div>
       {% if canShowTicketForms %}
         {% for product in eventTicketProducts %}
-          <div class="event-preview__ticket">
+          {% set ticketMembershipType = product.eventTicketProduct.membershipType %}
+          {% set ticketAccessible = ticketAccess[product.id] ?? true %}
+          <div class="event-preview__ticket{{ ticketAccessible ? '' : ' event-preview__ticket--locked' }}">
             <div class="event-preview__ticket-info">
               <span class="event-preview__ticket-name">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</span>
               <span class="event-preview__ticket-price">£{{ product.price }}</span>
+              {% if ticketMembershipType %}<span class="event-preview__ticket-badge">{{ ticketMembershipType.name }} members</span>{% endif %}
             </div>
-            <form method="post" action="{{ path('app_shop_add') }}" class="event-preview__ticket-form">
-              <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
-              <input type="hidden" name="productId" value="{{ product.id }}">
-              {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">{% endif %}
-              <select name="beneficiaryId" class="event-preview__ticket-select">
-                {% if not isRestricted %}<option value="">Myself</option>{% endif %}
-                {% for dependent in app.user.dependents %}
-                  <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
-            </form>
+            {% if ticketAccessible %}
+              <form method="post" action="{{ path('app_shop_add') }}" class="event-preview__ticket-form">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
+                <input type="hidden" name="productId" value="{{ product.id }}">
+                {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">{% endif %}
+                <select name="beneficiaryId" class="event-preview__ticket-select">
+                  {% if not isRestricted and (not ticketMembershipType or app.user.hasActiveMembershipType(ticketMembershipType)) %}<option value="">Myself</option>{% endif %}
+                  {% for dependent in app.user.dependents %}
+                    {% if not ticketMembershipType or dependent.hasActiveMembershipType(ticketMembershipType) %}
+                      <option value="{{ dependent.id }}">{{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
+              </form>
+            {% endif %}
           </div>
         {% endfor %}
       {% elseif not app.user %}
@@ -132,6 +145,9 @@
       <a href="{{ path('app_login') }}" class="btn btn--teal">{{ 'events_sign_in_to_book'|trans }}</a>
     {% elseif isRestricted %}
       <div class="alert alert--warning">{{ 'events_not_eligible'|trans }}</div>
+    {% elseif blockedByMissingEmergencyContact %}
+      <div class="alert alert--warning" style="margin-bottom:0.6rem;">{{ 'events_needs_emergency_contact'|trans }}</div>
+      <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">{{ 'events_update_details'|trans }}</a>
     {% elseif blockedByMembershipOrCredit %}
       <div class="alert alert--warning" style="margin-bottom:0.6rem;">{{ 'events_needs_membership_or_credit'|trans }}</div>
       <a href="{{ path('app_shop') }}" class="btn btn--teal">{{ 'events_buy_membership_or_credit'|trans }}</a>
@@ -152,5 +168,16 @@
         {% endif %}
       </form>
     {% endif %}
+  </div>
+{% endif %}
+
+{% if event.staffingRequirements is not empty %}
+  <div class="event-preview__staffing">
+    <div class="event-preview__staffing-title">{{ 'events_staffing_required'|trans }}</div>
+    <p class="event-preview__staffing-list">
+      {%- for requirement in event.staffingRequirements %}
+        {{ requirement.minCount }} {{ requirement.certification.name }}{{ requirement.minCount == 1 ? '' : 's' }}{% if not loop.last %}, {% endif %}
+      {%- endfor %}
+    </p>
   </div>
 {% endif %}

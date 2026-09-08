@@ -27,11 +27,6 @@
     </div>
     <div class="detail-grid">
       <div class="form-group">
-        <label for="price">Price (£)</label>
-        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0"
-               value="{{ membershipType.price }}" required>
-      </div>
-      <div class="form-group">
         <label for="duration">Duration</label>
         <select id="duration" name="duration" class="form-control">
           <option value="day" {{ membershipType.duration == 'day' ? 'selected' : '' }}>Day</option>

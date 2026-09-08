@@ -15,8 +15,13 @@
   </p>
 
   <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
-    Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification has been started.
-    To finish it off, please read through the declarations and sign electronically using the link below.
+    {% if holder != user %}
+      {{ holder.firstName ?: 'Your dependent' }}'s <strong style="color:#141414;">{{ record.certification.name }}</strong> certification has been started.
+      To finish it off on their behalf, please read through the declarations and sign electronically using the link below.
+    {% else %}
+      Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification has been started.
+      To finish it off, please read through the declarations and sign electronically using the link below.
+    {% endif %}
   </p>
 
   <!-- CTA button -->

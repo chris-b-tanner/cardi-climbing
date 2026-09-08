@@ -56,7 +56,7 @@ class WebhookController extends AbstractController
         if ($user !== null) {
             if ($textBody !== '') {
                 $note = new Note();
-                $note->setUser($user);
+                $note->setNoteable($user);
                 $note->setContent($textBody);
                 $em->persist($note);
                 $em->flush();
@@ -80,15 +80,16 @@ class WebhookController extends AbstractController
         $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(16))));
 
         $em->persist($user);
+        $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
         $sourceNote = new Note();
-        $sourceNote->setUser($user);
+        $sourceNote->setNoteable($user);
         $sourceNote->setContent('Contact added via inbound email from ' . $fromEmail . '.');
         $em->persist($sourceNote);
 
         if ($textBody !== '') {
             $note = new Note();
-            $note->setUser($user);
+            $note->setNoteable($user);
             $note->setContent($textBody);
             $em->persist($note);
         }

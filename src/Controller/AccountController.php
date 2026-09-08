@@ -76,13 +76,13 @@ class AccountController extends AbstractController
         ]);
     }
 
-    /** A member's own certification record — full detail, including agreed declarations and signature once complete. */
+    /** A member's own (or one of their dependents') certification record — full detail, including agreed declarations and signature once complete. */
     #[Route('/certifications/{recordId}', name: 'app_account_certification_view', requirements: ['recordId' => '\d+'], methods: ['GET'])]
     public function viewCertification(int $recordId, EntityManagerInterface $em): Response
     {
         /** @var User $user */
         $user   = $this->getUser();
-        $record = $this->findOwnCertificationRecord($em, $user, $recordId);
+        $record = $this->findAccessibleCertificationRecord($em, $user, $recordId);
 
         if (!$record) {
             $this->addFlash('error', 'Certification record not found.');
@@ -94,7 +94,11 @@ class AccountController extends AbstractController
         ]);
     }
 
-    /** Member self-service: work through declarations and sign to complete an in-progress certification. */
+    /**
+     * Self-service: work through declarations and sign to complete an in-progress certification —
+     * either the logged-in member's own, or one of their dependents' (who have no login of their
+     * own, so a parent completes it on their behalf).
+     */
     #[Route('/certifications/{recordId}/complete', name: 'app_account_certification_complete', requirements: ['recordId' => '\d+'], methods: ['GET', 'POST'])]
     public function completeCertification(
         Request $request,
@@ -103,7 +107,7 @@ class AccountController extends AbstractController
     ): Response {
         /** @var User $user */
         $user   = $this->getUser();
-        $record = $this->findOwnCertificationRecord($em, $user, $recordId);
+        $record = $this->findAccessibleCertificationRecord($em, $user, $recordId);
 
         if (!$record) {
             $this->addFlash('error', 'Certification record not found.');
@@ -114,22 +118,29 @@ class AccountController extends AbstractController
             return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
         }
 
+        // The declarations are about the certificate holder, not necessarily the person completing
+        // them — a parent filling this in for a dependent needs the dependent's own details on file.
+        $holder = $record->getUser();
+
         $missingProfileFields = [];
-        if (!$user->getEmergencyContactName() || !$user->getEmergencyContactPhone()) {
+        if (!$holder->getEmergencyContactName() || !$holder->getEmergencyContactPhone()) {
             $missingProfileFields[] = 'emergency contact name and phone number';
         }
-        if (!$user->getDateOfBirth()) {
+        if (!$holder->getDateOfBirth()) {
             $missingProfileFields[] = 'date of birth';
         }
-        if (!$user->getPhone()) {
+        if (!$holder->getPhone()) {
             $missingProfileFields[] = 'phone number';
         }
-        if (!$user->getAddressLine1() || !$user->getTown() || !$user->getPostcode()) {
+        if (!$holder->getAddressLine1() || !$holder->getTown() || !$holder->getPostcode()) {
             $missingProfileFields[] = 'address';
         }
 
         if ($missingProfileFields) {
-            $this->addFlash('error', 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.');
+            $message = $holder === $user
+                ? 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.'
+                : 'Ask an admin to add the following to ' . (trim(($holder->getFirstName() ?? '') . ' ' . ($holder->getLastName() ?? '')) ?: 'this member') . "'s profile before completing this certification: " . implode(', ', $missingProfileFields) . '.';
+            $this->addFlash('error', $message);
         }
 
         $declarations = $record->getCertification()->getDeclarations();
@@ -184,10 +195,16 @@ class AccountController extends AbstractController
         ]);
     }
 
-    private function findOwnCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification
+    /** A record belonging to $user themself, or to one of their dependents — dependents have no login of their own, so the parent acts on their behalf. */
+    private function findAccessibleCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification
     {
         $record = $em->getRepository(UserCertification::class)->find($recordId);
+        if (!$record) {
+            return null;
+        }
 
-        return ($record && $record->getUser() === $user) ? $record : null;
+        $holder = $record->getUser();
+
+        return ($holder === $user || $user->getDependents()->contains($holder)) ? $record : null;
     }
 }

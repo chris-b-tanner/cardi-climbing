@@ -57,6 +57,11 @@
 </form>
 
 <div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
+  {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'attendee', noteableId: attendee.id} %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
   <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
   {% if attendee.paidAmount != '0.00' %}
     <p style="font-size:0.85rem;color:var(--muted);">

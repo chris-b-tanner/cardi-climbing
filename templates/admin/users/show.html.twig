@@ -15,10 +15,10 @@
     {% elseif user.creditBalance > 0 %}
       <span class="status-pill status-pill--pending" style="margin-left:0.5rem;font-size:0.7rem;vertical-align:middle;">{{ user.creditBalance }} credit{{ user.creditBalance == 1 ? '' : 's' }}</span>
     {% else %}
-      <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}" style="display:inline-block;margin-left:0.5rem;vertical-align:middle;">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
-        <button type="submit" class="btn btn--teal btn--sm">+ Add membership</button>
-      </form>
+{#      <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}" style="display:inline-block;margin-left:0.5rem;vertical-align:middle;">#}
+{#        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">#}
+{#        <button type="submit" class="btn btn--teal btn--sm">+ Add membership</button>#}
+{#      </form>#}
     {% endif %}
   </h1>
   <div class="btn-row">
@@ -141,49 +141,6 @@
   </div>
 </div>
 
-{% set ownMembership = user.currentMembership %}
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.6rem;">Membership</div>
-  {% if ownMembership %}
-    {% set pillClass = ownMembership.status == 'active' ? ' status-pill--published' : ' status-pill--pending' %}
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.6rem;">
-      <span style="font-size:0.9375rem;">{{ ownMembership.membershipType.name }}</span>
-      <span class="status-pill{{ pillClass }}">{{ ownMembership.statusLabel }}</span>
-    </div>
-    <div class="detail-grid">
-      <div>
-        <div class="card__label">Created</div>
-        <div class="card__value">{{ ownMembership.createdAt|date('d M Y') }}</div>
-      </div>
-      <div>
-        <div class="card__label">Expires</div>
-        <div class="card__value">{{ ownMembership.expiresAt ? ownMembership.expiresAt|date('d M Y') : 'Never' }}</div>
-      </div>
-    </div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-top:0.6rem;">
-      £{{ ownMembership.price }}{% if ownMembership.paidAmount != '0.00' %} · Paid £{{ ownMembership.paidAmount }}{% endif %}
-      {%- if ownMembership.autoRenew %} · Auto-renews{% endif %}
-    </p>
-    {% if is_granted('ROLE_ADMIN') %}
-      <form method="post" action="{{ path('app_admin_user_membership_cancel', {id: user.id}) }}" style="margin-top:0.75rem;"
-            onsubmit="return confirm('Cancel this membership?');">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token('cancel_membership_' ~ ownMembership.id) }}">
-        <button type="submit" class="btn btn--danger btn--sm">Cancel membership</button>
-      </form>
-    {% endif %}
-  {% elseif user.parent and user.parent.currentMembership %}
-    {% set inherited = user.parent.currentMembership %}
-    {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
-    <p style="font-size:0.875rem;">
-      Inherits <strong>{{ inherited.membershipType.name }}</strong> from
-      <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
-      <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
-    </p>
-  {% else %}
-    <p style="color:var(--muted);font-size:0.875rem;">No membership on record.</p>
-  {% endif %}
-</div>
-
 {% if user.addressLine1 or user.town or user.postcode %}
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Address</div>
@@ -256,17 +213,107 @@
 {% set payments = user.payments|filter(p => p.status != 'pending') %}
 {% set hasBookings = bookings is not empty %}
 {% set hasPayments = payments is not empty %}
+{% set hasSales = user.salesOrders is not empty %}
 {% set hasCredits = user.creditLedgerEntries is not empty %}
-{% set hasCertifications = user.certifications is not empty %}
-{% set hasNotes = user.notes is not empty %}
+{% set hasNotes = notes is not empty %}
+
+{% set ownMembership = user.currentMembership %}
+<div class="member-columns member-columns--halves" style="margin-bottom:1rem;">
+  <div class="card" style="margin-bottom:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+      <div class="card__label" style="margin-bottom:0;">
+        Certifications
+      </div>
+
+    </div>
+    {% if user.certifications is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No certifications on record.</p>
+    {% else %}
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        {% for record in user.certifications %}
+          {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
+          <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+              <span style="font-size:0.9375rem;">{{ record.certification.name }}</span>
+              <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
+              {% if record.status == 'completed' %}
+                Approved {{ record.approvedAt|date('d M Y') }}
+              {% else %}
+                Started {{ record.startedAt|date('d M Y') }}
+                {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
+              {% endif %}
+              {% if is_granted('ROLE_ADMIN') %}
+                · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
+              {% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if is_granted('ROLE_ADMIN') %}
+      <br>
+      <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--teal btn--sm">+ Add certification</a>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Membership</div>
+    {% if ownMembership %}
+      {% set pillClass = ownMembership.status == 'active' ? ' status-pill--published' : ' status-pill--pending' %}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.6rem;">
+        <span style="font-size:0.9375rem;">{{ ownMembership.membershipType.name }}</span>
+        <span class="status-pill{{ pillClass }}">{{ ownMembership.statusLabel }}</span>
+      </div>
+      <div class="detail-grid">
+        <div>
+          <div class="card__label">Created</div>
+          <div class="card__value">{{ ownMembership.createdAt|date('d M Y') }}</div>
+        </div>
+        <div>
+          <div class="card__label">Expires</div>
+          <div class="card__value">{{ ownMembership.expiresAt ? ownMembership.expiresAt|date('d M Y') : 'Never' }}</div>
+        </div>
+      </div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:0.6rem;">
+        £{{ ownMembership.price }}{% if ownMembership.paidAmount != '0.00' %} · Paid £{{ ownMembership.paidAmount }}{% endif %}
+        {%- if ownMembership.autoRenew %} · Auto-renews{% endif %}
+      </p>
+      {% if is_granted('ROLE_ADMIN') %}
+        <form method="post" action="{{ path('app_admin_user_membership_cancel', {id: user.id}) }}" style="margin-top:0.75rem;"
+              onsubmit="return confirm('Cancel this membership?');">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('cancel_membership_' ~ ownMembership.id) }}">
+          <button type="submit" class="btn btn--danger btn--sm">Cancel membership</button>
+        </form>
+      {% endif %}
+    {% else %}
+      {% if user.parent and user.parent.currentMembership %}
+        {% set inherited = user.parent.currentMembership %}
+        {% set parentName = (user.parent.firstName ~ ' ' ~ user.parent.lastName)|trim ?: user.parent.email %}
+        <p style="font-size:0.875rem;margin-bottom:0.75rem;">
+          Inherits <strong>{{ inherited.membershipType.name }}</strong> from
+          <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}" style="color:var(--teal);">{{ parentName }}</a>
+          <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
+        </p>
+      {% else %}
+        <p style="color:var(--muted);font-size:0.875rem;margin-bottom:0.75rem;">No membership on record.</p>
+      {% endif %}
+      <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
+        <button type="submit" class="btn btn--teal btn--sm">+ Add membership</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
 
 <div class="card">
   <div class="pos-tabs" id="member-tabs">
     <button type="button" class="pos-tab" data-tab="bookings" data-has-content="{{ hasBookings ? '1' : '0' }}">Bookings</button>
+    <button type="button" class="pos-tab" data-tab="sales" data-has-content="{{ hasSales ? '1' : '0' }}">Sales</button>
     <button type="button" class="pos-tab" data-tab="payments" data-has-content="{{ hasPayments ? '1' : '0' }}">Payments</button>
     <button type="button" class="pos-tab" data-tab="credits" data-has-content="{{ hasCredits ? '1' : '0' }}">Credit transactions</button>
-    <button type="button" class="pos-tab" data-tab="certifications" data-has-content="{{ hasCertifications ? '1' : '0' }}">Certifications</button>
-    <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}">Notes</button>
+    <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}" data-has-pinned="{{ notes|filter(n => n.pinned) is not empty ? '1' : '0' }}">Notes</button>
   </div>
 
   <div class="tab-panel" data-tab-panel="bookings">
@@ -302,6 +349,42 @@
                 <td class="admin-table__muted">{{ booking.paidAmount != '0.00' ? '£' ~ booking.paidAmount : '—' }}</td>
                 <td><span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span></td>
                 <td><a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" class="admin-table__link">Edit</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" data-tab-panel="sales" style="display:none;">
+    {% if user.salesOrders is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No sales yet.</p>
+    {% else %}
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th style="text-align:right;">Total</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in user.salesOrders %}
+              {% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
+              <tr>
+                <td class="admin-table__muted">#{{ order.id }}</td>
+                <td><span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span></td>
+                <td class="admin-table__muted" style="text-align:right;">£{{ order.total }}</td>
+                <td class="admin-table__muted">{{ order.createdAt|date('d M Y H:i') }}</td>
+                <td>
+                  <a href="{{ path('app_admin_sale_show', {id: order.id}) }}" class="admin-table__link">
+                    {{ order.status == 'draft' ? 'Continue' : 'View' }}
+                  </a>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -416,77 +499,8 @@
   </div>
 
 
-  <div class="tab-panel" data-tab-panel="certifications" style="display:none;">
-    {% if is_granted('ROLE_ADMIN') %}
-      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:0.75rem;">
-        <a href="{{ path('app_admin_user_certification_pick', {id: user.id}) }}" class="btn btn--teal btn--sm">+ Add certification</a>
-      </div>
-    {% endif %}
-    {% if user.certifications is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;">No certifications on record.</p>
-    {% else %}
-      <div style="display:flex;flex-direction:column;gap:0.6rem;">
-        {% for record in user.certifications %}
-          {% set pillClass = record.status == 'completed' ? ' status-pill--published' : (record.status == 'cancelled' ? ' status-pill--cancelled' : (record.status == 'pending_approval' ? ' status-pill--pending' : '')) %}
-          <div style="border-left:3px solid var(--border);padding:0.4rem 0.75rem;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
-              <span style="font-size:0.9375rem;">{{ record.certification.name }}</span>
-              <span class="status-pill{{ pillClass }}">{{ record.statusLabel }}</span>
-            </div>
-            <p style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">
-              {% if record.status == 'completed' %}
-                Approved {{ record.approvedAt|date('d M Y') }}
-              {% else %}
-                Started {{ record.startedAt|date('d M Y') }}
-                {% if record.submitted %} · Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
-              {% endif %}
-              {% if is_granted('ROLE_ADMIN') %}
-                · <a href="{{ path('app_admin_user_certification_edit', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Edit</a>
-              {% endif %}
-            </p>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </div>
-
   <div class="tab-panel" data-tab-panel="notes" style="display:none;">
-    {% if user.notes is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
-    {% else %}
-      <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
-        {% for note in user.notes %}
-          <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
-            <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
-            <p style="font-size:0.75rem;color:var(--muted);">
-              {{ note.createdAt|date('j M Y, H:i') }}
-              {% if note.addedBy %}
-                · {{ (note.addedBy.firstName ~ ' ' ~ note.addedBy.lastName)|trim ?: note.addedBy.email }}
-              {% else %}
-                · System
-              {% endif %}
-              {% if note.addedBy and note.addedBy == app.user %}
-                · <form method="post" action="{{ path('app_admin_user_delete_note', {id: user.id, noteId: note.id}) }}"
-                        style="display:inline;"
-                        onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_note_' ~ note.id) }}">
-                    <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete</button>
-                  </form>
-              {% endif %}
-            </p>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    <form method="post" action="{{ path('app_admin_user_add_note', {id: user.id}) }}" novalidate>
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_' ~ user.id) }}">
-      <div class="form-group" style="margin-bottom:0.5rem;">
-        <textarea name="content" class="form-control" rows="3"
-                  placeholder="Add a note…" style="resize:vertical;"></textarea>
-      </div>
-      <button type="submit" class="btn btn--teal btn--sm">Add note</button>
-    </form>
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id} %}
   </div>
 </div>
 
@@ -507,10 +521,17 @@
 
     tabs.forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
 
-    // Default to the first tab that actually has something in it.
+    // Default to the first tab that actually has something in it — but a tab with a pinned note
+    // wins over that, since a pin means something needs attention right now.
     let defaultTab = tabs[0] ? tabs[0].dataset.tab : null;
     for (const tab of tabs) {
       if (tab.dataset.hasContent === '1') {
+        defaultTab = tab.dataset.tab;
+        break;
+      }
+    }
+    for (const tab of tabs) {
+      if (tab.dataset.hasPinned === '1') {
         defaultTab = tab.dataset.tab;
         break;
       }

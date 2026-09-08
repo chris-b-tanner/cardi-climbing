@@ -55,6 +55,9 @@
 
     {% set pillClass = record.status == 'completed' ? 'status-pill--confirmed' : (record.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
     <h1>{{ record.certification.name }}</h1>
+    {% if record.user != app.user %}
+      <p style="color:#6b7280;font-size:0.9rem;margin:-0.6rem 0 0.75rem;">For {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: 'your dependent' }}</p>
+    {% endif %}
     <p style="margin-bottom:1.5rem;">
       <span class="status-pill {{ pillClass }}">{{ record.statusLabel }}</span>
     </p>

@@ -90,10 +90,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['startedAt' => 'DESC'])]
     private Collection $certifications;
 
-    #[ORM\OneToMany(targetEntity: Note::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
-    #[ORM\OrderBy(['createdAt' => 'DESC'])]
-    private Collection $notes;
-
     /** This member's payments — donations and (in future) booking payments. */
     #[ORM\OneToMany(targetEntity: Payment::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
@@ -138,7 +134,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->roles          = [self::ROLE_MEMBER];
         $this->tags           = new ArrayCollection();
         $this->certifications = new ArrayCollection();
-        $this->notes          = new ArrayCollection();
         $this->payments       = new ArrayCollection();
         $this->memberships    = new ArrayCollection();
         $this->salesOrders    = new ArrayCollection();
@@ -317,6 +312,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getEmergencyContactPhone(): ?string { return $this->emergencyContactPhone; }
     public function setEmergencyContactPhone(?string $emergencyContactPhone): static { $this->emergencyContactPhone = $emergencyContactPhone; return $this; }
 
+    /** This member's own emergency contact name, falling back per-field to the family parent's for a dependent who hasn't set their own. */
+    public function getEffectiveEmergencyContactName(): ?string
+    {
+        return $this->emergencyContactName ?? $this->parent?->getEmergencyContactName();
+    }
+
+    /** This member's own emergency contact phone, falling back per-field to the family parent's for a dependent who hasn't set their own. */
+    public function getEffectiveEmergencyContactPhone(): ?string
+    {
+        return $this->emergencyContactPhone ?? $this->parent?->getEmergencyContactPhone();
+    }
+
+    /** Whether there's a usable emergency contact on file for this member — their own, or (for a dependent) inherited from their family parent. Gates booking onto a certification-restricted event. */
+    public function hasCompleteEmergencyContact(): bool
+    {
+        return $this->getEffectiveEmergencyContactName() !== null && $this->getEffectiveEmergencyContactPhone() !== null;
+    }
+
     public function getEmail2(): ?string { return $this->email2; }
     public function setEmail2(?string $email2): static { $this->email2 = $email2; return $this; }
 
@@ -330,8 +343,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         if (!$this->email3) { $this->email3 = $email; return true; }
         return false;
     }
-
-    public function getNotes(): Collection { return $this->notes; }
 
     /** This member's payments, most recent first. */
     public function getPayments(): Collection { return $this->payments; }
@@ -374,6 +385,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getEffectiveMembership(): ?Membership
     {
         return $this->getCurrentMembership() ?? $this->parent?->getCurrentMembership();
+    }
+
+    /** The address that should receive this member's certification emails — their own, or the family parent's for a dependent, who has no login of their own to receive/act on them directly. */
+    public function getCertificationNotificationEmail(): ?string
+    {
+        return $this->parent?->getEmail() ?? $this->email;
+    }
+
+    /** Whether this member's (or, for a dependent, their family's) currently active membership matches the given type — gates a membership-priced event ticket. */
+    public function hasActiveMembershipType(MembershipType $membershipType): bool
+    {
+        $membership = $this->getEffectiveMembership();
+        return $membership !== null && $membership->isCurrentlyActive() && $membership->getMembershipType() === $membershipType;
     }
 
     /** Whether this member can cover a free, certification-restricted booking — via their own (or inherited) active membership, or a spare drop-in credit on their own account. */

@@ -8,11 +8,13 @@ use App\Entity\EventTicketProduct;
 use App\Entity\InventoryMovement;
 use App\Entity\MembershipProduct;
 use App\Entity\MembershipType;
+use App\Entity\Note;
 use App\Entity\Product;
 use App\Entity\StockProduct;
 use App\Entity\User;
 use App\Repository\EventRepository;
 use App\Repository\MembershipTypeRepository;
+use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\StockProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -119,6 +121,7 @@ class AdminProductController extends AbstractController
         StockProductRepository $stockProductRepository,
         MembershipTypeRepository $membershipTypeRepository,
         EventRepository $eventRepository,
+        NoteRepository $noteRepository,
         EntityManagerInterface $em,
     ): Response {
         $error = null;
@@ -154,15 +157,26 @@ class AdminProductController extends AbstractController
             'vatCodes'        => self::VAT_CODES,
             'membershipTypes' => $membershipTypeRepository->findBy([], ['name' => 'ASC']),
             'events'          => $eventRepository->findAllOrdered(),
+            'notes'           => $noteRepository->findForNoteable(Note::TYPE_PRODUCT, $product->getId()),
         ]);
     }
 
     #[Route('/{id}/delete', name: 'app_admin_settings_product_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, Product $product, EntityManagerInterface $em): Response
+    public function delete(Request $request, Product $product, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         if (!$this->isCsrfTokenValid('admin_product_delete_' . $product->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
             return $this->redirectToRoute('app_home');
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_PRODUCT, $product->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $product->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_PRODUCT, $product->getId()) as $note) {
+            $em->remove($note);
         }
 
         $em->remove($product);
@@ -286,7 +300,7 @@ class AdminProductController extends AbstractController
             Product::TYPE_STOCK => $this->applyStock($request, $product, $stockProductRepository, $em),
             Product::TYPE_CREDIT => $this->applyCredit($request, $product, $em),
             Product::TYPE_MEMBERSHIP => $this->applyMembership($request, $product, $membershipTypeRepository, $em),
-            Product::TYPE_EVENT_TICKET => $this->applyEventTicket($request, $product, $eventRepository, $em),
+            Product::TYPE_EVENT_TICKET => $this->applyEventTicket($request, $product, $eventRepository, $membershipTypeRepository, $em),
             default => [null, $product],
         };
     }
@@ -348,7 +362,7 @@ class AdminProductController extends AbstractController
         return [null, $product];
     }
 
-    private function applyEventTicket(Request $request, Product $product, EventRepository $eventRepository, EntityManagerInterface $em): array
+    private function applyEventTicket(Request $request, Product $product, EventRepository $eventRepository, MembershipTypeRepository $membershipTypeRepository, EntityManagerInterface $em): array
     {
         $eventId = (int) $request->request->get('eventId', 0);
         $event   = $eventId ? $eventRepository->find($eventId) : null;
@@ -357,8 +371,18 @@ class AdminProductController extends AbstractController
             return ['Choose the event this product sells a ticket for.', $product];
         }
 
+        $membershipTypeId = trim($request->request->get('ticketMembershipTypeId', ''));
+        $membershipType   = null;
+        if ($membershipTypeId !== '') {
+            $membershipType = $membershipTypeRepository->find((int) $membershipTypeId);
+            if (!$membershipType instanceof MembershipType) {
+                return ['Choose a valid membership type, or leave it as an open ticket.', $product];
+            }
+        }
+
         $eventTicketProduct = $product->getEventTicketProduct() ?? new EventTicketProduct($product);
         $eventTicketProduct->setEvent($event);
+        $eventTicketProduct->setMembershipType($membershipType);
         $em->persist($eventTicketProduct);
 
         return [null, $product];

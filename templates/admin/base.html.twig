@@ -171,6 +171,7 @@
     .member-columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; align-items: start; }
     .member-columns--thirds { grid-template-columns: 1fr 2fr; }
     .member-columns--halves { grid-template-columns: 1fr 1fr; }
+    .member-columns--single { grid-template-columns: 1fr; }
     @media (max-width: 900px) { .member-columns { grid-template-columns: 1fr; } }
 
     .pos-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
@@ -253,6 +254,7 @@
     .status-pill--published { background: #dcfce7; color: var(--green); }
     .status-pill--cancelled { background: #fee2e2; color: var(--red); }
     .status-pill--pending   { background: #fef9c3; color: #854d0e; }
+    .status-pill--pinned    { background: #fef9c3; color: #854d0e; }
 
     .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
     .admin-table {
@@ -366,6 +368,12 @@
         </a>
       </li>
       <li>
+        <a href="{{ path('app_admin_actions') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_action' ? ' is-active' : '' }}">
+          <i class="bi bi-pin-angle-fill"></i> Actions
+        </a>
+      </li>
+      <li>
         <a href="{{ path('app_admin_certifications') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_certifications' ? ' is-active' : '' }}">
           <i class="bi bi-shield-check"></i> Certifications
@@ -386,7 +394,7 @@
       <li>
         <a href="{{ path('app_admin_sales') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_sale' ? ' is-active' : '' }}">
-          <i class="bi bi-box-seam"></i> Sales
+          <i class="bi bi-receipt"></i> Sales
         </a>
       </li>
       <li>
@@ -493,155 +501,6 @@
   });
 </script>
 
-<script>
-  // Generic "choose a contact" modal — see admin/_contact_picker_modal.html.twig. A no-op on any
-  // page that doesn't include that partial, so it's safe to always load.
-  window.ContactPicker = (function () {
-    const modal = document.getElementById('contact-picker-modal');
-    if (!modal) {
-      return { open: function () {} };
-    }
-
-    const backdrop       = document.getElementById('contact-picker-backdrop');
-    const closeBtn       = document.getElementById('contact-picker-close');
-    const titleEl        = document.getElementById('contact-picker-title');
-    const searchView     = document.getElementById('contact-picker-search-view');
-    const createView     = document.getElementById('contact-picker-create-view');
-    const searchInput    = document.getElementById('contact-picker-search');
-    const results        = document.getElementById('contact-picker-results');
-    const createToggle   = document.getElementById('contact-picker-create-toggle');
-    const createCancel   = document.getElementById('contact-picker-create-cancel');
-    const createSubmit   = document.getElementById('contact-picker-create-submit');
-    const firstNameInput = document.getElementById('contact-picker-firstName');
-    const lastNameInput  = document.getElementById('contact-picker-lastName');
-    const emailInput     = document.getElementById('contact-picker-email');
-    const dobInput       = document.getElementById('contact-picker-dateOfBirth');
-    const dependentLabel = document.getElementById('contact-picker-dependent-label');
-    const dependentText  = document.getElementById('contact-picker-dependent-text');
-    const dependentCheck = document.getElementById('contact-picker-makeDependent');
-    const errorBox       = document.getElementById('contact-picker-error');
-
-    const searchUrl = modal.dataset.searchUrl;
-    const createUrl = modal.dataset.createUrl;
-
-    let onChoose       = null;
-    let dependentsOfId = null;
-    let searchDebounce;
-
-    function showSearchView() {
-      searchView.style.display = '';
-      createView.style.display = 'none';
-      errorBox.style.display = 'none';
-    }
-
-    function showCreateView() {
-      searchView.style.display = 'none';
-      createView.style.display = '';
-    }
-
-    function loadResults(query) {
-      const params = new URLSearchParams();
-      if (query) params.set('q', query);
-      if (!query && dependentsOfId) params.set('dependentsOf', dependentsOfId);
-
-      fetch(`${searchUrl}?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(members => {
-          if (!members.length) {
-            results.innerHTML = '<div class="member-search-empty">No members found</div>';
-            return;
-          }
-          results.innerHTML = members.map(m => `<button type="button" class="member-search-item" data-id="${m.id}" data-label="${m.label.replace(/"/g, '&quot;')}">${m.label}</button>`).join('');
-        });
-    }
-
-    function choose(id) {
-      const callback = onChoose;
-      close();
-      if (callback) callback(id);
-    }
-
-    function close() {
-      modal.style.display = 'none';
-      onChoose = null;
-    }
-
-    results.addEventListener('click', (e) => {
-      const btn = e.target.closest('.member-search-item');
-      if (btn) choose(btn.dataset.id);
-    });
-
-    searchInput.addEventListener('input', () => {
-      clearTimeout(searchDebounce);
-      searchDebounce = setTimeout(() => loadResults(searchInput.value.trim()), 250);
-    });
-
-    createToggle.addEventListener('click', showCreateView);
-    createCancel.addEventListener('click', showSearchView);
-
-    createSubmit.addEventListener('click', () => {
-      const firstName = firstNameInput.value.trim();
-      if (!firstName) {
-        firstNameInput.focus();
-        return;
-      }
-
-      const body = new URLSearchParams();
-      body.set('_csrf_token', modal.dataset.csrf);
-      body.set('firstName', firstName);
-      body.set('lastName', lastNameInput.value.trim());
-      body.set('email', emailInput.value.trim());
-      body.set('dateOfBirth', dobInput.value);
-      if (dependentsOfId && dependentCheck.checked) {
-        body.set('parentId', dependentsOfId);
-      }
-
-      fetch(createUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body: body.toString(),
-      })
-        .then(r => r.json().then(data => ({ ok: r.ok, data })))
-        .then(({ ok, data }) => {
-          if (!ok) {
-            errorBox.textContent = data.error || 'Could not create this person.';
-            errorBox.style.display = 'block';
-            return;
-          }
-          choose(data.id);
-        });
-    });
-
-    closeBtn.addEventListener('click', close);
-    backdrop.addEventListener('click', close);
-
-    function open(options) {
-      onChoose       = options.onChoose;
-      dependentsOfId = options.dependentsOfId || null;
-
-      titleEl.textContent = options.title || 'Choose a contact';
-      searchInput.value = '';
-      firstNameInput.value = '';
-      lastNameInput.value = '';
-      emailInput.value = '';
-      dobInput.value = '';
-      dependentCheck.checked = false;
-
-      if (dependentsOfId && options.dependentsOfName) {
-        dependentLabel.style.display = 'flex';
-        dependentText.textContent = 'Make dependent of ' + options.dependentsOfName;
-      } else {
-        dependentLabel.style.display = 'none';
-      }
-
-      showSearchView();
-      modal.style.display = 'flex';
-      loadResults('');
-    }
-
-    return { open };
-  })();
-</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

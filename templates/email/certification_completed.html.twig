@@ -15,14 +15,18 @@
   </p>
 
   <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
-    Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification is now complete.
-    We've attached a PDF copy of your signed record for your files.
+    {% if holder != user %}
+      {{ holder.firstName ?: 'Your dependent' }}'s <strong style="color:#141414;">{{ record.certification.name }}</strong> certification is now complete.
+      We've attached a PDF copy of the signed record for your files.
+    {% else %}
+      Your <strong style="color:#141414;">{{ record.certification.name }}</strong> certification is now complete.
+      We've attached a PDF copy of your signed record for your files.
+    {% endif %}
   </p>
 
   <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
 
   <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;line-height:1.6;margin:0;">
-    You can view your certifications any time from the
-    <a href="https://www.cardiganclimbing.org/account#certifications" style="color:#1e4f41;text-decoration:none;">certifications tab in your account</a>.
+    You can <a href="{{ viewUrl }}" style="color:#1e4f41;text-decoration:none;">view {{ holder != user ? 'it' : 'your certification' }} in your account</a> any time.
   </p>
 {% endblock %}

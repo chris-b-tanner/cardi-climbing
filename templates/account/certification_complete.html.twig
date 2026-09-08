@@ -53,6 +53,9 @@
   <div class="account-wrap">
     <h1>{{ record.certification.name }}</h1>
     <p class="subtitle">
+      {% if record.user != app.user %}
+        For {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: 'your dependent' }}.
+      {% endif %}
       {% if record.certification.description %}{{ record.certification.description }}{% else %}Work through the declarations below and sign to complete this.{% endif %}
     </p>
 
@@ -62,11 +65,18 @@
 
     {% if missingProfileFields is not empty %}
       <div class="account-card">
-        <p style="margin-bottom:1rem;">
-          Please add the following to your account before you can complete the declarations below:
-          {{ missingProfileFields|join(', ') }}.
-        </p>
-        <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Update your details</a>
+        {% if record.user == app.user %}
+          <p style="margin-bottom:1rem;">
+            Please add the following to your account before you can complete the declarations below:
+            {{ missingProfileFields|join(', ') }}.
+          </p>
+          <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Update your details</a>
+        {% else %}
+          <p style="margin:0;">
+            Ask an admin to add the following to {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: "this member" }}'s profile before you can complete the declarations below:
+            {{ missingProfileFields|join(', ') }}.
+          </p>
+        {% endif %}
       </div>
     {% else %}
     <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate>

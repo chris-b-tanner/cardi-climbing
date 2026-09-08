@@ -17,14 +17,13 @@
   <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Sales</a>
 </div>
 
-<div class="member-columns">
+<div class="member-columns{{ order.status != 'draft' ? ' member-columns--single' : '' }}">
+  {% if order.status == 'draft' %}
   <div>
     <div class="page-header" style="margin-bottom:0.75rem;">
       <h2 style="font-size:1rem;">Products</h2>
     </div>
-    {% if order.status != 'draft' %}
-      <div class="empty" style="padding:1.5rem 1rem;">This order is no longer open — items can't be added.</div>
-    {% elseif products is empty %}
+    {% if products is empty %}
       <div class="empty" style="padding:1.5rem 1rem;">No active products to sell.</div>
     {% else %}
       {% set typeTabs = [
@@ -81,6 +80,7 @@
       </div>
     {% endif %}
   </div>
+  {% endif %}
 
   <div>
     <div class="page-header" style="margin-bottom:0.75rem;">
@@ -141,7 +141,22 @@
                   {{ row.qty }}
                 {% endif %}
               </td>
-              <td class="admin-table__muted" style="text-align:right;">£{{ row.chargedPrice }}</td>
+              <td class="admin-table__muted" style="text-align:right;">
+                {% if order.status == 'draft' %}
+                  <button type="button" class="price-edit-trigger"
+                          data-row-id="{{ row.id }}"
+                          data-product-name="{{ row.product.name }}{% if row.product.variantValue %} ({{ row.product.variantValue }}){% endif %}"
+                          data-standard-price="{{ row.listPriceAtSale }}"
+                          data-current-price="{{ row.chargedPrice }}"
+                          data-current-note="{{ row.note|e('html_attr') }}"
+                          style="background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px;">
+                    £{{ row.chargedPrice }}
+                  </button>
+                {% else %}
+                  £{{ row.chargedPrice }}
+                {% endif %}
+                {% if row.note %}<br><small class="admin-table__muted" style="font-style:italic;">{{ row.note }}</small>{% endif %}
+              </td>
               <td class="admin-table__muted" style="text-align:right;">£{{ row.lineTotal }}</td>
               {% if order.status == 'draft' %}
                 <td>
@@ -206,6 +221,11 @@
         {% endfor %}
       </div>
     {% endif %}
+
+    <div class="card" style="margin-top:1rem;">
+      <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
+      {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'order', noteableId: order.id} %}
+    </div>
 
     <div class="card" style="margin-top:1rem;font-size:0.8rem;color:var(--muted);">
       Created {{ order.createdAt|date('d M Y, H:i') }}
@@ -288,6 +308,47 @@
     <input type="hidden" name="email" id="beneficiary-new-email">
     <input type="hidden" name="dateOfBirth" id="beneficiary-new-dateOfBirth">
     <input type="hidden" name="makeDependent" id="beneficiary-new-makeDependent" value="">
+  </form>
+
+  <div id="price-modal" class="pos-modal" style="display:none;">
+    <div id="price-modal-backdrop" class="pos-modal__backdrop"></div>
+    <div class="pos-modal__box">
+      <div class="pos-modal__header">
+        <strong id="price-modal-title">Change price</strong>
+        <button type="button" id="price-modal-close" class="btn btn--ghost btn--sm">✕</button>
+      </div>
+
+      <p id="price-modal-standard" class="admin-table__muted" style="margin-bottom:0.9rem;"></p>
+
+      <div class="btn-row" style="margin-bottom:1rem;">
+        <button type="button" class="btn btn--ghost btn--sm price-discount-btn" data-pct="10">10% off</button>
+        <button type="button" class="btn btn--ghost btn--sm price-discount-btn" data-pct="25">25% off</button>
+        <button type="button" class="btn btn--ghost btn--sm price-discount-btn" data-pct="50">50% off</button>
+        <button type="button" class="btn btn--ghost btn--sm price-discount-btn" data-pct="100">100% off (free)</button>
+      </div>
+
+      <div class="form-group">
+        <label for="price-modal-price">Price (£)</label>
+        <input type="number" id="price-modal-price" class="form-control" min="0" step="0.01">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="price-modal-note">Note (required)</label>
+        <textarea id="price-modal-note" class="form-control" rows="2" placeholder="Why is the price being changed?"></textarea>
+      </div>
+
+      <div id="price-modal-error" class="flash flash--error" style="display:none;margin-top:0.9rem;"></div>
+
+      <div class="form-actions" style="margin-top:1rem;">
+        <button type="button" id="price-modal-save" class="btn btn--teal btn--sm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <form id="price-update-form" method="post" action="{{ path('app_admin_sale_row_price', {id: order.id}) }}" style="display:none;">
+    <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+    <input type="hidden" name="rowId" id="price-update-row-id">
+    <input type="hidden" name="price" id="price-update-price">
+    <input type="hidden" name="note" id="price-update-note">
   </form>
 {% endif %}
 {% endblock %}
@@ -604,6 +665,72 @@
       openBeneficiaryModal(link.dataset.rowId);
     });
   });
+
+  // ── Change price modal ────────────────────────────────────
+  const priceModal         = document.getElementById('price-modal');
+  const priceModalBackdrop = document.getElementById('price-modal-backdrop');
+  const priceModalClose    = document.getElementById('price-modal-close');
+  const priceModalTitle    = document.getElementById('price-modal-title');
+  const priceModalStandard = document.getElementById('price-modal-standard');
+  const priceModalPrice    = document.getElementById('price-modal-price');
+  const priceModalNote     = document.getElementById('price-modal-note');
+  const priceModalError    = document.getElementById('price-modal-error');
+  const priceModalSave     = document.getElementById('price-modal-save');
+
+  let priceRowId       = null;
+  let priceStandardValue = 0;
+
+  function openPriceModal(trigger) {
+    priceRowId          = trigger.dataset.rowId;
+    priceStandardValue  = parseFloat(trigger.dataset.standardPrice) || 0;
+
+    priceModalTitle.textContent = 'Change price — ' + trigger.dataset.productName;
+    priceModalStandard.textContent = 'Standard price: £' + priceStandardValue.toFixed(2);
+    priceModalPrice.value = trigger.dataset.currentPrice;
+    priceModalNote.value  = trigger.dataset.currentNote || '';
+    priceModalError.style.display = 'none';
+
+    priceModal.style.display = 'flex';
+  }
+
+  function closePriceModal() {
+    priceModal.style.display = 'none';
+    priceRowId = null;
+  }
+
+  document.querySelectorAll('.price-edit-trigger').forEach(trigger => {
+    trigger.addEventListener('click', () => openPriceModal(trigger));
+  });
+
+  document.querySelectorAll('.price-discount-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pct = parseFloat(btn.dataset.pct);
+      priceModalPrice.value = (priceStandardValue * (1 - pct / 100)).toFixed(2);
+    });
+  });
+
+  priceModalSave.addEventListener('click', () => {
+    const price = parseFloat(priceModalPrice.value);
+    if (priceModalPrice.value === '' || isNaN(price) || price < 0) {
+      priceModalError.textContent = 'Enter a valid price.';
+      priceModalError.style.display = 'block';
+      return;
+    }
+
+    if (!priceModalNote.value.trim()) {
+      priceModalError.textContent = 'A note is required when changing the price.';
+      priceModalError.style.display = 'block';
+      return;
+    }
+
+    document.getElementById('price-update-row-id').value = priceRowId;
+    document.getElementById('price-update-price').value = priceModalPrice.value;
+    document.getElementById('price-update-note').value = priceModalNote.value.trim();
+    document.getElementById('price-update-form').requestSubmit();
+  });
+
+  priceModalClose.addEventListener('click', closePriceModal);
+  priceModalBackdrop.addEventListener('click', closePriceModal);
 </script>
 {% endif %}
 {% endblock %}

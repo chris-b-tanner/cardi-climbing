@@ -3,9 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Attendee;
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
+use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
 use App\Service\EventBookingCreditService;
@@ -110,6 +112,10 @@ class AdminBookingController extends AbstractController
                 $error = 'This member does not hold the certification required for this event.';
             }
 
+            if (!$error && !$event->getRestrictions()->isEmpty() && !$user->hasCompleteEmergencyContact()) {
+                $error = 'This member has no emergency contact details on file — add them before checking in onto a certification-restricted event.';
+            }
+
             if (!$error
                 && $event->getMaxAttendees() !== null
                 && $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
@@ -165,16 +171,73 @@ class AdminBookingController extends AbstractController
 
         $selectedEventId = (int) $request->query->get('eventId', $request->request->get('eventId', 0));
 
+        $today     = new \DateTimeImmutable('today');
+        $weekStart = $today->modify('monday this week');
+        $weekEnd   = $weekStart->modify('+6 days');
+
+        $weekEvents = $eventRepository->findWithoutTicketsOverlapping($weekStart, $weekEnd);
+
+        // Batch-load this week's bookings once, then derive per-occurrence counts/booked-state in
+        // memory — same approach as the public calendar, avoids a query per occurrence shown.
+        $eventIds        = array_map(static fn ($e) => $e->getId(), $weekEvents);
+        $activeAttendees = $attendeeRepository->findActiveForEventsInRange($eventIds, $weekStart, $weekEnd);
+
+        $occurrenceStats = [];
+        foreach ($activeAttendees as $attendee) {
+            $occDate = $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate();
+            $key     = $attendee->getEvent()->getId() . ':' . $occDate->format('Y-m-d');
+            $occurrenceStats[$key] ??= ['count' => 0, 'bookedByUser' => false];
+            $occurrenceStats[$key]['count']++;
+
+            if ($attendee->getUser()->getId() === $user->getId()) {
+                $occurrenceStats[$key]['bookedByUser'] = true;
+            }
+        }
+
+        $days   = [];
+        $period = new \DatePeriod($weekStart, new \DateInterval('P1D'), $weekEnd->modify('+1 day'));
+        foreach ($period as $day) {
+            $dayOccurrences = [];
+
+            // Don't show historic events — only today's and this week's remaining occurrences.
+            if ($day >= $today) {
+                foreach ($weekEvents as $weekEvent) {
+                    if (!$weekEvent->isValidForDate($day)) {
+                        continue;
+                    }
+
+                    $stats     = $occurrenceStats[$weekEvent->getId() . ':' . $day->format('Y-m-d')] ?? ['count' => 0, 'bookedByUser' => false];
+                    $spotsLeft = $weekEvent->getMaxAttendees() !== null ? max(0, $weekEvent->getMaxAttendees() - $stats['count']) : null;
+
+                    $dayOccurrences[] = [
+                        'event'        => $weekEvent,
+                        'date'         => $day,
+                        'spotsLeft'    => $spotsLeft,
+                        'isFull'       => $spotsLeft !== null && $spotsLeft <= 0,
+                        'bookedByUser' => $stats['bookedByUser'],
+                        'isRestricted' => !$weekEvent->allowsUser($user),
+                    ];
+                }
+
+                usort($dayOccurrences, static fn (array $a, array $b) => $a['event']->getTimeFrom() <=> $b['event']->getTimeFrom());
+            }
+
+            $days[] = ['date' => $day, 'events' => $dayOccurrences];
+        }
+
         return $this->render('admin/bookings/new.html.twig', [
             'error'           => $error,
-            'events'          => $eventRepository->findWithoutTicketsOrdered(),
+            'days'            => $days,
+            'weekStart'       => $weekStart,
+            'weekEnd'         => $weekEnd,
+            'today'           => $today,
             'selectedEventId' => $selectedEventId,
             'selectedMember'  => $user,
         ]);
     }
 
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         $error = null;
 
@@ -202,6 +265,7 @@ class AdminBookingController extends AbstractController
         return $this->render('admin/bookings/edit.html.twig', [
             'attendee' => $attendee,
             'error'    => $error,
+            'notes'    => $noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()),
         ]);
     }
 
@@ -263,7 +327,7 @@ class AdminBookingController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_admin_booking_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         $userId = $attendee->getUser()->getId();
 
@@ -275,6 +339,16 @@ class AdminBookingController extends AbstractController
         if ($attendee->getPaidAmount() !== '0.00') {
             $this->addFlash('error', 'Cannot delete a booking with a paid amount recorded. Set the paid amount to £0 first.');
             return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId()]);
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_ATTENDEE, $attendee->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()) as $note) {
+            $em->remove($note);
         }
 
         $em->remove($attendee);

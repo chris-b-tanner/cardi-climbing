@@ -152,6 +152,11 @@
 </div>
 <div class="member-col-right">
 
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
+  {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'event', noteableId: event.id} %}
+</div>
+
 {% if event.staffingRequirements is not empty %}
 <div class="card">
   <div class="card__label" style="margin-bottom:0.75rem;">
@@ -258,15 +263,11 @@
           <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email attendees</a>
         {% endif %}
       {% endif %}
-      {% if eventTicketProducts is empty %}
-        <button type="button" id="event-attendee-add-trigger" class="btn btn--teal btn--sm">+ Add attendee</button>
-      {% endif %}
     </div>
   </div>
 
   {% if eventTicketProducts is empty %}
     {{ _self.attendee_table(attendees) }}
-    {% include 'admin/_contact_picker_modal.html.twig' %}
   {% else %}
     <div class="pos-tabs" id="attendee-tabs">
       {% for product in eventTicketProducts %}
@@ -277,31 +278,18 @@
 
     {% for product in eventTicketProducts %}
       <div class="tab-panel" data-tab-panel="{{ product.id }}" style="display:none;">
-        <div style="text-align:right;margin-bottom:0.75rem;">
-          {% if is_granted('ROLE_ADMIN') %}
+        {% if is_granted('ROLE_ADMIN') %}
+          <div style="text-align:right;margin-bottom:0.75rem;">
             <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit ticket</a>
-          {% endif %}
-          <button type="button" class="btn btn--teal btn--sm attendee-add-trigger" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}">+ Add attendee</button>
-        </div>
+          </div>
+        {% endif %}
         {{ _self.attendee_table(attendeesByTab[product.id]) }}
       </div>
     {% endfor %}
 
     <div class="tab-panel" data-tab-panel="free" style="display:none;">
-      <div style="text-align:right;margin-bottom:0.75rem;">
-        <button type="button" class="btn btn--teal btn--sm attendee-add-trigger" data-product-id="" data-product-name="">+ Add attendee</button>
-      </div>
       {{ _self.attendee_table(attendeesByTab['free']) }}
     </div>
-
-    <form id="attendee-contact-form" method="post" action="{{ path('app_admin_event_add_attendee_contact', {id: event.id}) }}" style="display:none;">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_add_attendee_' ~ event.id) }}">
-      <input type="hidden" name="userId" id="attendee-contact-userId">
-      <input type="hidden" name="productId" id="attendee-contact-productId">
-      {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
-    </form>
-
-    {% include 'admin/_contact_picker_modal.html.twig' %}
   {% endif %}
 </div>
 
@@ -313,23 +301,6 @@
 <style>
   .occurrence-picker { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 </style>
-{% if eventTicketProducts is empty %}
-<script>
-  const eventAttendeeAddTrigger = document.getElementById('event-attendee-add-trigger');
-  if (eventAttendeeAddTrigger) {
-    eventAttendeeAddTrigger.addEventListener('click', () => {
-      ContactPicker.open({
-        title: 'Add attendee',
-        onChoose: function (userId) {
-          const params = new URLSearchParams({ eventId: '{{ event.id }}', userId: userId });
-          {% if event.isRecurring %}params.set('occurrenceDate', '{{ occurrenceDate|date('Y-m-d') }}');{% endif %}
-          window.location.href = '{{ path('app_admin_booking_new') }}?' + params.toString();
-        },
-      });
-    });
-  }
-</script>
-{% endif %}
 {% if eventTicketProducts is not empty %}
 <script>
   const attendeeTabs   = document.querySelectorAll('#attendee-tabs .pos-tab');
@@ -352,19 +323,6 @@
     }
   }
   if (defaultAttendeeTab) selectAttendeeTab(defaultAttendeeTab);
-
-  document.querySelectorAll('.attendee-add-trigger').forEach(btn => {
-    btn.addEventListener('click', () => {
-      ContactPicker.open({
-        title: btn.dataset.productName ? 'Add attendee — ' + btn.dataset.productName : 'Add attendee — Free',
-        onChoose: function (userId) {
-          document.getElementById('attendee-contact-userId').value = userId;
-          document.getElementById('attendee-contact-productId').value = btn.dataset.productId || '';
-          document.getElementById('attendee-contact-form').requestSubmit();
-        },
-      });
-    });
-  });
 </script>
 {% endif %}
 {% endblock %}

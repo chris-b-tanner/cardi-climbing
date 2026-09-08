@@ -28,20 +28,30 @@ class EventRepository extends ServiceEntityRepository
 
     /**
      * Events sold with no ticket product — the only ones an admin can check a member directly
-     * onto, since an event with tickets is booked by selling one instead (via the shop/cart).
+     * onto, since an event with tickets is booked by selling one instead (via the shop/cart) —
+     * whose date, or for a recurring event whose recurrence window, overlaps the given range.
+     * No published-only filter: an admin can check a member into a draft event too.
      *
      * @return Event[]
      */
-    public function findWithoutTicketsOrdered(): array
+    public function findWithoutTicketsOverlapping(\DateTimeImmutable $rangeStart, \DateTimeImmutable $rangeEnd): array
     {
         return $this->createQueryBuilder('e')
             ->where('e.id NOT IN (SELECT IDENTITY(etp.event) FROM ' . EventTicketProduct::class . ' etp)')
-            ->orderBy('e.date', 'DESC')
+            ->andWhere('
+                (e.isRecurring = false AND e.date BETWEEN :start AND :end)
+                OR
+                (e.isRecurring = true AND e.date <= :end AND (e.recurUntil IS NULL OR e.recurUntil >= :start))
+            ')
+            ->setParameter('start', $rangeStart)
+            ->setParameter('end', $rangeEnd)
+            ->orderBy('e.date', 'ASC')
+            ->addOrderBy('e.timeFrom', 'ASC')
             ->getQuery()
             ->getResult();
     }
 
-    /** Whether {event} has any ticket product at all (active or not) — see findWithoutTicketsOrdered(). */
+    /** Whether {event} has any ticket product at all (active or not) — see findWithoutTicketsOverlapping(). */
     public function hasAnyTicketProduct(Event $event): bool
     {
         return $this->getEntityManager()->getRepository(EventTicketProduct::class)->findOneBy(['event' => $event]) !== null;

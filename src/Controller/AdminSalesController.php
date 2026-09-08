@@ -9,6 +9,7 @@ use App\Entity\SalesOrder;
 use App\Entity\SalesOrderRow;
 use App\Entity\User;
 use App\Repository\EventRepository;
+use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
@@ -74,20 +75,31 @@ class AdminSalesController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_admin_sale_show', requirements: ['id' => '\d+'])]
-    public function show(SalesOrder $order, ProductRepository $productRepository): Response
+    public function show(SalesOrder $order, ProductRepository $productRepository, NoteRepository $noteRepository): Response
     {
         return $this->render('admin/sales/show.html.twig', [
             'order'    => $order,
             'products' => $productRepository->findActive(),
+            'notes'    => $noteRepository->findForNoteable(Note::TYPE_ORDER, $order->getId()),
         ]);
     }
 
     /** Only a still-open draft can be deleted — a completed or cancelled order is kept as a financial record even if it has no payments (e.g. a free order). */
     #[Route('/{id}/delete', name: 'app_admin_sale_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, SalesOrder $order, EntityManagerInterface $em): Response
+    public function delete(Request $request, SalesOrder $order, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         if (!$this->assertOpenAndValid($request, $order)) {
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_ORDER, $order->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_ORDER, $order->getId()) as $note) {
+            $em->remove($note);
         }
 
         $em->remove($order);
@@ -323,6 +335,37 @@ class AdminSalesController extends AbstractController
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
+    /** A note is mandatory here — an overridden price always needs a recorded reason, unlike the row's note in general. */
+    #[Route('/{id}/rows/price', name: 'app_admin_sale_row_price', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function updateRowPrice(Request $request, SalesOrder $order, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $row = $this->getOwnedRow($order, (int) $request->request->get('rowId', 0));
+
+        $priceRaw = trim($request->request->get('price', ''));
+        $note     = trim($request->request->get('note', ''));
+
+        if ($priceRaw === '' || !is_numeric($priceRaw) || (float) $priceRaw < 0) {
+            $this->addFlash('error', 'Enter a valid price.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        if ($note === '') {
+            $this->addFlash('error', 'A note is required when changing the price.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $row->setChargedPrice(number_format((float) $priceRaw, 2, '.', ''));
+        $row->setNote($note);
+        $em->flush();
+
+        $this->addFlash('success', 'Price updated.');
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
     /** Creates a new member on the fly (optionally as the order member's dependent) and uses them as a row's beneficiary. */
     #[Route('/{id}/beneficiary/new', name: 'app_admin_sale_create_beneficiary', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function createBeneficiary(Request $request, SalesOrder $order, UserRepository $userRepository, UserPasswordHasherInterface $hasher, EntityManagerInterface $em): Response
@@ -366,13 +409,14 @@ class AdminSalesController extends AbstractController
         }
 
         $em->persist($beneficiary);
+        $em->flush(); // assigns $beneficiary's id — needed before a Note can reference it via noteableId
 
         /** @var User $admin */
         $admin     = $this->getUser();
         $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
 
         $note = new Note();
-        $note->setUser($beneficiary);
+        $note->setNoteable($beneficiary);
         $note->setContent('Added as a beneficiary on Sale #' . $order->getId() . ' by ' . $adminName . '.');
         $note->setAddedBy($admin);
         $em->persist($note);

@@ -1,0 +1,104 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Actions{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Actions</h1>
+</div>
+
+{% set types = [
+  {key: 'member', label: 'Members', icon: 'bi-person-badge'},
+  {key: 'attendee', label: 'Bookings', icon: 'bi-calendar-check'},
+  {key: 'event', label: 'Events', icon: 'bi-calendar3'},
+  {key: 'product', label: 'Products', icon: 'bi-tag'},
+  {key: 'order', label: 'Sales', icon: 'bi-receipt'},
+] %}
+
+{% if items is empty %}
+  <div class="empty">
+    <strong>Nothing pinned</strong>
+    Pin a note on a member, booking, event, product, or order to add it here.
+  </div>
+{% else %}
+  <div class="pos-tabs" id="actions-tabs">
+    {% for type in types %}
+      {% set typeItems = items|filter(i => i.note.noteableType == type.key) %}
+      <button type="button" class="pos-tab" data-tab="{{ type.key }}" data-has-content="{{ typeItems is not empty ? '1' : '0' }}">
+        <i class="bi {{ type.icon }}"></i> {{ type.label }} ({{ typeItems|length }})
+      </button>
+    {% endfor %}
+  </div>
+
+  {% for type in types %}
+    {% set typeItems = items|filter(i => i.note.noteableType == type.key) %}
+    <div class="tab-panel" data-tab-panel="{{ type.key }}" style="display:none;">
+      {% if typeItems is empty %}
+        <p style="color:var(--muted);font-size:0.875rem;">No pinned notes on {{ type.label|lower }}.</p>
+      {% else %}
+        <div class="actions-card-grid">
+          {% for item in typeItems %}
+            {% set note = item.note %}
+            <div class="card actions-card">
+              <div class="card__label" style="margin-bottom:0.4rem;">
+                {% if item.target.url %}
+                  <a href="{{ item.target.url }}" class="admin-table__link">{{ item.target.label }}</a>
+                {% else %}
+                  {{ item.target.label }}
+                {% endif %}
+              </div>
+              <p style="font-size:0.9rem;white-space:pre-wrap;margin-bottom:0.6rem;">{{ note.content }}</p>
+              <p class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
+                Pinned: {{ note.pinnedAt|date('d M Y') }}{% if note.pinnedBy %} by {{ (note.pinnedBy.firstName ~ ' ' ~ note.pinnedBy.lastName)|trim ?: note.pinnedBy.email }}{% endif %}
+              </p>
+              <div class="btn-row">
+                <form method="post" action="{{ path('app_admin_note_complete', {id: note.id}) }}">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_complete_' ~ note.id) }}">
+                  <button type="submit" class="btn btn--teal btn--sm">Complete</button>
+                </form>
+                <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">
+                  <button type="submit" class="btn btn--ghost btn--sm">Unpin</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<style>
+  .actions-card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem;
+  }
+  .actions-card { margin-bottom: 0; display: flex; flex-direction: column; }
+</style>
+<script>
+  (function () {
+    const tabs   = document.querySelectorAll('#actions-tabs .pos-tab');
+    const panels = document.querySelectorAll('.tab-panel[data-tab-panel]');
+
+    function selectTab(tab) {
+      tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tab));
+      panels.forEach(p => p.style.display = p.dataset.tabPanel === tab ? '' : 'none');
+    }
+
+    tabs.forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+    // Default to the first tab that actually has a pinned note in it.
+    let defaultTab = tabs[0] ? tabs[0].dataset.tab : null;
+    for (const tab of tabs) {
+      if (tab.dataset.hasContent === '1') {
+        defaultTab = tab.dataset.tab;
+        break;
+      }
+    }
+    if (defaultTab) selectTab(defaultTab);
+  })();
+</script>
+{% endblock %}

@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
+use App\Repository\NoteRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
@@ -81,7 +82,9 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_home');
             }
 
-            $email = trim($request->request->get('email', '')) ?: null;
+            $email  = trim($request->request->get('email', '')) ?: null;
+            $dobRaw = trim($request->request->get('dateOfBirth', ''));
+            $dob    = $dobRaw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $dobRaw) ?: null) : null;
 
             if ($email !== null && $userRepository->findOneBy(['email' => $email])) {
                 $error = 'A member with that email address already exists.';
@@ -90,19 +93,22 @@ class AdminController extends AbstractController
                 $user->setEmail($email);
                 $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
                 $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
+                $user->setPhone(trim($request->request->get('phone', '')) ?: null);
+                $user->setDateOfBirth($dob);
                 $user->setOptIn($request->request->has('optIn'));
 
                 // No login for this contact until they set a password via "forgot password" — requires an email on file.
                 $user->setPassword($hasher->hashPassword($user, bin2hex(random_bytes(32))));
 
                 $em->persist($user);
+                $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
                 /** @var User $admin */
                 $admin = $this->getUser();
                 $adminName = trim(($admin->getFirstName() ?? '') . ' ' . ($admin->getLastName() ?? '')) ?: $admin->getEmail();
 
                 $note = new Note();
-                $note->setUser($user);
+                $note->setNoteable($user);
                 $note->setContent('Contact added manually by ' . $adminName . '.');
                 $note->setAddedBy($admin);
                 $em->persist($note);
@@ -120,7 +126,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -130,6 +136,7 @@ class AdminController extends AbstractController
             'user'       => $user,
             'duplicates' => $duplicates,
             'bookings'   => $attendeeRepository->findAllForUser($user),
+            'notes'      => $noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()),
         ]);
     }
 
@@ -294,6 +301,7 @@ class AdminController extends AbstractController
     public function mergeUsers(
         Request $request,
         UserRepository $userRepository,
+        NoteRepository $noteRepository,
         EntityManagerInterface $em,
     ): Response {
         if ($request->isMethod('GET')) {
@@ -307,7 +315,13 @@ class AdminController extends AbstractController
                 $this->addFlash('error', 'One or more members not found.');
                 return $this->redirectToRoute('app_admin_users');
             }
-            return $this->render('admin/users/merge.html.twig', ['users' => $users]);
+
+            $noteCounts = [];
+            foreach ($users as $candidate) {
+                $noteCounts[$candidate->getId()] = $noteRepository->countForNoteable(Note::TYPE_MEMBER, $candidate->getId());
+            }
+
+            return $this->render('admin/users/merge.html.twig', ['users' => $users, 'noteCounts' => $noteCounts]);
         }
 
         if (!$this->isCsrfTokenValid('merge_users', $request->request->get('_csrf_token'))) {
@@ -333,8 +347,8 @@ class AdminController extends AbstractController
 
         // Reassign notes, bookings, and certifications via raw SQL to bypass Doctrine cascade-remove
         $em->getConnection()->executeStatement(
-            'UPDATE note SET user_id = :p WHERE user_id = :s',
-            ['p' => $primaryId, 's' => $secondaryId]
+            'UPDATE note SET noteable_id = :p WHERE noteable_type = :type AND noteable_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId, 'type' => Note::TYPE_MEMBER]
         );
         $em->getConnection()->executeStatement(
             'UPDATE attendee SET user_id = :p WHERE user_id = :s',
@@ -391,7 +405,7 @@ class AdminController extends AbstractController
 
     #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function deleteUser(Request $request, User $user, EntityManagerInterface $em, AttendeeRepository $attendeeRepository): Response
+    public function deleteUser(Request $request, User $user, EntityManagerInterface $em, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository): Response
     {
         if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -411,6 +425,16 @@ class AdminController extends AbstractController
         if ($attendeeRepository->findAllForUser($user) || !$user->getPayments()->isEmpty()) {
             $this->addFlash('error', 'Cannot delete a member with bookings or payments on record — archive them instead.');
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_MEMBER, $user->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()) as $note) {
+            $em->remove($note);
         }
 
         $em->remove($user);
@@ -458,7 +482,7 @@ class AdminController extends AbstractController
         $admin = $this->getUser();
 
         $note = new Note();
-        $note->setUser($user);
+        $note->setNoteable($user);
         $note->setContent('Member archived. Reason: ' . $reason);
         $note->setAddedBy($admin);
         $em->persist($note);
@@ -480,60 +504,6 @@ class AdminController extends AbstractController
         $em->flush();
 
         $this->addFlash('success', 'Member archived.');
-        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-    }
-
-    #[Route('/users/{id}/notes', name: 'app_admin_user_add_note', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function addNote(Request $request, User $user, EntityManagerInterface $em): Response
-    {
-        if (!$this->isCsrfTokenValid('note_' . $user->getId(), $request->request->get('_csrf_token'))) {
-            $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_home');
-        }
-
-        $content = trim($request->request->get('content', ''));
-
-        if ($content !== '') {
-            /** @var User $admin */
-            $admin = $this->getUser();
-
-            $note = new Note();
-            $note->setUser($user);
-            $note->setContent($content);
-            $note->setAddedBy($admin);
-
-            $em->persist($note);
-            $em->flush();
-        }
-
-        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-    }
-
-    /** Only the note's own author can delete it. */
-    #[Route('/users/{id}/notes/{noteId}/delete', name: 'app_admin_user_delete_note', requirements: ['id' => '\d+', 'noteId' => '\d+'], methods: ['POST'])]
-    public function deleteNote(Request $request, User $user, int $noteId, EntityManagerInterface $em): Response
-    {
-        $note = $em->getRepository(Note::class)->find($noteId);
-
-        if (!$note || $note->getUser() !== $user) {
-            $this->addFlash('error', 'Note not found.');
-            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-        }
-
-        if (!$this->isCsrfTokenValid('delete_note_' . $note->getId(), $request->request->get('_csrf_token'))) {
-            $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_home');
-        }
-
-        if ($note->getAddedBy() !== $this->getUser()) {
-            $this->addFlash('error', 'You can only delete notes you added.');
-            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-        }
-
-        $em->remove($note);
-        $em->flush();
-
-        $this->addFlash('success', 'Note deleted.');
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
@@ -579,8 +549,11 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_certification_pick', ['id' => $user->getId()]);
         }
 
-        if (!$user->getEmail()) {
-            $this->addFlash('error', 'This member has no email address on file — add one before assigning a certification, since they need to be emailed a link to complete it.');
+        if (!$user->getCertificationNotificationEmail()) {
+            $message = $user->getParent()
+                ? 'This member\'s family has no email address on file — add one to their account or their parent\'s before assigning a certification, since a link to complete it needs to be emailed somewhere.'
+                : 'This member has no email address on file — add one before assigning a certification, since they need to be emailed a link to complete it.';
+            $this->addFlash('error', $message);
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
@@ -616,7 +589,8 @@ class AdminController extends AbstractController
 
             $certificationMailer->sendInvitation($record);
 
-            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getEmail()) . ' — they\'ve been emailed a link to complete it.');
+            $recipient = $user->getParent() ? 'their parent has' : 'they\'ve';
+            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getCertificationNotificationEmail()) . " — {$recipient} been emailed a link to complete it.");
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
@@ -669,8 +643,11 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
         }
 
-        if (!$user->getEmail()) {
-            $this->addFlash('error', 'This member has no email address on file — add one before resending the invitation.');
+        if (!$user->getCertificationNotificationEmail()) {
+            $message = $user->getParent()
+                ? 'This member\'s family has no email address on file — add one to their account or their parent\'s before resending the invitation.'
+                : 'This member has no email address on file — add one before resending the invitation.';
+            $this->addFlash('error', $message);
             return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
         }
 

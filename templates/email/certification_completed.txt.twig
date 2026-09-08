@@ -3,11 +3,12 @@ Y WAL — All done!
 
 Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
 
-Your {{ record.certification.name }} certification is now complete. We've attached a PDF copy of your
-signed record for your files.
+{% if holder != user %}{{ holder.firstName ?: 'Your dependent' }}'s {{ record.certification.name }} certification is now complete. We've attached
+a PDF copy of the signed record for your files.{% else %}Your {{ record.certification.name }} certification is now complete. We've attached a PDF copy of your
+signed record for your files.{% endif %}
 
-You can view your certifications any time from your account:
-https://www.cardiganclimbing.org/account#certifications
+You can view {{ holder != user ? 'it' : 'your certification' }} in your account any time:
+{{ viewUrl }}
 
 ---
 Y Wal | Cardigan (Aberteifi), Ceredigion, Wales

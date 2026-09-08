@@ -36,22 +36,18 @@ class AdminMembershipTypeController extends AbstractController
             }
 
             $name  = trim($request->request->get('name', ''));
-            $price = trim($request->request->get('price', ''));
             $duration = $request->request->get('duration', '');
 
             if ($name === '') {
                 $error = 'Name is required.';
             } elseif ($membershipTypeRepository->findOneBy(['name' => $name])) {
                 $error = 'A membership type with that name already exists.';
-            } elseif (!is_numeric($price) || (float) $price < 0) {
-                $error = 'Enter a valid price.';
             } elseif (!in_array($duration, [MembershipType::DURATION_DAY, MembershipType::DURATION_MONTH, MembershipType::DURATION_YEAR], true)) {
                 $error = 'Choose a valid duration.';
             } else {
                 $membershipType = new MembershipType();
                 $membershipType->setName($name);
                 $membershipType->setDescription(trim($request->request->get('description', '')) ?: null);
-                $membershipType->setPrice(number_format((float) $price, 2, '.', ''));
                 $membershipType->setDuration($duration);
                 $membershipType->setStatus($request->request->get('status') === MembershipType::STATUS_INACTIVE ? MembershipType::STATUS_INACTIVE : MembershipType::STATUS_ACTIVE);
                 $membershipType->setIsFamily($request->request->has('isFamily'));
@@ -81,7 +77,6 @@ class AdminMembershipTypeController extends AbstractController
             }
 
             $name  = trim($request->request->get('name', ''));
-            $price = trim($request->request->get('price', ''));
             $duration = $request->request->get('duration', '');
             $duplicate = $membershipTypeRepository->findOneBy(['name' => $name]);
 
@@ -89,14 +84,11 @@ class AdminMembershipTypeController extends AbstractController
                 $error = 'Name is required.';
             } elseif ($duplicate && $duplicate->getId() !== $membershipType->getId()) {
                 $error = 'A membership type with that name already exists.';
-            } elseif (!is_numeric($price) || (float) $price < 0) {
-                $error = 'Enter a valid price.';
             } elseif (!in_array($duration, [MembershipType::DURATION_DAY, MembershipType::DURATION_MONTH, MembershipType::DURATION_YEAR], true)) {
                 $error = 'Choose a valid duration.';
             } else {
                 $membershipType->setName($name);
                 $membershipType->setDescription(trim($request->request->get('description', '')) ?: null);
-                $membershipType->setPrice(number_format((float) $price, 2, '.', ''));
                 $membershipType->setDuration($duration);
                 $membershipType->setStatus($request->request->get('status') === MembershipType::STATUS_INACTIVE ? MembershipType::STATUS_INACTIVE : MembershipType::STATUS_ACTIVE);
                 $membershipType->setIsFamily($request->request->has('isFamily'));

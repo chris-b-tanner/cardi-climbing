@@ -124,6 +124,18 @@
           {% endfor %}
         </select>
       </div>
+      <div class="form-group" style="margin-bottom:0;margin-top:1rem;">
+        <label for="ticketMembershipTypeId">Membership type (optional)</label>
+        <select id="ticketMembershipTypeId" name="ticketMembershipTypeId" class="form-control">
+          <option value="">Open ticket — available to everyone</option>
+          {% for membershipType in membershipTypes %}
+            <option value="{{ membershipType.id }}" {{ product.eventTicketProduct.membershipType == membershipType ? 'selected' : '' }}>{{ membershipType.name }}</option>
+          {% endfor %}
+        </select>
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">
+          Assign a membership type to make this a discounted price only members of that type can select. Leave as "Open ticket" for a price anyone can buy.
+        </p>
+      </div>
     </div>
   {% else %}
     <div class="card" style="margin-top:1.25rem;">
@@ -200,6 +212,11 @@
       {% endif %}
     </div>
   {% endif %}
+
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'product', noteableId: product.id} %}
+  </div>
 </div>
 </div>
 {% endblock %}

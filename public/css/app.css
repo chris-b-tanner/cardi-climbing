@@ -63,6 +63,8 @@ p + p { margin-top: 1rem; }
 .btn--teal:hover { background: var(--teal-dk); border-color: var(--teal-dk); }
 .btn--outline { background: transparent; color: var(--black); border-color: var(--black); }
 .btn--outline:hover { background: var(--black); color: var(--white); }
+.btn--dark-grey { background: #3a3a3a; color: var(--white); border-color: #3a3a3a; }
+.btn--dark-grey:hover { background: #222; border-color: #222; }
 .btn--sm { padding: 0.5rem 1.1rem; font-size: 0.7rem; }
 
 /* ── Nav ────────────────────────────────────────────── */
@@ -196,6 +198,24 @@ p + p { margin-top: 1rem; }
   display: flex;
   align-items: center;
   height: 64px;
+}
+
+/* ── Survey banner ──────────────────────────────────── */
+.survey-banner { background: var(--sand); }
+.survey-banner--top { margin-top: 64px; }
+.survey-banner__inner {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 0.85rem 1.5rem;
+  padding: 0.85rem 1.5rem;
+  text-align: center;
+}
+.survey-banner__text {
+  font-family: var(--f-head); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; font-size: 0.85rem; color: var(--black);
+  margin-right: 10px;
+}
+@media (min-width: 1024px) {
+  .survey-banner__text { white-space: nowrap; }
 }
 
 /* ── Hero ───────────────────────────────────────────── */
@@ -954,6 +974,19 @@ p + p { margin-top: 1rem; }
   padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
   font-size: 0.82rem; font-family: inherit; color: var(--black); background: var(--white);
 }
+.event-preview__ticket--locked { opacity: 0.55; }
+.event-preview__ticket-badge {
+  align-self: flex-start; margin-top: 0.1rem; padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border); border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.event-preview__staffing { margin-top: 1.5rem; }
+.event-preview__staffing-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.4rem;
+}
+.event-preview__staffing-list { font-size: 0.9rem; color: var(--black); }
 
 /* ── Booking confirmation ─────────────────────────────── */
 .booking-confirm__wrap { max-width: 640px; }

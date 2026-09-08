@@ -52,7 +52,7 @@
             </div>
           {% endif %}
           <div class="merge-card__detail" style="color:var(--muted);font-size:0.8rem;margin-top:0.5rem;">
-            Joined {{ user.createdAt|date('j M Y') }} · {{ user.notes|length }} note(s)
+            Joined {{ user.createdAt|date('j M Y') }} · {{ noteCounts[user.id] }} note(s)
           </div>
         </div>
       </label>

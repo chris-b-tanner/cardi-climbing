@@ -22,6 +22,11 @@ class CertificationMailer
 
     public function sendInvitation(UserCertification $record): void
     {
+        $holder    = $record->getUser();
+        // A dependent has no login of their own, so the notification — and the "complete this"
+        // link it carries — goes to their family parent, who signs in as themself to act on it.
+        $recipient = $holder->getParent() ?? $holder;
+
         $completeUrl = $this->urlGenerator->generate(
             'app_account_certification_complete',
             ['recordId' => $record->getId()],
@@ -30,12 +35,13 @@ class CertificationMailer
 
         $email = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))
-            ->to($record->getUser()->getEmail())
+            ->to($holder->getCertificationNotificationEmail())
             ->subject('Complete your ' . $record->getCertification()->getName() . ' certification — Y Wal')
             ->htmlTemplate('email/certification_invite.html.twig')
             ->textTemplate('email/certification_invite.txt.twig')
             ->context([
-                'user'         => $record->getUser(),
+                'user'         => $recipient,
+                'holder'       => $holder,
                 'record'       => $record,
                 'completeUrl'  => $completeUrl,
             ]);
@@ -45,17 +51,28 @@ class CertificationMailer
 
     public function sendCompletion(UserCertification $record, string $pdfContent): void
     {
+        $holder    = $record->getUser();
+        $recipient = $holder->getParent() ?? $holder;
+
         $filename = (new AsciiSlugger())->slug($record->getCertification()->getName())->lower() . '-certificate.pdf';
+
+        $viewUrl = $this->urlGenerator->generate(
+            'app_account_certification_view',
+            ['recordId' => $record->getId()],
+            UrlGeneratorInterface::ABSOLUTE_URL,
+        );
 
         $email = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))
-            ->to($record->getUser()->getEmail())
+            ->to($holder->getCertificationNotificationEmail())
             ->subject($record->getCertification()->getName() . ' completed — Y Wal')
             ->htmlTemplate('email/certification_completed.html.twig')
             ->textTemplate('email/certification_completed.txt.twig')
             ->context([
-                'user'   => $record->getUser(),
-                'record' => $record,
+                'user'    => $recipient,
+                'holder'  => $holder,
+                'record'  => $record,
+                'viewUrl' => $viewUrl,
             ])
             ->attach($pdfContent, $filename, 'application/pdf');
 

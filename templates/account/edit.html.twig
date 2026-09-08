@@ -279,32 +279,47 @@
       {% endif %}
     </section>
 
+    {% macro cert_card(record) %}
+      {% set pillClass = record.status == 'completed' ? 'status-pill--confirmed' : (record.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
+      <div class="item-card">
+        <div class="item-card__top">
+          <div class="item-card__title">{{ record.certification.name }}</div>
+          <span class="status-pill {{ pillClass }}">{{ record.statusLabel }}</span>
+        </div>
+        <div class="item-card__meta">
+          Started {{ record.startedAt|date('d M Y') }}
+          {% if record.submitted %}&middot; Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
+        </div>
+        <div class="item-card__actions">
+          {% if record.status == 'in_progress' %}
+            <a href="{{ path('app_account_certification_complete', {recordId: record.id}) }}" class="btn btn--teal btn--sm">Complete now</a>
+          {% else %}
+            <a href="{{ path('app_account_certification_view', {recordId: record.id}) }}" class="item-card__view-link">View details</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endmacro %}
+
+    {% set dependentsWithCerts = user.dependents|filter(d => d.certifications is not empty) %}
+
     <section class="account-panel" data-panel="certifications" hidden>
-      {% if user.certifications is empty %}
+      {% if user.certifications is empty and dependentsWithCerts is empty %}
         <div class="account-empty">
           <p>You don't have any certifications on record yet.</p>
           <p>Certifications allow you to book onto certain events, such as self-access bouldering out of hours.</p>
         </div>
       {% else %}
         {% for record in user.certifications %}
-          {% set pillClass = record.status == 'completed' ? 'status-pill--confirmed' : (record.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
-          <div class="item-card">
-            <div class="item-card__top">
-              <div class="item-card__title">{{ record.certification.name }}</div>
-              <span class="status-pill {{ pillClass }}">{{ record.statusLabel }}</span>
-            </div>
-            <div class="item-card__meta">
-              Started {{ record.startedAt|date('d M Y') }}
-              {% if record.submitted %}&middot; Submitted {{ record.completedAt|date('d M Y') }}{% endif %}
-            </div>
-            <div class="item-card__actions">
-              {% if record.status == 'in_progress' %}
-                <a href="{{ path('app_account_certification_complete', {recordId: record.id}) }}" class="btn btn--teal btn--sm">Complete now</a>
-              {% else %}
-                <a href="{{ path('app_account_certification_view', {recordId: record.id}) }}" class="item-card__view-link">View details</a>
-              {% endif %}
-            </div>
+          {{ _self.cert_card(record) }}
+        {% endfor %}
+
+        {% for dependent in dependentsWithCerts %}
+          <div class="account-panel__subheading" style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:1.75rem 0 0.75rem;">
+            {{ (dependent.firstName ~ ' ' ~ dependent.lastName)|trim ?: dependent.email ?: 'Dependent' }}
           </div>
+          {% for record in dependent.certifications %}
+            {{ _self.cert_card(record) }}
+          {% endfor %}
         {% endfor %}
       {% endif %}
     </section>

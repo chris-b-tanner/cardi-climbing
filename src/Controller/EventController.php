@@ -6,6 +6,7 @@ use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\EventStaffingRequirement;
 use App\Entity\Note;
+use App\Entity\Product;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
@@ -189,6 +190,12 @@ class EventController extends AbstractController
         $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
         $view['eventTicketProducts'] = $eventTicketProducts = $productRepository->findActiveEventTickets($event);
 
+        $ticketAccess = [];
+        foreach ($eventTicketProducts as $ticketProduct) {
+            $ticketAccess[$ticketProduct->getId()] = $this->userQualifiesForTicket($user, $ticketProduct);
+        }
+        $view['ticketAccess'] = $ticketAccess;
+
         $cartTicketCount = 0;
         if ($user !== null) {
             foreach ($cartService->getLines($user) as $line) {
@@ -320,9 +327,10 @@ class EventController extends AbstractController
             $user->setPassword($passwordHasher->hashPassword($user, $password));
 
             $em->persist($user);
+            $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
             $note = new Note();
-            $note->setUser($user);
+            $note->setNoteable($user);
             $note->setContent('Contact added via event booking: "' . $event->getTitle() . '".');
             $em->persist($note);
         }
@@ -446,6 +454,10 @@ class EventController extends AbstractController
             return 'You do not hold the certification required to book this event.';
         }
 
+        if (!$event->getRestrictions()->isEmpty() && !$user->hasCompleteEmergencyContact()) {
+            return 'Please add emergency contact details to your account before booking onto this event.';
+        }
+
         $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
 
         if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
@@ -488,6 +500,36 @@ class EventController extends AbstractController
         return $attendee;
     }
 
+    /**
+     * Whether $user can select this ticket's price — always true for an open ticket, otherwise
+     * only if $user (or one of their dependents, who they can also book the ticket for) currently
+     * holds the membership type it's restricted to.
+     */
+    private function userQualifiesForTicket(?User $user, Product $ticketProduct): bool
+    {
+        $membershipType = $ticketProduct->getEventTicketProduct()?->getMembershipType();
+
+        if ($membershipType === null) {
+            return true;
+        }
+
+        if ($user === null) {
+            return false;
+        }
+
+        if ($user->hasActiveMembershipType($membershipType)) {
+            return true;
+        }
+
+        foreach ($user->getDependents() as $dependent) {
+            if ($dependent->hasActiveMembershipType($membershipType)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param array{count: int, bookedByUser: bool} $stats */
     private function buildOccurrenceView(Event $event, \DateTimeImmutable $date, ?User $user, array $stats): array
     {
@@ -510,6 +552,10 @@ class EventController extends AbstractController
         $needsMembershipOrCredit     = $event->requiresMembershipOrCredit();
         $blockedByMembershipOrCredit = $needsMembershipOrCredit && $user !== null && !$user->canCoverMembershipOrCreditBooking();
 
+        // A certification-restricted event needs a way to reach the booker in an emergency —
+        // checked here regardless of price, unlike the membership/credit gate above.
+        $blockedByMissingEmergencyContact = !$event->getRestrictions()->isEmpty() && $user !== null && !$user->hasCompleteEmergencyContact();
+
         // Only set when an active membership is what covers this booking — lets the template tell
         // "no payment needed" (membership) apart from "a credit will be spent" (no membership).
         $activeMembership = null;
@@ -526,18 +572,19 @@ class EventController extends AbstractController
         $canBookUnpublished = !$event->isPublished() && $this->isGranted('ROLE_TEAM');
 
         return [
-            'event'                       => $event,
-            'date'                        => $date,
-            'isPast'                      => $isPast,
-            'isFull'                      => $isFull,
-            'spotsLeft'                   => $spotsLeft,
-            'isBooked'                    => $isBooked,
-            'isRestricted'                => $isRestricted,
-            'needsMembershipOrCredit'     => $needsMembershipOrCredit,
-            'blockedByMembershipOrCredit' => $blockedByMembershipOrCredit,
-            'activeMembershipTypeName'    => $activeMembership?->getMembershipType()->getName(),
-            'isDraft'                     => !$event->isPublished(),
-            'canBook'                     => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$blockedByMembershipOrCredit,
+            'event'                            => $event,
+            'date'                             => $date,
+            'isPast'                           => $isPast,
+            'isFull'                           => $isFull,
+            'spotsLeft'                        => $spotsLeft,
+            'isBooked'                         => $isBooked,
+            'isRestricted'                     => $isRestricted,
+            'needsMembershipOrCredit'          => $needsMembershipOrCredit,
+            'blockedByMembershipOrCredit'      => $blockedByMembershipOrCredit,
+            'blockedByMissingEmergencyContact' => $blockedByMissingEmergencyContact,
+            'activeMembershipTypeName'         => $activeMembership?->getMembershipType()->getName(),
+            'isDraft'                          => !$event->isPublished(),
+            'canBook'                          => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$blockedByMembershipOrCredit && !$blockedByMissingEmergencyContact,
         ];
     }
 
@@ -590,6 +637,13 @@ class EventController extends AbstractController
 
     private function parseDate(string $raw): ?\DateTimeImmutable
     {
+        // Guard against the empty string specifically: DateTimeImmutable's constructor treats it
+        // like "now" rather than throwing, so without this every caller's "no date given" case
+        // would silently resolve to today instead of null.
+        if ($raw === '') {
+            return null;
+        }
+
         try {
             return new \DateTimeImmutable($raw);
         } catch (\Exception) {

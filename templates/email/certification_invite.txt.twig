@@ -3,8 +3,10 @@ Y WAL — Almost there!
 
 Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
 
-Your {{ record.certification.name }} certification has been started. To finish it off, please read
-through the declarations and sign electronically using the link below.
+{% if holder != user %}{{ holder.firstName ?: 'Your dependent' }}'s {{ record.certification.name }} certification has been started. To finish
+it off on their behalf, please read through the declarations and sign electronically using the link
+below.{% else %}Your {{ record.certification.name }} certification has been started. To finish it off, please read
+through the declarations and sign electronically using the link below.{% endif %}
 
 Complete your certification here:
 {{ completeUrl }}

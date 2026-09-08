@@ -38,6 +38,9 @@
                 {{ product.membershipProduct.membershipType.name }}
               {% elseif product.productType == 'event_ticket' and product.eventTicketProduct %}
                 {{ product.eventTicketProduct.event.title }}
+                {% if product.eventTicketProduct.membershipType %}
+                  <div style="font-size:0.72rem;">{{ product.eventTicketProduct.membershipType.name }} members</div>
+                {% endif %}
               {% else %}
                 —
               {% endif %}

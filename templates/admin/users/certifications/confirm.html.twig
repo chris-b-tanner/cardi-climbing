@@ -19,6 +19,13 @@
       <div class="card__label">Certification</div>
       <div class="card__value">{{ certification.name }}</div>
     </div>
+    <div>
+      <div class="card__label">Notification email</div>
+      <div class="card__value">
+        {{ user.certificationNotificationEmail ?: '—' }}
+        {% if user.parent %}<span style="color:var(--muted);font-size:0.8rem;"> (parent's — {{ displayName ?: 'this member' }} has no login of their own)</span>{% endif %}
+      </div>
+    </div>
     {% if certification.description %}
       <div style="grid-column:1 / -1;">
         <div class="card__label">Description</div>
