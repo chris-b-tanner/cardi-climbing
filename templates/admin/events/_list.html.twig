@@ -14,7 +14,6 @@
           <th>Date</th>
           <th>Time</th>
           <th>Location</th>
-          <th>Recurring</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -33,10 +32,15 @@
                 <i class="bi bi-box-seam" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Linked to ticket product(s)"></i>
               {% endif %}
             </td>
-            <td class="admin-table__muted">{{ event.date|date('d M Y') }}</td>
+            <td class="admin-table__muted">
+              {% if event.isRecurring %}
+                {{ event.date|date('d M Y') }} &ndash; {{ event.recurUntil ? event.recurUntil|date('d M Y') : 'Ongoing' }}
+              {% else %}
+                {{ event.date|date('d M Y') }}
+              {% endif %}
+            </td>
             <td class="admin-table__muted">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>
             <td class="admin-table__muted">{{ event.location }}</td>
-            <td class="admin-table__muted">{{ event.isRecurring ? 'Yes' : '—' }}</td>
             <td>
               <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
                 {{ event.isPublished ? 'Published' : 'Draft' }}

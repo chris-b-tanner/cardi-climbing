@@ -11,8 +11,8 @@ use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingMailer;
+use App\Service\BookingService;
 use App\Service\DoorAccessService;
-use App\Service\EventBookingCreditService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -46,13 +46,11 @@ class AdminBookingController extends AbstractController
     #[Route('/new', name: 'app_admin_booking_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        EntityManagerInterface $em,
         EventRepository $eventRepository,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
         BookingMailer $bookingMailer,
-        EventBookingCreditService $eventBookingCreditService,
-        DoorAccessService $doorAccessService,
+        BookingService $bookingService,
     ): Response {
         $userId = (int) ($request->query->get('userId') ?: $request->request->get('userId', 0));
         $user   = $userId ? $userRepository->find($userId) : null;
@@ -105,36 +103,6 @@ class AdminBookingController extends AbstractController
                 }
             }
 
-            $storedOccurrenceDate = (!$error && $event->isRecurring()) ? $occurrenceDate : null;
-
-            if (!$error && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
-                $error = 'This member is already booked onto this event.';
-            }
-
-            if (!$error && !$event->allowsUser($user)) {
-                $error = 'This member does not hold the certification required for this event.';
-            }
-
-            if (!$error && !$event->getRestrictions()->isEmpty() && !$user->hasCompleteEmergencyContact()) {
-                $error = 'This member has no emergency contact details on file — add them before checking in onto a certification-restricted event.';
-            }
-
-            if (!$error
-                && $event->getMaxAttendees() !== null
-                && $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
-            ) {
-                $error = 'This event is full.';
-            }
-
-            $needsCredit = false;
-            if (!$error) {
-                try {
-                    $needsCredit = $eventBookingCreditService->requiresCredit($event, $user);
-                } catch (\InvalidArgumentException $e) {
-                    $error = $e->getMessage();
-                }
-            }
-
             if (!$error) {
                 $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
                 if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING], true)) {
@@ -144,38 +112,28 @@ class AdminBookingController extends AbstractController
                 /** @var User $admin */
                 $admin = $this->getUser();
 
-                $attendee = new Attendee();
-                $attendee->setEvent($event);
-                $attendee->setUser($user);
-                $attendee->setOccurrenceDate($storedOccurrenceDate);
-                $attendee->setStatus($status);
-                $attendee->setAddedBy($admin);
-
                 // Checking someone in for a session that's already running (or about to, within
                 // 15 minutes) is a real, right-now attendance — stamp it as such. A session safely
                 // in the future is just a booking/reservation; it isn't attended yet.
-                if ($this->isCheckInWindow($event, $occurrenceDate)) {
-                    $attendee->setCheckedInAt(new \DateTimeImmutable());
-                    $attendee->setCheckedInBy($admin);
-                    $attendee->setCheckedInMethod(Attendee::CHECKED_IN_MANUAL);
+                $result = $bookingService->createBooking(
+                    $event,
+                    $user,
+                    $occurrenceDate,
+                    status: $status,
+                    addedBy: $admin,
+                    checkInNow: $this->isCheckInWindow($event, $occurrenceDate),
+                );
+
+                if (is_string($result)) {
+                    $error = $result;
+                } else {
+                    if ($request->request->has('sendEmail') && $user->getEmail()) {
+                        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
+                    }
+
+                    $this->addFlash('success', 'Member checked in.');
+                    return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
                 }
-
-                $em->persist($attendee);
-
-                if ($needsCredit) {
-                    $eventBookingCreditService->spendCredit($user, $event, $attendee);
-                }
-
-                $doorAccessService->generatePinIfNeeded($attendee);
-
-                $em->flush();
-
-                if ($request->request->has('sendEmail') && $user->getEmail()) {
-                    $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $attendee->getPin());
-                }
-
-                $this->addFlash('success', 'Member checked in.');
-                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
             }
         }
 
@@ -248,7 +206,7 @@ class AdminBookingController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
-    public function edit(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository, DoorAccessService $doorAccessService): Response
+    public function edit(Request $request, Attendee $attendee, NoteRepository $noteRepository, DoorAccessService $doorAccessService, BookingService $bookingService): Response
     {
         $error = null;
 
@@ -264,15 +222,11 @@ class AdminBookingController extends AbstractController
             }
 
             if (!$error) {
-                $attendee->setStatus($status);
-
                 if ($status === Attendee::STATUS_CANCELLED) {
-                    $doorAccessService->revokePin($attendee);
+                    $bookingService->cancelBooking($attendee);
                 } else {
-                    $doorAccessService->generatePinIfNeeded($attendee);
+                    $bookingService->reinstateBooking($attendee, $status);
                 }
-
-                $em->flush();
 
                 $this->addFlash('success', 'Booking updated.');
                 return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);

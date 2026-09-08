@@ -4,7 +4,9 @@
 {% block content %}
 <div class="page-header">
   <h1>Events</h1>
-  <a href="{{ path('app_admin_event_new') }}" class="btn btn--teal btn--sm">+ New event</a>
+  {% if is_granted('ROLE_ADMIN') %}
+    <a href="{{ path('app_admin_event_new') }}" class="btn btn--teal btn--sm">+ New event</a>
+  {% endif %}
 </div>
 
 <div class="filter-form">

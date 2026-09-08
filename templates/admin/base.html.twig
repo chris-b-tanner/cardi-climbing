@@ -382,6 +382,12 @@
         </a>
       </li>
       <li>
+        <a href="{{ path('app_admin_events') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
+          <i class="bi bi-calendar3"></i> Events
+        </a>
+      </li>
+      <li>
         <a href="{{ path('app_admin_bookings') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_booking' ? ' is-active' : '' }}">
           <i class="bi bi-calendar-check"></i> Bookings
@@ -413,8 +419,8 @@
       </li>
       {% if is_granted('ROLE_ADMIN') %}
         <li>
-          <a href="{{ path('app_admin_events') }}"
-             class="admin-nav__link{{ (currentRoute starts with 'app_admin_settings' or currentRoute starts with 'app_admin_event') ? ' is-active' : '' }}">
+          <a href="{{ path('app_admin_settings_team') }}"
+             class="admin-nav__link{{ currentRoute starts with 'app_admin_settings' ? ' is-active' : '' }}">
             <i class="bi bi-gear"></i> Settings
           </a>
         </li>
@@ -431,12 +437,8 @@
       <a href="{{ path('app_logout') }}" class="admin-topbar__link">Sign out</a>
     </div>
 
-    {% if currentRoute starts with 'app_admin_settings' or currentRoute starts with 'app_admin_event' %}
+    {% if currentRoute starts with 'app_admin_settings' %}
       <div class="admin-subnav">
-        <a href="{{ path('app_admin_events') }}"
-           class="admin-subnav__link{{ currentRoute starts with 'app_admin_event' ? ' is-active' : '' }}">
-          <i class="bi bi-calendar3"></i> Events
-        </a>
         <a href="{{ path('app_admin_settings_team') }}"
            class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_team' ? ' is-active' : '' }}">
           Team

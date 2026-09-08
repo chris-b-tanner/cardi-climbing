@@ -24,7 +24,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AdminEventController extends AbstractController
 {
     #[Route('', name: 'app_admin_events')]
-    #[IsGranted('ROLE_ADMIN')]
     public function index(Request $request, EventRepository $eventRepository): Response
     {
         $query  = trim($request->query->get('q', ''));
