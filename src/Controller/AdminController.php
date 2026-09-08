@@ -133,6 +133,7 @@ class AdminController extends AbstractController
         EntityManagerInterface $em,
         TagRepository $tagRepository,
         UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
     ): Response {
         $allTags = $tagRepository->findBy([], ['name' => 'ASC']);
         $canHaveDependents = $user->getParent() === null && $user->getEmail() !== null;
@@ -221,6 +222,7 @@ class AdminController extends AbstractController
             'user'              => $user,
             'allTags'           => $allTags,
             'canHaveDependents' => $canHaveDependents,
+            'bookings'          => $attendeeRepository->findAllForUser($user),
         ]);
     }
 

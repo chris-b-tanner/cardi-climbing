@@ -185,6 +185,41 @@
     <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
+
+{% if is_granted('ROLE_ADMIN') and not user.deletedAt %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
+    {% if user.hasDependents %}
+      <p style="font-size:0.85rem;color:var(--muted);">
+        Remove {{ displayName ?: 'this member' }}'s dependents before deleting or archiving them.
+      </p>
+    {% elseif bookings is not empty or user.payments is not empty %}
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
+        This member has booking or payment history, so they can't be permanently deleted — archiving removes their personal details but keeps that history.
+      </p>
+      <form method="post" action="{{ path('app_admin_user_archive', {id: user.id}) }}"
+            onsubmit="return (function(f){
+              var reason = window.prompt('Why are you archiving {{ (displayName ?: user.email)|e('js') }}? This removes their personal details but keeps their booking/payment history.');
+              if (!reason || !reason.trim()) return false;
+              f.reason.value = reason;
+              return true;
+            })(this);">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('archive_user_' ~ user.id) }}">
+        <input type="hidden" name="reason">
+        <button type="submit" class="btn btn--danger btn--sm">Archive</button>
+      </form>
+    {% else %}
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
+        Permanently delete {{ displayName ?: user.email }}. This cannot be undone.
+      </p>
+      <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
+            onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
+        <button type="submit" class="btn btn--danger btn--sm">Delete</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

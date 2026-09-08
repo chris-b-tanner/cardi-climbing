@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Attendee;
+use App\Entity\Event;
 use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -150,6 +151,15 @@ class AdminBookingController extends AbstractController
                 $attendee->setStatus($status);
                 $attendee->setAddedBy($admin);
 
+                // Checking someone in for a session that's already running (or about to, within
+                // 15 minutes) is a real, right-now attendance — stamp it as such. A session safely
+                // in the future is just a booking/reservation; it isn't attended yet.
+                if ($this->isCheckInWindow($event, $occurrenceDate)) {
+                    $attendee->setCheckedInAt(new \DateTimeImmutable());
+                    $attendee->setCheckedInBy($admin);
+                    $attendee->setCheckedInMethod(Attendee::CHECKED_IN_MANUAL);
+                }
+
                 $em->persist($attendee);
 
                 if ($needsCredit) {
@@ -165,11 +175,7 @@ class AdminBookingController extends AbstractController
                 }
 
                 $this->addFlash('success', 'Member checked in.');
-                $showParams = ['id' => $event->getId()];
-                if ($storedOccurrenceDate) {
-                    $showParams['date'] = $storedOccurrenceDate->format('Y-m-d');
-                }
-                return $this->redirectToRoute('app_admin_event_show', $showParams);
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
             }
         }
 
@@ -214,12 +220,13 @@ class AdminBookingController extends AbstractController
                     $spotsLeft = $weekEvent->getMaxAttendees() !== null ? max(0, $weekEvent->getMaxAttendees() - $stats['count']) : null;
 
                     $dayOccurrences[] = [
-                        'event'        => $weekEvent,
-                        'date'         => $day,
-                        'spotsLeft'    => $spotsLeft,
-                        'isFull'       => $spotsLeft !== null && $spotsLeft <= 0,
-                        'bookedByUser' => $stats['bookedByUser'],
-                        'isRestricted' => !$weekEvent->allowsUser($user),
+                        'event'           => $weekEvent,
+                        'date'            => $day,
+                        'spotsLeft'       => $spotsLeft,
+                        'isFull'          => $spotsLeft !== null && $spotsLeft <= 0,
+                        'bookedByUser'    => $stats['bookedByUser'],
+                        'isRestricted'    => !$weekEvent->allowsUser($user),
+                        'isCheckInWindow' => $this->isCheckInWindow($weekEvent, $day),
                     ];
                 }
 
@@ -327,6 +334,14 @@ class AdminBookingController extends AbstractController
 
         $this->addFlash('success', $successMessage);
         return $this->redirectToEventShow($attendee);
+    }
+
+    /** Whether {date}'s occurrence of {event} is already running, or about to start within 15 minutes — the threshold for treating a check-in as a real, right-now attendance rather than a future booking. Also true once the session has ended; there's no "too late" cutoff here, only "too early". */
+    private function isCheckInWindow(Event $event, \DateTimeImmutable $date): bool
+    {
+        $sessionStart = $event->combineDateAndTime($date, $event->getTimeFrom());
+
+        return new \DateTimeImmutable() >= $sessionStart->sub(new \DateInterval('PT15M'));
     }
 
     private function redirectToEventShow(Attendee $attendee): Response

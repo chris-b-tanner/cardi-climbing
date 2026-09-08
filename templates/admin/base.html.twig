@@ -131,6 +131,7 @@
     .flash { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.875rem; }
     .flash--success { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
     .flash--error   { background: #fee2e2; color: var(--red);   border: 1px solid #fecaca; }
+    .flash--info    { background: #eff6ff; color: #1e40af;      border: 1px solid #bfdbfe; }
 
     .page-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -142,8 +143,9 @@
 
     .btn {
       display: inline-block; padding: 0.5rem 1rem; border-radius: 6px;
-      font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none;
-      text-decoration: none; line-height: 1.4;
+      font-family: inherit; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none;
+      text-decoration: none; line-height: 1.4; text-align: center;
+      appearance: none; -webkit-appearance: none; background: none;
     }
     .btn--teal  { background: var(--teal); color: #fff; }
     .btn--teal:hover  { background: var(--teal-dk); }

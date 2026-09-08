@@ -9,7 +9,9 @@
 {% set activeMembership = user.effectiveMembership and user.effectiveMembership.currentlyActive ? user.effectiveMembership : null %}
 <div class="page-header">
   <h1>
-    <span class="member-id">#{{ user.id }}</span> {{ displayName ?: user.email }}
+    <span class="member-id">#{{ user.id }}</span>
+    <a href="{{ path('app_admin_users') }}" class="page-header__crumb">Members</a> &raquo;
+    {{ displayName ?: user.email }}
     {% if activeMembership %}
       <span class="status-pill status-pill--published" style="margin-left:0.5rem;font-size:0.7rem;vertical-align:middle;">{{ activeMembership.membershipType.name }}</span>
     {% elseif user.creditBalance > 0 %}
@@ -22,33 +24,11 @@
     {% endif %}
   </h1>
   <div class="btn-row">
-    <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
     <a href="{{ path('app_admin_user_edit', {id: user.id}) }}" class="btn btn--teal btn--sm">Edit</a>
-    {% if is_granted('ROLE_ADMIN') and not user.deletedAt %}
-      {% if user.hasDependents %}
-        <span class="btn btn--ghost btn--sm" style="opacity:0.5;cursor:not-allowed;" title="Remove this member's dependents before deleting or archiving them.">Delete</span>
-      {% elseif bookings is not empty or user.payments is not empty %}
-        <form method="post" action="{{ path('app_admin_user_archive', {id: user.id}) }}"
-              style="display:inline;"
-              onsubmit="return (function(f){
-                var reason = window.prompt('Why are you archiving {{ (displayName ?: user.email)|e('js') }}? This removes their personal details but keeps their booking/payment history.');
-                if (!reason || !reason.trim()) return false;
-                f.reason.value = reason;
-                return true;
-              })(this);">
-          <input type="hidden" name="_csrf_token" value="{{ csrf_token('archive_user_' ~ user.id) }}">
-          <input type="hidden" name="reason">
-          <button type="submit" class="btn btn--danger btn--sm">Archive</button>
-        </form>
-      {% else %}
-        <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
-              style="display:inline;"
-              onsubmit="return confirm('Permanently delete {{ (displayName ?: user.email)|e('js') }}? This cannot be undone.');">
-          <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
-          <button type="submit" class="btn btn--danger btn--sm">Delete</button>
-        </form>
-      {% endif %}
-    {% endif %}
+    <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}" style="display:inline;">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
+      <button type="submit" class="btn btn--teal btn--sm">+ New sale</button>
+    </form>
   </div>
 </div>
 
@@ -153,15 +133,20 @@
 </div>
 {% endif %}
 
-{% if user.emergencyContactName or user.emergencyContactPhone %}
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Emergency contact</div>
-  <div class="card__value" style="line-height:1.8;">
-    {% if user.emergencyContactName %}<span>{{ user.emergencyContactName }}</span><br>{% endif %}
-    {% if user.emergencyContactPhone %}<a href="tel:{{ user.emergencyContactPhone }}" style="color:var(--teal);">{{ user.emergencyContactPhone }}</a>{% endif %}
-  </div>
+  {% if user.emergencyContactName or user.emergencyContactPhone %}
+    <div class="card__value" style="line-height:1.8;">
+      {% if user.emergencyContactName %}<span>{{ user.emergencyContactName }}</span><br>{% endif %}
+      {% if user.emergencyContactPhone %}<a href="tel:{{ user.emergencyContactPhone }}" style="color:var(--teal);">{{ user.emergencyContactPhone }}</a>{% endif %}
+    </div>
+  {% else %}
+    <div class="duplicate-warning" style="margin-bottom:0;">
+      <span class="duplicate-warning__icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+      <span>No emergency contact on file.</span>
+    </div>
+  {% endif %}
 </div>
-{% endif %}
 
 {% if user.family is not empty %}
 <div class="card" id="family">
@@ -297,19 +282,15 @@
           <span class="status-pill{{ inherited.status == 'active' ? ' status-pill--published' : ' status-pill--pending' }}">{{ inherited.statusLabel }}</span>
         </p>
       {% else %}
-        <p style="color:var(--muted);font-size:0.875rem;margin-bottom:0.75rem;">No membership on record.</p>
+        <p style="color:var(--muted);font-size:0.875rem;">No membership on record. Create a new sale to choose a membership.</p>
       {% endif %}
-      <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
-        <button type="submit" class="btn btn--teal btn--sm">+ Add membership</button>
-      </form>
     {% endif %}
   </div>
 </div>
 
 <div class="card">
   <div class="pos-tabs" id="member-tabs">
-    <button type="button" class="pos-tab" data-tab="bookings" data-has-content="{{ hasBookings ? '1' : '0' }}">Bookings</button>
+    <button type="button" class="pos-tab" data-tab="bookings" data-has-content="{{ hasBookings ? '1' : '0' }}">Bookings / Check-in</button>
     <button type="button" class="pos-tab" data-tab="sales" data-has-content="{{ hasSales ? '1' : '0' }}">Sales</button>
     <button type="button" class="pos-tab" data-tab="payments" data-has-content="{{ hasPayments ? '1' : '0' }}">Payments</button>
     <button type="button" class="pos-tab" data-tab="credits" data-has-content="{{ hasCredits ? '1' : '0' }}">Credit transactions</button>
