@@ -298,23 +298,24 @@
               <th>Event</th>
               <th>Date</th>
               <th>Price</th>
-              <th>Paid</th>
               <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {% for booking in bookings %}
-              {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+              {% set pillClass = booking.status == 'confirmed' ? ' status-pill--published' : (booking.status == 'cancelled' ? ' status-pill--cancelled' : (booking.status == 'waiting' ? ' status-pill--waiting' : '')) %}
               <tr>
                 <td>
                   <a href="{{ path('app_admin_event_show', booking.event.isRecurring ? {id: booking.event.id, date: (booking.occurrenceDate ?? booking.event.date)|date('Y-m-d')} : {id: booking.event.id}) }}" class="admin-table__link">
                     {{ booking.event.title }}
                   </a>
+                  {% if booking.isStaffing %}
+                    <br><span style="font-size:0.72rem;color:var(--muted);">{{ booking.staffingRequirement.certification.name }} &middot; {{ booking.staffingStatusLabel }}</span>
+                  {% endif %}
                 </td>
                 <td class="admin-table__muted">{{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}</td>
                 <td class="admin-table__muted">{{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}</td>
-                <td class="admin-table__muted">{{ booking.paidAmount != '0.00' ? '£' ~ booking.paidAmount : '—' }}</td>
                 <td><span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span></td>
                 <td><a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" class="admin-table__link">Edit</a></td>
               </tr>

@@ -16,6 +16,7 @@ class CertificationMailer
     public function __construct(
         private readonly MailerInterface $mailer,
         private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly MagicLinkService $magicLinkService,
         #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
@@ -27,11 +28,15 @@ class CertificationMailer
         // link it carries — goes to their family parent, who signs in as themself to act on it.
         $recipient = $holder->getParent() ?? $holder;
 
-        $completeUrl = $this->urlGenerator->generate(
-            'app_account_certification_complete',
-            ['recordId' => $record->getId()],
-            UrlGeneratorInterface::ABSOLUTE_URL,
-        );
+        // A magic link rather than a plain one: many contacts (anyone added by an admin, or a
+        // dependent) have no password to log in with at all, so a plain link would just strand
+        // them at the login screen. This logs $recipient straight in and on to the complete page.
+        $completeUrl = $this->urlGenerator->generate('app_magic_link', [
+            'token' => $this->magicLinkService->generate(
+                $recipient,
+                $this->urlGenerator->generate('app_account_certification_complete', ['recordId' => $record->getId()]),
+            ),
+        ], UrlGeneratorInterface::ABSOLUTE_URL);
 
         $email = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))

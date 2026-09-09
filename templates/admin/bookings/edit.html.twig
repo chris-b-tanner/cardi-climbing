@@ -44,6 +44,7 @@
         <select id="status" name="status" class="form-control">
           <option value="confirmed" {{ attendee.status == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
           <option value="pending" {{ attendee.status == 'pending' ? 'selected' : '' }}>Pending</option>
+          <option value="waiting" {{ attendee.status == 'waiting' ? 'selected' : '' }}>Waiting</option>
           <option value="cancelled" {{ attendee.status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
         </select>
       </div>

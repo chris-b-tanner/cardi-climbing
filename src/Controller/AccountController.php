@@ -64,7 +64,7 @@ class AccountController extends AbstractController
                 $em->flush();
 
                 $this->addFlash('success', 'Your details have been updated.');
-                return $this->redirectToRoute('app_account');
+                return $this->redirect($this->resolveReturnTo($request));
             }
         }
 
@@ -140,7 +140,7 @@ class AccountController extends AbstractController
             $message = $holder === $user
                 ? 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.'
                 : 'Ask an admin to add the following to ' . $holder->getDisplayName() . "'s profile before completing this certification: " . implode(', ', $missingProfileFields) . '.';
-            $this->addFlash('error', $message);
+            $this->addFlash('warning', $message);
         }
 
         $declarations = $record->getCertification()->getDeclarations();
@@ -206,5 +206,19 @@ class AccountController extends AbstractController
         $holder = $record->getUser();
 
         return ($holder === $user || $user->getDependents()->contains($holder)) ? $record : null;
+    }
+
+    /**
+     * Where to send the member after saving their profile — normally back to the account page, but
+     * the certification wizard's step 1 reuses this same form/endpoint and wants them back on the
+     * wizard instead. Only ever a local path (never a full URL) so this can't become an open redirect.
+     */
+    private function resolveReturnTo(Request $request): string
+    {
+        $returnTo = $request->request->get('returnTo', '');
+
+        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
+            ? $returnTo
+            : $this->generateUrl('app_account');
     }
 }

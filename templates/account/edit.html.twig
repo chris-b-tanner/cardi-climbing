@@ -142,88 +142,9 @@
     <section class="account-panel" data-panel="info">
       <form method="post" action="{{ path('app_account') }}" novalidate>
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_edit') }}">
+        <input type="hidden" name="returnTo" value="{{ path('app_account', {_fragment: 'info'}) }}">
 
-        <div class="account-card">
-          <div class="account-card__title">Personal details</div>
-          <div class="field-row">
-            <div class="field">
-              <label for="firstName">First name</label>
-              <input type="text" id="firstName" name="firstName"
-                     value="{{ user.firstName }}" autocomplete="given-name">
-            </div>
-            <div class="field">
-              <label for="lastName">Last name</label>
-              <input type="text" id="lastName" name="lastName"
-                     value="{{ user.lastName }}" autocomplete="family-name">
-            </div>
-          </div>
-          <div class="field">
-            <label for="company">Company</label>
-            <input type="text" id="company" name="company"
-                   value="{{ user.company }}" autocomplete="organization">
-          </div>
-          <div class="field">
-            <label for="email">Email address</label>
-            <input type="email" id="email" name="email"
-                   value="{{ user.email }}" autocomplete="email" required>
-          </div>
-          <div class="field">
-            <label for="phone">Phone number</label>
-            <input type="tel" id="phone" name="phone"
-                   value="{{ user.phone }}" autocomplete="tel">
-          </div>
-          <div class="field">
-            <label for="dateOfBirth">Date of birth</label>
-            <input type="date" id="dateOfBirth" name="dateOfBirth"
-                   value="{{ user.dateOfBirth ? user.dateOfBirth|date('Y-m-d') : '' }}" autocomplete="bday">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label class="optin-label">
-              <input type="checkbox" name="optIn" value="1"{% if user.optIn %} checked{% endif %}>
-              Keep me updated about Y Wal news
-            </label>
-          </div>
-        </div>
-
-        <div class="account-card">
-          <div class="account-card__title">Emergency contact</div>
-          <div class="field">
-            <label for="emergencyContactName">Contact name</label>
-            <input type="text" id="emergencyContactName" name="emergencyContactName"
-                   value="{{ user.emergencyContactName }}" autocomplete="off">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="emergencyContactPhone">Contact phone number</label>
-            <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone"
-                   value="{{ user.emergencyContactPhone }}" autocomplete="off">
-          </div>
-        </div>
-
-        <div class="account-card">
-          <div class="account-card__title">Address</div>
-          <div class="field">
-            <label for="addressLine1">Address line 1</label>
-            <input type="text" id="addressLine1" name="addressLine1"
-                   value="{{ user.addressLine1 }}" autocomplete="address-line1">
-          </div>
-          <div class="field">
-            <label for="addressLine2">Address line 2</label>
-            <input type="text" id="addressLine2" name="addressLine2"
-                   value="{{ user.addressLine2 }}" autocomplete="address-line2">
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="town">Town / City</label>
-              <input type="text" id="town" name="town"
-                     value="{{ user.town }}" autocomplete="address-level2">
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label for="postcode">Postcode</label>
-              <input type="text" id="postcode" name="postcode"
-                     value="{{ user.postcode }}" autocomplete="postal-code">
-            </div>
-          </div>
-        </div>
+        {% include 'account/_profile_fields.html.twig' with {user: user} %}
 
         {% if user.dependents is not empty %}
         <div class="account-card">

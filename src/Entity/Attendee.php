@@ -13,6 +13,8 @@ class Attendee
     public const STATUS_PENDING   = 'pending';
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_CANCELLED = 'cancelled';
+    /** Not yet wired into any booking flow — reserved for the future waiting-list feature. */
+    public const STATUS_WAITING   = 'waiting';
 
     public const STAFFING_PENDING  = 'pending';
     public const STAFFING_APPROVED = 'approved';

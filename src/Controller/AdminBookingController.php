@@ -218,7 +218,7 @@ class AdminBookingController extends AbstractController
             }
 
             $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
-            if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING, Attendee::STATUS_CANCELLED], true)) {
+            if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING, Attendee::STATUS_WAITING, Attendee::STATUS_CANCELLED], true)) {
                 $error = 'Please choose a valid status.';
             }
 

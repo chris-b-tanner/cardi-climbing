@@ -67,4 +67,31 @@ class UserCertificationRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Holders of {certification}, optionally narrowed by {query} (name/email) — for the admin "add
+     * {certification}" staffing picker. An empty query returns the full holder list rather than
+     * requiring a search first, since that pool is usually short enough to just pick from directly.
+     *
+     * @return User[]
+     */
+    public function searchHoldersForCertification(Certification $certification, string $query = ''): array
+    {
+        $qb = $this->getEntityManager()->createQueryBuilder()
+            ->select('DISTINCT u')
+            ->from(User::class, 'u')
+            ->innerJoin(UserCertification::class, 'uc', 'WITH', 'uc.user = u')
+            ->where('uc.certification = :certification')
+            ->andWhere('uc.completedAt IS NOT NULL')
+            ->setParameter('certification', $certification)
+            ->orderBy('u.firstName')
+            ->addOrderBy('u.lastName');
+
+        if ($query !== '') {
+            $qb->andWhere('u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.email LIKE :q')
+               ->setParameter('q', '%' . $query . '%');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

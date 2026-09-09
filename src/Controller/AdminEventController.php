@@ -12,8 +12,12 @@ use App\Repository\CertificationRepository;
 use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
+use App\Repository\UserCertificationRepository;
+use App\Repository\UserRepository;
+use App\Service\DoorAccessService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -107,17 +111,6 @@ class AdminEventController extends AbstractController
 
         $eventTicketProducts = $productRepository->findActiveEventTickets($event);
 
-        // Which tab each attendee falls under — the ticket product their booking was sold through, or 'free' if none.
-        $attendeesByTab = ['free' => []];
-        foreach ($eventTicketProducts as $ticketProduct) {
-            $attendeesByTab[$ticketProduct->getId()] = [];
-        }
-        foreach ($attendees as $attendee) {
-            $row = $attendee->getSalesOrderRow();
-            $key = $row ? $row->getProduct()->getId() : null;
-            $attendeesByTab[$key !== null && isset($attendeesByTab[$key]) ? $key : 'free'][] = $attendee;
-        }
-
         return $this->render('admin/events/show.html.twig', [
             'event'               => $event,
             'attendees'           => $attendees,
@@ -126,7 +119,6 @@ class AdminEventController extends AbstractController
             'nextDate'            => $nextDate,
             'staffing'            => $staffing,
             'eventTicketProducts' => $eventTicketProducts,
-            'attendeesByTab'      => $attendeesByTab,
             'notes'               => $noteRepository->findForNoteable(Note::TYPE_EVENT, $event->getId()),
         ]);
     }
@@ -202,6 +194,125 @@ class AdminEventController extends AbstractController
 
         $this->addFlash('success', 'Member put on duty.');
         return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    /**
+     * Lists (and, once typed, narrows) holders of {requirementId}'s certification for the "Add
+     * {certification}" modal — everyone who isn't already attending this occurrence in any capacity
+     * (an already-booked holder is put on duty via the "eligible" dropdown next to it instead). No
+     * query returns the full holder list rather than requiring a search first, since that pool is
+     * usually short enough to just pick from directly.
+     */
+    #[Route('/{id}/staffing/search', name: 'app_admin_event_staffing_search', requirements: ['id' => '\d+'])]
+    public function staffingSearch(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserCertificationRepository $userCertificationRepository,
+        AttendeeRepository $attendeeRepository,
+    ): JsonResponse {
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->query->get('requirementId'));
+        if (!$requirement || $requirement->getEvent() !== $event) {
+            return $this->json([]);
+        }
+
+        $storedOccurrenceDate = $event->isRecurring() ? $this->parseOccurrenceDate($request->query->get('occurrenceDate', '')) : null;
+
+        $query      = trim($request->query->get('q', ''));
+        $candidates = $userCertificationRepository->searchHoldersForCertification($requirement->getCertification(), $query);
+
+        $candidates = array_values(array_filter(
+            $candidates,
+            static fn (User $candidate) => !$attendeeRepository->findActiveBooking($event, $candidate, $storedOccurrenceDate),
+        ));
+
+        return $this->json(array_map(static fn (User $u) => [
+            'id'    => $u->getId(),
+            'label' => $u->getEmail() ? $u->getDisplayName() . ' — ' . $u->getEmail() : $u->getDisplayName(),
+        ], $candidates));
+    }
+
+    /**
+     * Adds {userId} straight onto {requirementId}'s duty roster as a brand-new, staff-only
+     * attendee (confirmed, no capacity/credit checks — those govern ordinary attendee seats, not
+     * staffing a session) — for someone who isn't already booked onto this occurrence. An
+     * already-booked holder is put on duty via assignStaffing() instead.
+     */
+    #[Route('/{id}/staffing/add', name: 'app_admin_event_staffing_add', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addStaffMember(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+        DoorAccessService $doorAccessService,
+    ): Response {
+        if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $showParams        = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->request->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->request->get('requirementId'));
+        $user        = $userRepository->find((int) $request->request->get('userId'));
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$user) {
+            $this->addFlash('error', 'Could not find that member or staffing role.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        if (!$user->hasCertification($requirement->getCertification())) {
+            $this->addFlash('error', 'That member does not hold the required certification.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        $occurrenceDate = $this->parseOccurrenceDate($occurrenceDateRaw) ?? $event->getDate();
+        if ($event->isRecurring() && !$event->isValidForDate($occurrenceDate)) {
+            $this->addFlash('error', 'That date is not a valid occurrence of this event.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
+            $this->addFlash('error', 'That member is already attending this event.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $attendee = new Attendee();
+        $attendee->setEvent($event);
+        $attendee->setUser($user);
+        $attendee->setOccurrenceDate($storedOccurrenceDate);
+        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
+        $attendee->setAddedBy($admin);
+        $attendee->setStaffingRequirement($requirement);
+        $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+
+        $em->persist($attendee);
+        $doorAccessService->generatePinIfNeeded($attendee);
+        $em->flush();
+
+        $this->addFlash('success', $user->getDisplayName() . ' added as ' . $requirement->getCertification()->getName() . '.');
+        return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    private function parseOccurrenceDate(string $raw): ?\DateTimeImmutable
+    {
+        if ($raw === '') {
+            return null;
+        }
+        try {
+            return new \DateTimeImmutable($raw);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

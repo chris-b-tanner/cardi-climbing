@@ -12,14 +12,15 @@
             <th>Member</th>
             <th>Status</th>
             <th>Price</th>
-            <th>Paid</th>
+            <th>Ticket</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for attendee in attendees %}
             {% set displayName = attendee.user.displayName %}
-            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
-            <tr>
+            {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : (attendee.status == 'waiting' ? ' status-pill--waiting' : '')) %}
+            <tr data-name="{{ displayName|lower }}" data-email="{{ attendee.user.email|lower }}">
               <td>
                 <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
                   {{ displayName ?: attendee.user.email }}
@@ -30,7 +31,14 @@
               </td>
               <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
               <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
-              <td class="admin-table__muted">£{{ attendee.paidAmount }}</td>
+              <td class="admin-table__muted">
+                {% if attendee.salesOrderRow %}
+                  {{ attendee.salesOrderRow.product.name }}{% if attendee.salesOrderRow.product.variantValue %} ({{ attendee.salesOrderRow.product.variantValue }}){% endif %}
+                {% else %}
+                  &mdash;
+                {% endif %}
+              </td>
+              <td><a href="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" class="admin-table__link">Edit</a></td>
             </tr>
           {% endfor %}
         </tbody>
@@ -62,7 +70,7 @@
   </div>
 {% endif %}
 
-<div class="member-columns">
+<div class="member-columns member-columns--thirds">
 <div class="member-col-left">
 
 <div class="card">
@@ -166,10 +174,64 @@
 </div>
 <div class="member-col-right">
 
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
-  {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'event', noteableId: event.id} %}
-</div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+      {% set confirmedCount = attendees|filter(a => a.status == 'confirmed')|length %}
+      {% set placesLeft = event.maxAttendees ? max(event.maxAttendees - confirmedCount, 0) : null %}
+      <div class="card__label" style="margin-bottom:0;">
+        Attendees ({{ confirmedCount }}){% if placesLeft is not null %}, {{ placesLeft }} place{{ placesLeft == 1 ? '' : 's' }} left{% endif %}{% if event.isRecurring %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}
+      </div>
+      <div class="btn-row">
+        {% if attendees is not empty %}
+          <a href="{{ path('app_admin_event_attendees_print', event.isRecurring ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id}) }}" class="btn btn--ghost btn--sm" target="_blank"><i class="bi bi-printer-fill"></i> Print attendee list</a>
+          {% if event.isRecurring %}
+            <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email this date</a>
+            <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email series</a>
+          {% else %}
+            <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email attendees</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    {% set confirmedAttendees = attendees|filter(a => a.status == 'confirmed') %}
+    {% set pendingAttendees   = attendees|filter(a => a.status == 'pending') %}
+    {% set waitingAttendees   = attendees|filter(a => a.status == 'waiting') %}
+    {% set cancelledAttendees = attendees|filter(a => a.status == 'cancelled') %}
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+      <div class="pos-tabs" id="attendee-tabs">
+        <button type="button" class="pos-tab" data-tab="confirmed">Confirmed ({{ confirmedAttendees|length }})</button>
+        <button type="button" class="pos-tab" data-tab="pending">Pending ({{ pendingAttendees|length }})</button>
+        <button type="button" class="pos-tab" data-tab="waiting">Waiting ({{ waitingAttendees|length }})</button>
+        <button type="button" class="pos-tab" data-tab="cancelled">Cancelled ({{ cancelledAttendees|length }})</button>
+      </div>
+      <input type="search" id="attendee-search" class="form-control" style="max-width:220px;padding:0.4rem 0.85rem;font-size:0.8rem; margin-bottom: 10px;"
+             placeholder="Search name or email…" autocomplete="off">
+    </div>
+
+    <div class="tab-panel" data-tab-panel="confirmed" style="display:none;">
+      {{ _self.attendee_table(confirmedAttendees) }}
+    </div>
+    <div class="tab-panel" data-tab-panel="pending" style="display:none;">
+      {{ _self.attendee_table(pendingAttendees) }}
+    </div>
+    <div class="tab-panel" data-tab-panel="waiting" style="display:none;">
+      {{ _self.attendee_table(waitingAttendees) }}
+    </div>
+    <div class="tab-panel" data-tab-panel="cancelled" style="display:none;">
+      {{ _self.attendee_table(cancelledAttendees) }}
+    </div>
+    <p id="attendee-search-empty" class="tag-badge--none" style="display:none;">No matching attendees.</p>
+
+    {% if eventTicketProducts is not empty and is_granted('ROLE_ADMIN') %}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;">
+        {% for product in eventTicketProducts %}
+          <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
 
 {% if event.staffingRequirements is not empty %}
 <div class="card">
@@ -190,11 +252,17 @@
           {{ approvedForReq|length }} / {{ requirement.minCount }} on duty
         </span>
       </div>
-      {% if short %}
-        <a href="{{ path('app_admin_email_compose', {certificationId: requirement.certification.id}) }}" style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);display:inline-block;margin-top:0.4rem;">
-          <i class="bi bi-envelope-fill"></i> Email {{ requirement.certification.name }}s
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.4rem;">
+        {% if short %}
+          <a href="{{ path('app_admin_email_compose', {certificationId: requirement.certification.id}) }}" style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);">
+            <i class="bi bi-envelope-fill"></i> Email {{ requirement.certification.name }}s
+          </a>
+        {% endif %}
+        <a href="#" class="staffing-add-trigger" data-requirement-id="{{ requirement.id }}" data-certification-name="{{ requirement.certification.name }}"
+           style="font-size:0.78rem;font-weight:600;color:var(--teal-dk);">
+          <i class="bi bi-person-plus-fill"></i> Add {{ requirement.certification.name }}
         </a>
-      {% endif %}
+      </div>
 
       {% if approvedForReq is not empty %}
         <div style="margin-top:0.5rem;display:flex;flex-direction:column;gap:0.3rem;">
@@ -260,52 +328,32 @@
     </div>
   {% endfor %}
 </div>
+
+<div id="staffing-picker-modal" class="pos-modal" style="display:none;">
+  <div id="staffing-picker-backdrop" class="pos-modal__backdrop"></div>
+  <div class="pos-modal__box">
+    <div class="pos-modal__header">
+      <strong id="staffing-picker-title">Add staff</strong>
+      <button type="button" id="staffing-picker-close" class="btn btn--ghost btn--sm">✕</button>
+    </div>
+    <input type="text" id="staffing-picker-search" class="form-control" placeholder="Search members…"
+           autocomplete="off" style="margin-bottom:0.75rem;">
+    <div id="staffing-picker-results" style="display:flex;flex-direction:column;gap:0.3rem;max-height:260px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<form id="staffing-add-form" method="post" action="{{ path('app_admin_event_staffing_add', {id: event.id}) }}" style="display:none;">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_staffing_' ~ event.id) }}">
+  <input type="hidden" name="requirementId" id="staffing-add-requirement-id">
+  <input type="hidden" name="userId" id="staffing-add-user-id">
+  {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
+</form>
 {% endif %}
 
-<div class="card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
-    <div class="card__label" style="margin-bottom:0;">
-      Attendees ({{ attendees|length }}){% if event.isRecurring %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}
-    </div>
-    <div class="btn-row">
-      {% if attendees is not empty %}
-        <a href="{{ path('app_admin_event_attendees_print', event.isRecurring ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id}) }}" class="btn btn--ghost btn--sm" target="_blank"><i class="bi bi-printer-fill"></i> Print attendee list</a>
-        {% if event.isRecurring %}
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'date', occurrenceDate: occurrenceDate|date('Y-m-d')}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email this date</a>
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id, scope: 'series'}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email series</a>
-        {% else %}
-          <a href="{{ path('app_admin_email_compose', {eventId: event.id}) }}" class="btn btn--ghost btn--sm"><i class="bi bi-envelope-fill"></i> Email attendees</a>
-        {% endif %}
-      {% endif %}
-    </div>
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'event', noteableId: event.id} %}
   </div>
-
-  {% if eventTicketProducts is empty %}
-    {{ _self.attendee_table(attendees) }}
-  {% else %}
-    <div class="pos-tabs" id="attendee-tabs">
-      {% for product in eventTicketProducts %}
-        <button type="button" class="pos-tab" data-tab="{{ product.id }}">{{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %} &mdash; £{{ product.price }}</button>
-      {% endfor %}
-      <button type="button" class="pos-tab" data-tab="free">Free</button>
-    </div>
-
-    {% for product in eventTicketProducts %}
-      <div class="tab-panel" data-tab-panel="{{ product.id }}" style="display:none;">
-        {% if is_granted('ROLE_ADMIN') %}
-          <div style="text-align:right;margin-bottom:0.75rem;">
-            <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit ticket</a>
-          </div>
-        {% endif %}
-        {{ _self.attendee_table(attendeesByTab[product.id]) }}
-      </div>
-    {% endfor %}
-
-    <div class="tab-panel" data-tab-panel="free" style="display:none;">
-      {{ _self.attendee_table(attendeesByTab['free']) }}
-    </div>
-  {% endif %}
-</div>
 
 </div>
 </div>
@@ -315,28 +363,144 @@
 <style>
   .occurrence-picker { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 </style>
-{% if eventTicketProducts is not empty %}
 <script>
   const attendeeTabs   = document.querySelectorAll('#attendee-tabs .pos-tab');
   const attendeePanels = document.querySelectorAll('.tab-panel[data-tab-panel]');
+  const attendeeSearch = document.getElementById('attendee-search');
+  const attendeeEmpty  = document.getElementById('attendee-search-empty');
 
-  function selectAttendeeTab(tab) {
-    attendeeTabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tab));
-    attendeePanels.forEach(p => p.style.display = p.dataset.tabPanel === tab ? '' : 'none');
+  let activeAttendeeTab = attendeeTabs[0] ? attendeeTabs[0].dataset.tab : null;
+
+  function matchesAttendeeQuery(row, query) {
+    if (!query) return true;
+    const name  = row.dataset.name  || '';
+    const email = row.dataset.email || '';
+    return name.includes(query) || email.includes(query);
   }
 
-  attendeeTabs.forEach(t => t.addEventListener('click', () => selectAttendeeTab(t.dataset.tab)));
+  function renderAttendees() {
+    const query = attendeeSearch ? attendeeSearch.value.trim().toLowerCase() : '';
 
-  // Default to the first tab that actually has attendees in it.
-  let defaultAttendeeTab = attendeeTabs[0] ? attendeeTabs[0].dataset.tab : null;
+    const matchingTabs = new Set();
+    attendeePanels.forEach(panel => {
+      const rows = panel.querySelectorAll('tbody tr[data-name]');
+      if ([...rows].some(row => matchesAttendeeQuery(row, query))) {
+        matchingTabs.add(panel.dataset.tabPanel);
+      }
+    });
+
+    if (query && matchingTabs.size === 1) {
+      // Exactly one status has matches — jump to it.
+      activeAttendeeTab = [...matchingTabs][0];
+    } else if (query && !matchingTabs.has(activeAttendeeTab)) {
+      // The current tab has nothing matching — move to the first one (in tab order) that does.
+      for (const tab of attendeeTabs) {
+        if (matchingTabs.has(tab.dataset.tab)) {
+          activeAttendeeTab = tab.dataset.tab;
+          break;
+        }
+      }
+    }
+
+    attendeeTabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === activeAttendeeTab));
+    attendeePanels.forEach(p => p.style.display = p.dataset.tabPanel === activeAttendeeTab ? '' : 'none');
+
+    let visible = 0;
+    attendeePanels.forEach(panel => {
+      if (panel.dataset.tabPanel !== activeAttendeeTab) return;
+      panel.querySelectorAll('tbody tr[data-name]').forEach(row => {
+        const show = matchesAttendeeQuery(row, query);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+    });
+    attendeeEmpty.style.display = (query && visible === 0) ? 'block' : 'none';
+  }
+
+  attendeeTabs.forEach(t => t.addEventListener('click', () => {
+    activeAttendeeTab = t.dataset.tab;
+    renderAttendees();
+  }));
+
+  if (attendeeSearch) {
+    attendeeSearch.addEventListener('input', renderAttendees);
+  }
+
+  // Default to "Confirmed", unless it's empty and another status actually has attendees in it.
   for (const tab of attendeeTabs) {
     const panel = document.querySelector(`.tab-panel[data-tab-panel="${tab.dataset.tab}"]`);
     if (panel && panel.querySelector('tbody tr')) {
-      defaultAttendeeTab = tab.dataset.tab;
+      activeAttendeeTab = tab.dataset.tab;
       break;
     }
   }
-  if (defaultAttendeeTab) selectAttendeeTab(defaultAttendeeTab);
+  renderAttendees();
+</script>
+{% if event.staffingRequirements is not empty %}
+<script>
+  const staffingPickerModal    = document.getElementById('staffing-picker-modal');
+  const staffingPickerBackdrop = document.getElementById('staffing-picker-backdrop');
+  const staffingPickerClose    = document.getElementById('staffing-picker-close');
+  const staffingPickerTitle    = document.getElementById('staffing-picker-title');
+  const staffingPickerSearch   = document.getElementById('staffing-picker-search');
+  const staffingPickerResults  = document.getElementById('staffing-picker-results');
+  const staffingSearchUrl      = {{ path('app_admin_event_staffing_search', {id: event.id})|json_encode|raw }};
+  const staffingOccurrenceDate = {{ (event.isRecurring ? occurrenceDate|date('Y-m-d') : null)|json_encode|raw }};
+  let staffingSearchDebounce;
+  let staffingRequirementId;
+
+  function closeStaffingPicker() {
+    staffingPickerModal.style.display = 'none';
+  }
+
+  function runStaffingSearch() {
+    const q = staffingPickerSearch.value.trim();
+
+    const params = new URLSearchParams({requirementId: staffingRequirementId, q});
+    if (staffingOccurrenceDate) params.set('occurrenceDate', staffingOccurrenceDate);
+
+    fetch(`${staffingSearchUrl}?${params}`)
+      .then(r => r.json())
+      .then(results => {
+        staffingPickerResults.innerHTML = '';
+        if (!results.length) {
+          staffingPickerResults.innerHTML = '<p style="font-size:0.82rem;color:var(--muted);">No matching certified members found.</p>';
+          return;
+        }
+        results.forEach(result => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'member-search-item';
+          btn.textContent = result.label;
+          btn.addEventListener('click', () => {
+            document.getElementById('staffing-add-user-id').value = result.id;
+            document.getElementById('staffing-add-form').requestSubmit();
+          });
+          staffingPickerResults.appendChild(btn);
+        });
+      });
+  }
+
+  document.querySelectorAll('.staffing-add-trigger').forEach(trigger => {
+    trigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      staffingRequirementId = trigger.dataset.requirementId;
+      document.getElementById('staffing-add-requirement-id').value = staffingRequirementId;
+      staffingPickerTitle.textContent = 'Add ' + trigger.dataset.certificationName;
+      staffingPickerSearch.value = '';
+      staffingPickerModal.style.display = 'flex';
+      staffingPickerSearch.focus();
+      runStaffingSearch(); // list the (usually short) full holder pool immediately — searching is optional
+    });
+  });
+
+  staffingPickerSearch.addEventListener('input', () => {
+    clearTimeout(staffingSearchDebounce);
+    staffingSearchDebounce = setTimeout(runStaffingSearch, 300);
+  });
+
+  staffingPickerClose.addEventListener('click', closeStaffingPicker);
+  staffingPickerBackdrop.addEventListener('click', closeStaffingPicker);
 </script>
 {% endif %}
 {% endblock %}

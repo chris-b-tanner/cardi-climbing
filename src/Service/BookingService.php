@@ -123,17 +123,19 @@ class BookingService
     }
 
     /**
-     * Moves {attendee} to {status} (confirmed/pending) — the other side of cancelBooking(), e.g.
-     * un-cancelling a booking. Issues a door PIN if the event is self-access and it doesn't already
-     * have an active one. Returns an error message instead of reinstating if doing so would push a
-     * capped event over its max attendees — only checked when {attendee} is currently cancelled,
-     * since switching an already-active booking between confirmed/pending doesn't add a new seat.
+     * Moves {attendee} to {status} (confirmed/pending/waiting) — the other side of cancelBooking(),
+     * e.g. un-cancelling a booking. Issues a door PIN if the event is self-access and it doesn't
+     * already have an active one. Returns an error message instead of reinstating if doing so would
+     * push a capped event over its max attendees — only checked when {attendee} is currently
+     * cancelled (switching an already-active booking between statuses doesn't add a new seat) and
+     * the target isn't "waiting" (which never claims a seat — that's the point of it).
      */
     public function reinstateBooking(Attendee $attendee, string $status): ?string
     {
         $event = $attendee->getEvent();
 
         if ($attendee->isCancelled()
+            && $status !== Attendee::STATUS_WAITING
             && $event->getMaxAttendees() !== null
             && $this->attendeeRepository->countActiveForOccurrence($event, $attendee->getOccurrenceDate()) >= $event->getMaxAttendees()
         ) {

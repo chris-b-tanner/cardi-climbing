@@ -17,7 +17,36 @@
     font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.05em; color: #6b7280; margin-bottom: 1rem;
   }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
 
+  .field { margin-bottom: 1rem; }
+  .account-card > .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: #6b7280; margin-bottom: 0.35rem;
+  }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="tel"],
+  .field input[type="date"] {
+    width: 100%; padding: 0.6rem 0.75rem;
+    border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: 0.9375rem; font-family: inherit; color: #1a1a1a;
+  }
+  .field input:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
+
+  .optin-label {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.875rem; color: #1a1a1a; cursor: pointer;
+  }
+  .optin-label input { width: 1rem; height: 1rem; accent-color: #2a9d8f; }
+
+  .alert--success {
+    background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
+  }
   .alert--error {
     background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
     border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
@@ -45,6 +74,28 @@
 
   .account-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
   .account-actions .btn { padding: 0.6rem 1.4rem; }
+
+  /* ── Wizard steps ─────────────────────────────────── */
+  .wizard-step { display: flex; align-items: flex-start; gap: 0.9rem; margin-bottom: 1rem; }
+  .wizard-step__badge {
+    flex-shrink: 0; width: 1.75rem; height: 1.75rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700;
+    background: #f3f4f6; color: #6b7280;
+  }
+  .wizard-step--done .wizard-step__badge { background: #dcfce7; color: #15803d; }
+  .wizard-step--current .wizard-step__badge { background: #2a9d8f; color: #fff; }
+  .wizard-step--pending { opacity: 0.5; }
+  .wizard-step__title { font-weight: 700; font-size: 1.05rem; color: #1a1a1a; margin-top: 0.15rem; }
+  .wizard-step__body { flex: 1; min-width: 0; }
+
+  .profile-summary { font-size: 0.9rem; line-height: 1.7; color: #1a1a1a; }
+  .profile-summary__label { color: #6b7280; }
+  .profile-summary-edit-btn {
+    background: none; border: none; padding: 0; margin-top: 0.75rem;
+    font-family: inherit; font-size: 0.85rem; font-weight: 600; color: #2a9d8f;
+    text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  }
 </style>
 {% endblock %}
 
@@ -56,68 +107,125 @@
       {% if record.user != app.user %}
         For {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: 'your dependent' }}.
       {% endif %}
-      {% if record.certification.description %}{{ record.certification.description }}{% else %}Work through the declarations below and sign to complete this.{% endif %}
+      {% if record.certification.description %}{{ record.certification.description }}{% else %}Confirm your details and complete the declarations below.{% endif %}
     </p>
 
+    {% for msg in app.flashes('success') %}
+      <div class="alert--success">{{ msg }}</div>
+    {% endfor %}
     {% if error %}
       <div class="alert--error">{{ error }}</div>
     {% endif %}
 
-    {% if missingProfileFields is not empty %}
-      <div class="account-card">
-        {% if record.user == app.user %}
-          <p style="margin-bottom:1rem;">
-            Please add the following to your account before you can complete the declarations below:
-            {{ missingProfileFields|join(', ') }}.
-          </p>
-          <a href="{{ path('app_account', {_fragment: 'info'}) }}" class="btn btn--teal">Update your details</a>
+    {% set step1Done = missingProfileFields is empty %}
+    {% set canEditProfile = record.user == app.user %}
+
+    {# ── Step 1: personal information ──────────────────────────────── #}
+    <div class="wizard-step {{ step1Done ? 'wizard-step--done' : 'wizard-step--current' }}">
+      <div class="wizard-step__badge">{{ step1Done ? '✓' : '1' }}</div>
+      <div class="wizard-step__body">
+        <div class="wizard-step__title">Confirm your personal information</div>
+
+        {% if not step1Done %}
+          {% if canEditProfile %}
+            <p style="font-size:0.9rem;color:#6b7280;margin:0.35rem 0 1rem;">
+              We need a few more details on file before this certification can be completed.
+            </p>
+            <form method="post" action="{{ path('app_account') }}" novalidate>
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_edit') }}">
+              <input type="hidden" name="returnTo" value="{{ path('app_account_certification_complete', {recordId: record.id}) }}">
+              {% include 'account/_profile_fields.html.twig' with {user: record.user} %}
+              <div class="account-actions">
+                <button type="submit" class="btn btn--teal">Save and continue</button>
+              </div>
+            </form>
+          {% else %}
+            <div class="account-card">
+              <p style="margin:0;">
+                Ask an admin to add the following to {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: "this member" }}'s profile before you can complete the declarations below:
+                {{ missingProfileFields|join(', ') }}.
+              </p>
+            </div>
+          {% endif %}
         {% else %}
-          <p style="margin:0;">
-            Ask an admin to add the following to {{ (record.user.firstName ~ ' ' ~ record.user.lastName)|trim ?: "this member" }}'s profile before you can complete the declarations below:
-            {{ missingProfileFields|join(', ') }}.
-          </p>
+          {% set holder = record.user %}
+          <div class="account-card">
+            <div class="profile-summary" id="profile-summary">
+              <div><span class="profile-summary__label">Name:</span> {{ (holder.firstName ~ ' ' ~ holder.lastName)|trim ?: '—' }}</div>
+              <div><span class="profile-summary__label">Date of birth:</span> {{ holder.dateOfBirth ? holder.dateOfBirth|date('d M Y') : '—' }}</div>
+              <div><span class="profile-summary__label">Phone:</span> {{ holder.phone ?: '—' }}</div>
+              <div><span class="profile-summary__label">Emergency contact:</span> {{ holder.emergencyContactName ?: '—' }}{% if holder.emergencyContactPhone %} &middot; {{ holder.emergencyContactPhone }}{% endif %}</div>
+              <div><span class="profile-summary__label">Address:</span> {{ [holder.addressLine1, holder.addressLine2, holder.town, holder.postcode]|filter(v => v)|join(', ') ?: '—' }}</div>
+            </div>
+            {% if canEditProfile %}
+              <button type="button" class="profile-summary-edit-btn" id="profile-edit-toggle">Edit details</button>
+              <div id="profile-edit-form" hidden style="margin-top:1rem;">
+                <form method="post" action="{{ path('app_account') }}" novalidate>
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('account_edit') }}">
+                  <input type="hidden" name="returnTo" value="{{ path('app_account_certification_complete', {recordId: record.id}) }}">
+                  {% include 'account/_profile_fields.html.twig' with {user: holder} %}
+                  <div class="account-actions">
+                    <button type="submit" class="btn btn--teal">Save changes</button>
+                    <button type="button" class="btn btn--outline" id="profile-edit-cancel">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            {% endif %}
+          </div>
         {% endif %}
       </div>
-    {% else %}
-    <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate>
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
-      <input type="hidden" name="signature" id="signature-input">
+    </div>
 
-      {% if declarations|length > 0 %}
-        <div class="account-card">
-          <div class="account-card__title">Declarations</div>
-          {% for declaration in declarations %}
-            <label class="declaration">
-              <input type="checkbox" name="declarations[]" value="{{ declaration.id }}" required>
-              <span>{{ declaration.text }}</span>
-            </label>
-          {% endfor %}
-        </div>
-      {% endif %}
+    {# ── Step 2: declarations ──────────────────────────────────────── #}
+    <div class="wizard-step {{ step1Done ? 'wizard-step--current' : 'wizard-step--pending' }}">
+      <div class="wizard-step__badge">2</div>
+      <div class="wizard-step__body">
+        <div class="wizard-step__title">Complete the declaration</div>
 
-      <div class="account-card">
-        <div class="account-card__title">Signature</div>
-        <label class="declaration">
-          <input type="checkbox" name="signature_consent" value="1" required>
-          <span>{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</span>
-        </label>
-        <div class="signature-field">
-          <label for="signature-pad">Sign in the box below</label>
-          <div class="signature-pad-wrap">
-            <canvas id="signature-pad" width="600" height="200"></canvas>
-          </div>
-          <p class="signature-hint">
-            <button type="button" id="signature-clear" class="item-card__cancel-btn" style="background:none;border:none;padding:0;font:inherit;color:#6b7280;text-decoration:underline;cursor:pointer;">Clear</button>
-          </p>
-        </div>
+        {% if step1Done %}
+          <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate style="margin-top:0.75rem;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
+            <input type="hidden" name="signature" id="signature-input">
+
+            {% if declarations|length > 0 %}
+              <div class="account-card">
+                <div class="account-card__title">Declarations</div>
+                {% for declaration in declarations %}
+                  <label class="declaration">
+                    <input type="checkbox" name="declarations[]" value="{{ declaration.id }}" required>
+                    <span>{{ declaration.text }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="account-card">
+              <div class="account-card__title">Signature</div>
+              <label class="declaration">
+                <input type="checkbox" name="signature_consent" value="1" required>
+                <span>{{ constant('App\\Entity\\UserCertification::SIGNATURE_DECLARATION_TEXT') }}</span>
+              </label>
+              <div class="signature-field">
+                <label for="signature-pad">Sign in the box below</label>
+                <div class="signature-pad-wrap">
+                  <canvas id="signature-pad" width="600" height="200"></canvas>
+                </div>
+                <p class="signature-hint">
+                  <button type="button" id="signature-clear" class="item-card__cancel-btn" style="background:none;border:none;padding:0;font:inherit;color:#6b7280;text-decoration:underline;cursor:pointer;">Clear</button>
+                </p>
+              </div>
+            </div>
+
+            <div class="account-actions">
+              <button type="submit" class="btn btn--teal">Complete {{ record.certification.name }}</button>
+              <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" class="btn btn--outline">Cancel</a>
+            </div>
+          </form>
+        {% else %}
+          <p style="font-size:0.9rem;color:#6b7280;margin:0.35rem 0 0;">Available once step 1 is complete.</p>
+        {% endif %}
       </div>
-
-      <div class="account-actions">
-        <button type="submit" class="btn btn--teal">Complete {{ record.certification.name }}</button>
-        <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" class="btn btn--outline">Cancel</a>
-      </div>
-    </form>
-    {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -125,6 +233,28 @@
 {% block scripts %}
 {{ parent() }}
 <script>
+  (function () {
+    var editToggle = document.getElementById('profile-edit-toggle');
+    var editForm   = document.getElementById('profile-edit-form');
+    var editCancel = document.getElementById('profile-edit-cancel');
+    var summary    = document.getElementById('profile-summary');
+
+    if (editToggle) {
+      editToggle.addEventListener('click', function () {
+        editForm.hidden = false;
+        editToggle.hidden = true;
+        summary.hidden = true;
+      });
+    }
+    if (editCancel) {
+      editCancel.addEventListener('click', function () {
+        editForm.hidden = true;
+        editToggle.hidden = false;
+        summary.hidden = false;
+      });
+    }
+  })();
+
   (function () {
     var canvas = document.getElementById('signature-pad');
     if (!canvas) return;

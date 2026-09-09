@@ -16,12 +16,13 @@
           <th>Status</th>
           <th>Checked in</th>
           <th>Method</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for attendee in attendees %}
           {% set displayName = attendee.user.displayName %}
-          {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : '') %}
+          {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : (attendee.status == 'waiting' ? ' status-pill--waiting' : '')) %}
           <tr>
             <td>
               <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
@@ -43,6 +44,7 @@
             <td class="admin-table__muted">
               {{ attendee.isCheckedIn ? (attendee.checkedInMethod == 'door_pin' ? 'Door PIN' : 'Manual') : '—' }}
             </td>
+            <td><a href="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" class="admin-table__link">Edit</a></td>
           </tr>
         {% endfor %}
       </tbody>
