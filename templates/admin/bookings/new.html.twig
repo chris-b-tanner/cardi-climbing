@@ -34,8 +34,14 @@
   <input type="hidden" name="userId" value="{{ selectedMember.id }}">
 
   <div class="card">
-    <div class="card__label" style="margin-bottom:0.75rem;">
-      This week &mdash; {{ weekStart|date('d M') }}&ndash;{{ weekEnd|date('d M Y') }}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+      <div class="card__label" style="margin-bottom:0;">
+        {{ weekStart|date('d M') }}&ndash;{{ weekEnd|date('d M Y') }}
+      </div>
+      <div class="btn-row">
+        <a href="{{ path('app_admin_booking_new', {userId: selectedMember.id, date: prevWeek}) }}" class="btn btn--ghost btn--sm">&lsaquo; Previous week</a>
+        <a href="{{ path('app_admin_booking_new', {userId: selectedMember.id, date: nextWeek}) }}" class="btn btn--ghost btn--sm">Next week &rsaquo;</a>
+      </div>
     </div>
     <div class="checkin-week-grid">
       {% for day in days %}

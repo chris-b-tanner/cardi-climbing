@@ -140,7 +140,8 @@ class AdminBookingController extends AbstractController
         $selectedEventId = (int) $request->query->get('eventId', $request->request->get('eventId', 0));
 
         $today     = new \DateTimeImmutable('today');
-        $weekStart = $today->modify('monday this week');
+        $anchor    = $this->parseDate($request->query->get('date', '')) ?? $today;
+        $weekStart = $anchor->modify('monday this week');
         $weekEnd   = $weekStart->modify('+6 days');
 
         $weekEvents = $eventRepository->findWithoutTicketAccessOverlapping($weekStart, $weekEnd);
@@ -200,10 +201,26 @@ class AdminBookingController extends AbstractController
             'days'            => $days,
             'weekStart'       => $weekStart,
             'weekEnd'         => $weekEnd,
+            'prevWeek'        => $weekStart->modify('-7 days')->format('Y-m-d'),
+            'nextWeek'        => $weekStart->modify('+7 days')->format('Y-m-d'),
             'today'           => $today,
             'selectedEventId' => $selectedEventId,
             'selectedMember'  => $user,
         ]);
+    }
+
+    /** Guards against the empty string specifically: DateTimeImmutable's constructor treats it like "now" rather than throwing, so "no date given" needs handling before it silently resolves to today. */
+    private function parseDate(string $raw): ?\DateTimeImmutable
+    {
+        if ($raw === '') {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($raw);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
