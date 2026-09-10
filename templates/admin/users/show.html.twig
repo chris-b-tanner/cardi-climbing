@@ -154,6 +154,26 @@
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('make_parent_' ~ member.id) }}">
           <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">(make parent)</button>
         </form>
+        {% set familyWarnings = [] %}
+        {% if not user.currentMembership and user.parent.currentMembership %}
+          {% set familyWarnings = familyWarnings|merge(['lose membership access — currently covered by ' ~ user.parent.displayName ~ "'s membership"]) %}
+        {% endif %}
+        {% if not user.emergencyContactName %}
+          {% set familyWarnings = familyWarnings|merge(["have no emergency contact on file (currently using " ~ user.parent.displayName ~ "'s) — this blocks booking onto certification-restricted events until one is added"]) %}
+        {% endif %}
+        {% if not user.email %}
+          {% set familyWarnings = familyWarnings|merge(['have no email of their own — certification invites currently go to ' ~ user.parent.displayName]) %}
+        {% endif %}
+        {% set leaveConfirmText = 'Remove ' ~ memberName ~ ' from this family?' %}
+        {% if familyWarnings is not empty %}
+          {% set leaveConfirmText = leaveConfirmText ~ '\n\nThey will ' ~ familyWarnings|join('; and ') ~ '.' %}
+        {% endif %}
+        <form method="post" action="{{ path('app_admin_user_leave_family', {id: member.id}) }}"
+              style="display:inline;"
+              onsubmit="return confirm('{{ leaveConfirmText|e('js') }}');">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('leave_family_' ~ member.id) }}">
+          <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--red);text-decoration:underline;cursor:pointer;">(remove from family)</button>
+        </form>
       {% endif %}
       {%- if not loop.last %}, {% endif %}
     {% endfor %}

@@ -283,6 +283,41 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
+    /**
+     * Detaches a dependent from its family — the reverse of being added as one. Only valid for an
+     * actual dependent (someone with a parent); a family's parent can't "leave" this way, since
+     * that would need reassigning their dependents first (see makeParent() to hand the family over,
+     * then leave from the new dependent side).
+     *
+     * This only ever clears the parent link — nothing else is touched. Historical bookings, sales,
+     * and credit ledger entries are already tied directly to this member's own id, not to the
+     * family, so they stay correctly attributed either way. What does change immediately, because
+     * it was only ever a live fallback rather than data copied onto this record, is anything this
+     * member was inheriting from the parent: membership coverage (getEffectiveMembership()),
+     * emergency contact details (getEffectiveEmergencyContactName/Phone()), and — if they have no
+     * email of their own — where certification notifications go. The confirmation prompt (built in
+     * the template) warns about whichever of those actually apply before the admin confirms.
+     */
+    #[Route('/users/{id}/leave-family', name: 'app_admin_user_leave_family', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function leaveFamily(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('leave_family_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        if ($user->getParent() === null) {
+            $this->addFlash('error', 'This member isn\'t a dependent of a family.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $user->setParent(null);
+        $em->flush();
+
+        $this->addFlash('success', $user->getDisplayName() . ' has been removed from the family.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
     #[Route('/users/merge', name: 'app_admin_user_merge', methods: ['GET', 'POST'])]
     #[IsGranted('ROLE_ADMIN')]
     public function mergeUsers(

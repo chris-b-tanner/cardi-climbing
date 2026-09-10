@@ -30,8 +30,8 @@
     {% else %}
       {% set typeTabs = [
         {key: 'membership', label: 'Memberships'},
-        {key: 'event_ticket', label: 'Events'},
-        {key: 'credit', label: 'Drop-ins'},
+        {key: 'event_ticket', label: 'Events / classes'},
+        {key: 'credit', label: 'Credit'},
         {key: 'stock', label: 'Stock'},
         {key: 'service', label: 'Non-stock / services'},
       ] %}
@@ -78,8 +78,19 @@
           </div>
           <div id="occurrence-calendar" class="pos-calendar-grid"></div>
           <p id="occurrence-empty" class="admin-table__muted" style="display:none;">No occurrences this month.</p>
+          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+            <button type="button" id="occurrence-select-all" class="btn btn--ghost btn--sm" style="width:100%;">Select all remaining dates</button>
+            <p style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem;text-align:center;">
+              Adds one line per remaining date this term — for {{ order.user.displayName }}. Discounts can be edited on the order afterwards.
+            </p>
+          </div>
         </div>
       </div>
+
+      <form id="recurring-all-form" method="post" action="{{ path('app_admin_sale_add_recurring_rows', {id: order.id}) }}" style="display:none;">
+        <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+        <input type="hidden" name="productId" id="recurring-all-product-id">
+      </form>
     {% endif %}
   </div>
   {% endif %}
@@ -162,7 +173,13 @@
               <td class="admin-table__muted" style="text-align:right;">£{{ row.lineTotal }}</td>
               {% if order.status == 'draft' %}
                 <td>
-                  <form method="post" action="{{ path('app_admin_sale_row_remove', {id: order.id, rowId: row.id}) }}">
+                  {% set seriesCount = order.rows|filter(r => r.product == row.product and r.effectiveBeneficiary == row.effectiveBeneficiary)|length %}
+                  <form method="post" action="{{ path('app_admin_sale_row_remove', {id: order.id, rowId: row.id}) }}"
+                        {% if seriesCount > 1 %}
+                          class="row-remove-form"
+                          data-series-count="{{ seriesCount }}"
+                          data-series-remove-url="{{ path('app_admin_sale_row_remove_series', {id: order.id, rowId: row.id}) }}"
+                        {% endif %}>
                     <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
                     <button type="submit" class="btn btn--ghost btn--sm">x</button>
                   </form>
@@ -474,20 +491,29 @@
   const occurrencePrev     = document.getElementById('occurrence-prev');
   const occurrenceNext     = document.getElementById('occurrence-next');
   const occurrenceTitle    = document.getElementById('occurrence-modal-title');
+  const occurrenceSelectAll     = document.getElementById('occurrence-select-all');
+  const recurringAllForm        = document.getElementById('recurring-all-form');
+  const recurringAllProductId   = document.getElementById('recurring-all-product-id');
   const occurrencesUrl     = '{{ path('app_admin_sale_occurrences') }}';
+  const orderId            = {{ order.id }};
 
   let occurrenceForm = null;
+  let occurrenceProductId = null;
   let occurrenceYear, occurrenceMonth, occurrenceEventId;
 
   function openOccurrenceModal(form) {
     occurrenceForm    = form;
     occurrenceEventId = form.dataset.eventId;
+    const productIdField = form.querySelector('input[name="productId"]');
+    occurrenceProductId  = productIdField ? productIdField.value : null;
     occurrenceTitle.textContent = 'Choose a date — ' + (form.dataset.name || '');
 
     const now = new Date();
     occurrenceYear  = now.getFullYear();
     occurrenceMonth = now.getMonth() + 1;
 
+    occurrenceSelectAll.textContent = 'Select all remaining dates';
+    occurrenceSelectAll.disabled = true;
     occurrenceModal.style.display = 'flex';
     loadOccurrences();
   }
@@ -498,7 +524,7 @@
   }
 
   function loadOccurrences() {
-    const url = `${occurrencesUrl}?eventId=${occurrenceEventId}&year=${occurrenceYear}&month=${occurrenceMonth}`;
+    const url = `${occurrencesUrl}?eventId=${occurrenceEventId}&year=${occurrenceYear}&month=${occurrenceMonth}&orderId=${orderId}&productId=${occurrenceProductId}`;
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(r => r.json())
       .then(data => {
@@ -506,6 +532,13 @@
         occurrenceMonth = data.month;
         occurrenceMonthLbl.textContent = data.monthLabel;
         renderOccurrenceCalendar(data.occurrences);
+
+        if (data.remainingCount !== null && data.remainingCount !== undefined) {
+          occurrenceSelectAll.textContent = data.remainingCount > 0
+            ? `Select all remaining dates (${data.remainingCount})`
+            : 'No remaining dates to add';
+          occurrenceSelectAll.disabled = data.remainingCount === 0;
+        }
       });
   }
 
@@ -540,6 +573,16 @@
     occurrenceForm.requestSubmit();
   }
 
+  function selectAllRemaining() {
+    if (!occurrenceProductId || occurrenceSelectAll.disabled) return;
+    // A dedicated form, not the tile's own — the tile form's submit listener (below) always
+    // intercepts its submits to (re)open this modal, so reusing it here would just reset the
+    // modal instead of ever reaching the server.
+    recurringAllProductId.value = occurrenceProductId;
+    recurringAllForm.requestSubmit();
+  }
+
+  occurrenceSelectAll.addEventListener('click', selectAllRemaining);
   occurrenceClose.addEventListener('click', closeOccurrenceModal);
   occurrenceBackdrop.addEventListener('click', closeOccurrenceModal);
   occurrencePrev.addEventListener('click', () => {
@@ -556,6 +599,13 @@
   productForms.forEach(form => {
     if (form.dataset.recurring === '1') {
       form.addEventListener('submit', (e) => {
+        // Only intercept the tile's own initial click (no date chosen yet) to open the picker —
+        // once chooseOccurrence() has set occurrenceDate and re-submits this same form for real,
+        // let it go through to the server instead of just reopening the modal again.
+        const occurrenceDateField = form.querySelector('input[name="occurrenceDate"]');
+        if (occurrenceDateField && occurrenceDateField.value) {
+          return;
+        }
         e.preventDefault();
         openOccurrenceModal(form);
       });
@@ -665,6 +715,18 @@
     link.addEventListener('click', (e) => {
       e.preventDefault();
       openBeneficiaryModal(link.dataset.rowId);
+    });
+  });
+
+  // ── Remove a row that's part of a series (same product + beneficiary, multiple dates) ──
+  document.querySelectorAll('.row-remove-form').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!confirm(`Remove all ${form.dataset.seriesCount} dates in this series?`)) {
+        return; // let the default single-row submission proceed
+      }
+      e.preventDefault();
+      form.action = form.dataset.seriesRemoveUrl;
+      form.submit();
     });
   });
 

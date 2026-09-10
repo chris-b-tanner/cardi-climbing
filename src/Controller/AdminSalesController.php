@@ -186,9 +186,84 @@ class AdminSalesController extends AbstractController
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
-    /** Valid upcoming occurrence dates for a recurring event, for the "choose a date" calendar modal on the product tile. */
+    /**
+     * "Select all remaining dates" — one line per not-yet-covered upcoming occurrence of a
+     * recurring event ticket (e.g. booking a member onto a whole term in one go), for the order's
+     * own member — same default beneficiary as a single add; change a row's beneficiary
+     * afterwards if a date needs to go to someone else. Silently skips any occurrence the member
+     * already has a line for rather than erroring, so it's safe to run again after adding a few
+     * dates individually. Admin/POS only — the public site books one occurrence at a time.
+     */
+    #[Route('/{id}/rows/recurring-all', name: 'app_admin_sale_add_recurring_rows', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addRemainingRecurringRows(Request $request, SalesOrder $order, ProductRepository $productRepository, SalesOrderService $salesOrderService, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $product            = $productRepository->find((int) $request->request->get('productId', 0));
+        $eventTicketProduct = $product?->getEventTicketProduct();
+
+        if (!$product instanceof Product || !$product->isActive() || !$eventTicketProduct || !$eventTicketProduct->getEvent()->isRecurring()) {
+            $this->addFlash('error', 'Choose a valid recurring event ticket.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $event = $eventTicketProduct->getEvent();
+        $today = new \DateTimeImmutable('today');
+        // recurUntil is required when a recurring event is created, but fall back to a bounded
+        // window rather than looping indefinitely if an older/legacy row somehow has none.
+        $end = $event->getRecurUntil() ?? $today->modify('+1 year');
+
+        $existingLines = $this->existingLines($order);
+        $added         = 0;
+        $skipped       = 0;
+
+        $period = new \DatePeriod($today, new \DateInterval('P1D'), $end->modify('+1 day'));
+        foreach ($period as $day) {
+            if (!$event->isValidForDate($day)) {
+                continue;
+            }
+
+            if ($salesOrderService->wouldConflictWithExisting($product, $day, $order->getUser(), $existingLines)) {
+                $skipped++;
+                continue;
+            }
+
+            $row = new SalesOrderRow();
+            $row->setProduct($product);
+            $row->setQty(1);
+            $row->setListPriceAtSale($product->getPrice());
+            $row->setChargedPrice($product->getPrice());
+            $row->setVatCodeAtSale($product->getVatCode());
+            $row->setOccurrenceDate($day);
+            $order->addRow($row);
+            $em->persist($row);
+
+            $existingLines[] = [$product, $day, $order->getUser()];
+            $added++;
+        }
+
+        $em->flush();
+
+        if ($added === 0) {
+            $this->addFlash('error', $skipped > 0
+                ? 'This member already has a line for every remaining date.'
+                : 'No remaining occurrences found for this event.');
+        } else {
+            $message = 'Added ' . $added . ' ' . ($added === 1 ? 'date' : 'dates') . ' for ' . $product->getName() . '.';
+            if ($skipped > 0) {
+                $message .= ' Skipped ' . $skipped . ' already on the order.';
+            }
+            $this->addFlash('success', $message);
+        }
+
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /** Valid upcoming occurrence dates for a recurring event, for the "choose a date" calendar modal on the product tile — plus how many of them "select all remaining" would actually add for this order (i.e. excluding ones it already has a line for). */
     #[Route('/occurrences', name: 'app_admin_sale_occurrences')]
-    public function occurrences(Request $request, EventRepository $eventRepository): JsonResponse
+    public function occurrences(Request $request, EventRepository $eventRepository, ProductRepository $productRepository, SalesOrderService $salesOrderService, EntityManagerInterface $em): JsonResponse
     {
         $event = $eventRepository->find((int) $request->query->get('eventId', 0));
         if (!$event instanceof Event) {
@@ -212,15 +287,32 @@ class AdminSalesController extends AbstractController
             }
         }
 
+        $remainingCount = null;
+        $order   = $em->getRepository(SalesOrder::class)->find((int) $request->query->get('orderId', 0));
+        $product = $productRepository->find((int) $request->query->get('productId', 0));
+        if ($order && $product) {
+            $end           = $event->getRecurUntil() ?? $today->modify('+1 year');
+            $existingLines = $this->existingLines($order);
+            $remainingCount = 0;
+
+            $fullPeriod = new \DatePeriod($today, new \DateInterval('P1D'), $end->modify('+1 day'));
+            foreach ($fullPeriod as $day) {
+                if ($event->isValidForDate($day) && !$salesOrderService->wouldConflictWithExisting($product, $day, $order->getUser(), $existingLines)) {
+                    $remainingCount++;
+                }
+            }
+        }
+
         return $this->json([
-            'monthLabel'  => $monthStart->format('F Y'),
-            'year'        => (int) $year,
-            'month'       => $month,
-            'prevYear'    => (int) $monthStart->modify('-1 month')->format('Y'),
-            'prevMonth'   => (int) $monthStart->modify('-1 month')->format('n'),
-            'nextYear'    => (int) $monthStart->modify('+1 month')->format('Y'),
-            'nextMonth'   => (int) $monthStart->modify('+1 month')->format('n'),
-            'occurrences' => $occurrences,
+            'monthLabel'     => $monthStart->format('F Y'),
+            'year'           => (int) $year,
+            'month'          => $month,
+            'prevYear'       => (int) $monthStart->modify('-1 month')->format('Y'),
+            'prevMonth'      => (int) $monthStart->modify('-1 month')->format('n'),
+            'nextYear'       => (int) $monthStart->modify('+1 month')->format('Y'),
+            'nextMonth'      => (int) $monthStart->modify('+1 month')->format('n'),
+            'occurrences'    => $occurrences,
+            'remainingCount' => $remainingCount,
         ]);
     }
 
@@ -274,6 +366,36 @@ class AdminSalesController extends AbstractController
         $em->remove($row);
         $em->flush();
 
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /**
+     * Removes {rowId} and every other row on this order for the same product + beneficiary — e.g.
+     * clearing a whole term's worth of recurring-event-ticket lines in one go, offered by the
+     * template as the "remove all in series?" confirm when there's more than one such row.
+     */
+    #[Route('/{id}/rows/{rowId}/remove-series', name: 'app_admin_sale_row_remove_series', requirements: ['id' => '\d+', 'rowId' => '\d+'], methods: ['POST'])]
+    public function removeRowSeries(Request $request, SalesOrder $order, int $rowId, EntityManagerInterface $em): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $row         = $this->getOwnedRow($order, $rowId);
+        $product     = $row->getProduct();
+        $beneficiary = $row->getEffectiveBeneficiary();
+
+        $removed = 0;
+        foreach ($order->getRows()->toArray() as $candidate) {
+            if ($candidate->getProduct() === $product && $candidate->getEffectiveBeneficiary() === $beneficiary) {
+                $order->removeRow($candidate);
+                $em->remove($candidate);
+                $removed++;
+            }
+        }
+        $em->flush();
+
+        $this->addFlash('success', 'Removed ' . $removed . ' ' . ($removed === 1 ? 'line' : 'lines') . ' in this series.');
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
