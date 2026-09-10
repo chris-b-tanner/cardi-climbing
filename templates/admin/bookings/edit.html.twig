@@ -2,11 +2,12 @@
 {% block title %}Edit booking{% endblock %}
 
 {% set displayName = attendee.user.displayName %}
+{% set backLabel = returnTo starts with '/admin/events/' ? '← Back to event' : '← Back to member' %}
 
 {% block content %}
 <div class="page-header">
   <h1>Edit booking</h1>
-  <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
+  <a href="{{ returnTo }}" class="btn btn--ghost btn--sm">{{ backLabel }}</a>
 </div>
 
 {% if error %}
@@ -15,6 +16,7 @@
 
 <form method="post" action="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" novalidate>
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_edit_' ~ attendee.id) }}">
+  <input type="hidden" name="returnTo" value="{{ returnTo }}">
 
   <div class="card">
     <div class="detail-grid">
@@ -53,7 +55,7 @@
 
   <div class="form-actions">
     <button type="submit" class="btn btn--teal">Save changes</button>
-    <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="btn btn--ghost">Cancel</a>
+    <a href="{{ returnTo }}" class="btn btn--ghost">Cancel</a>
   </div>
 </form>
 
@@ -124,6 +126,7 @@
     <form method="post" action="{{ path('app_admin_booking_delete', {id: attendee.id}) }}"
           onsubmit="return confirm('Permanently delete this booking? This cannot be undone.');">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_booking_' ~ attendee.id) }}">
+      <input type="hidden" name="returnTo" value="{{ returnTo }}">
       <button type="submit" class="btn btn--danger btn--sm">Delete booking</button>
     </form>
   {% endif %}

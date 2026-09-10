@@ -227,12 +227,13 @@ class AdminBookingController extends AbstractController
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function edit(Request $request, Attendee $attendee, NoteRepository $noteRepository, DoorAccessService $doorAccessService, BookingService $bookingService): Response
     {
-        $error = null;
+        $error    = null;
+        $returnTo = $this->resolveReturnTo($request, $attendee);
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('admin_booking_edit_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
                 $this->addFlash('error', 'Access denied.');
-                return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+                return $this->redirect($returnTo);
             }
 
             $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
@@ -249,7 +250,7 @@ class AdminBookingController extends AbstractController
 
                 if (!$error) {
                     $this->addFlash('success', 'Booking updated.');
-                    return $this->redirectToRoute('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+                    return $this->redirect($returnTo);
                 }
             }
         }
@@ -257,10 +258,25 @@ class AdminBookingController extends AbstractController
         return $this->render('admin/bookings/edit.html.twig', [
             'attendee'   => $attendee,
             'error'      => $error,
+            'returnTo'   => $returnTo,
             'notes'      => $noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()),
             'validFrom'  => $attendee->getEvent()->isSelfAccess() ? $doorAccessService->computeValidFrom($attendee) : null,
             'validUntil' => $attendee->getEvent()->isSelfAccess() ? $doorAccessService->computeValidUntil($attendee) : null,
         ]);
+    }
+
+    /**
+     * Where to send the admin back to after editing a booking — the event's attendee list or the
+     * member's own contact page, whichever they came from (see the `returnTo` link built by each
+     * of those pages). Only ever a local path, so this can't become an open redirect.
+     */
+    private function resolveReturnTo(Request $request, Attendee $attendee): string
+    {
+        $returnTo = $request->request->get('returnTo') ?? $request->query->get('returnTo', '');
+
+        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
+            ? $returnTo
+            : $this->generateUrl('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
     }
 
     #[Route('/{id}/staffing/approve', name: 'app_admin_booking_staffing_approve', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -350,22 +366,22 @@ class AdminBookingController extends AbstractController
     #[Route('/{id}/delete', name: 'app_admin_booking_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
-        $userId = $attendee->getUser()->getId();
+        $returnTo = $this->resolveReturnTo($request, $attendee);
 
         if (!$this->isCsrfTokenValid('delete_booking_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_admin_user_show', ['id' => $userId]);
+            return $this->redirect($returnTo);
         }
 
         if ($attendee->getPaidAmount() !== '0.00') {
             $this->addFlash('error', 'Cannot delete a booking with a paid amount recorded. Set the paid amount to £0 first.');
-            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId()]);
+            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId(), 'returnTo' => $returnTo]);
         }
 
         $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_ATTENDEE, $attendee->getId());
         if ($pinnedCount > 0) {
             $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
-            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId()]);
+            return $this->redirectToRoute('app_admin_booking_edit', ['id' => $attendee->getId(), 'returnTo' => $returnTo]);
         }
 
         foreach ($noteRepository->findForNoteable(Note::TYPE_ATTENDEE, $attendee->getId()) as $note) {
@@ -376,7 +392,7 @@ class AdminBookingController extends AbstractController
         $em->flush();
 
         $this->addFlash('success', 'Booking deleted.');
-        return $this->redirectToRoute('app_admin_user_show', ['id' => $userId]);
+        return $this->redirect($returnTo);
     }
 
 }

@@ -58,8 +58,11 @@
               {% endfor %}
             </td>
             {% if context == 'new_sale' %}
+              {% set saleNewParams = {userId: user.id} %}
+              {% if eventId %}{% set saleNewParams = saleNewParams|merge({eventId: eventId}) %}{% endif %}
+              {% if occurrenceDate %}{% set saleNewParams = saleNewParams|merge({occurrenceDate: occurrenceDate}) %}{% endif %}
               <td>
-                <form method="post" action="{{ path('app_admin_sale_new', {userId: user.id}) }}" style="margin:0;">
+                <form method="post" action="{{ path('app_admin_sale_new', saleNewParams) }}" style="margin:0;">
                   <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_sale_new_' ~ user.id) }}">
                   <button type="submit" class="btn btn--teal btn--sm">Choose</button>
                 </form>

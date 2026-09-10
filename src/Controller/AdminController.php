@@ -40,30 +40,38 @@ class AdminController extends AbstractController
             : null;
         $sort    = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
         $dir     = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
-        $context = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
+        $context        = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
+        // Carried through from the event view's "Add attendee" button so the sale created from
+        // the "Choose" form below already knows which event/occurrence to add as a line item.
+        $eventId        = $context === 'new_sale' ? (int) $request->query->get('eventId', 0) : 0;
+        $occurrenceDate = $context === 'new_sale' ? trim($request->query->get('occurrenceDate', '')) : '';
 
         $users     = $userRepository->search($query, $tagId, null, $sort, $dir);
         $parentIds = $userRepository->findParentIds();
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/users/_list.html.twig', [
-                'users'       => $users,
-                'parentIds'   => $parentIds,
-                'currentSort' => $sort,
-                'currentDir'  => $dir,
-                'context'     => $context,
+                'users'          => $users,
+                'parentIds'      => $parentIds,
+                'currentSort'    => $sort,
+                'currentDir'     => $dir,
+                'context'        => $context,
+                'eventId'        => $eventId,
+                'occurrenceDate' => $occurrenceDate,
             ]);
         }
 
         return $this->render('admin/users/index.html.twig', [
-            'users'        => $users,
-            'parentIds'    => $parentIds,
-            'tags'         => $tagRepository->findBy([], ['name' => 'ASC']),
-            'currentQuery' => $query,
-            'currentTagId' => $tagId,
-            'currentSort'  => $sort,
-            'currentDir'   => $dir,
-            'context'      => $context,
+            'users'          => $users,
+            'parentIds'      => $parentIds,
+            'tags'           => $tagRepository->findBy([], ['name' => 'ASC']),
+            'currentQuery'   => $query,
+            'currentTagId'   => $tagId,
+            'currentSort'    => $sort,
+            'currentDir'     => $dir,
+            'context'        => $context,
+            'eventId'        => $eventId,
+            'occurrenceDate' => $occurrenceDate,
         ]);
     }
 

@@ -32,7 +32,11 @@ class AdminEventController extends AbstractController
     public function index(Request $request, EventRepository $eventRepository): Response
     {
         $query  = trim($request->query->get('q', ''));
-        $events = $eventRepository->search($query);
+        $access = $request->query->get('access', '');
+        if (!in_array($access, [Event::ACCESS_TICKET, Event::ACCESS_CREDIT, Event::ACCESS_MEMBERSHIP, EventRepository::ACCESS_FILTER_FREE], true)) {
+            $access = '';
+        }
+        $events = $eventRepository->search($query, $access);
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/events/_list.html.twig', [
@@ -41,8 +45,9 @@ class AdminEventController extends AbstractController
         }
 
         return $this->render('admin/events/index.html.twig', [
-            'events'       => $events,
-            'currentQuery' => $query,
+            'events'        => $events,
+            'currentQuery'  => $query,
+            'currentAccess' => $access,
         ]);
     }
 

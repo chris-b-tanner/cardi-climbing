@@ -32,7 +32,11 @@ class AdminSalesController extends AbstractController
     public function index(Request $request, SalesOrderRepository $salesOrderRepository): Response
     {
         $query  = trim($request->query->get('q', ''));
-        $orders = $salesOrderRepository->search($query);
+        $status = $request->query->get('status', '');
+        if (!in_array($status, [SalesOrder::STATUS_DRAFT, SalesOrder::STATUS_COMPLETE, SalesOrder::STATUS_CANCELLED], true)) {
+            $status = '';
+        }
+        $orders = $salesOrderRepository->search($query, $status);
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/sales/_list.html.twig', [
@@ -41,14 +45,15 @@ class AdminSalesController extends AbstractController
         }
 
         return $this->render('admin/sales/index.html.twig', [
-            'orders'       => $orders,
-            'currentQuery' => $query,
+            'orders'        => $orders,
+            'currentQuery'  => $query,
+            'currentStatus' => $status,
         ]);
     }
 
     /** Starts a new draft order for {userId} — landed on from the members list's "new sale" context. */
     #[Route('/new/{userId}', name: 'app_admin_sale_new', requirements: ['userId' => '\d+'], methods: ['POST'])]
-    public function new(Request $request, int $userId, UserRepository $userRepository, EntityManagerInterface $em): Response
+    public function new(Request $request, int $userId, UserRepository $userRepository, EventRepository $eventRepository, ProductRepository $productRepository, EntityManagerInterface $em): Response
     {
         $user = $userRepository->find($userId);
         if (!$user instanceof User) {
@@ -69,9 +74,62 @@ class AdminSalesController extends AbstractController
         $order->setCreatedBy($admin);
 
         $em->persist($order);
+
+        $eventId = (int) $request->query->get('eventId', 0);
+        if ($eventId > 0) {
+            $event = $eventRepository->find($eventId);
+            if ($event instanceof Event) {
+                $this->addTicketRowForEvent($order, $event, (string) $request->query->get('occurrenceDate', ''), $productRepository, $em);
+            }
+        }
+
         $em->flush();
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /**
+     * Best-effort "carry the event over" for a sale started from the event view's "Add attendee"
+     * button — only adds the line automatically when there's exactly one active ticket product for
+     * the event and (for a recurring event) a valid occurrence date; otherwise it just flashes what
+     * to pick manually rather than guessing between ticket variants.
+     */
+    private function addTicketRowForEvent(SalesOrder $order, Event $event, string $rawOccurrenceDate, ProductRepository $productRepository, EntityManagerInterface $em): void
+    {
+        $occurrenceDate = null;
+        if ($event->isRecurring()) {
+            $parsed         = $rawOccurrenceDate !== '' ? \DateTimeImmutable::createFromFormat('Y-m-d', $rawOccurrenceDate) : false;
+            $occurrenceDate = $parsed !== false ? $parsed->setTime(0, 0) : null;
+
+            if ($occurrenceDate === null || !$event->isValidForDate($occurrenceDate)) {
+                $this->addFlash('error', 'Could not add a ticket line automatically for "' . $event->getTitle() . '" — choose the date and ticket below.');
+                return;
+            }
+        }
+
+        $ticketProducts = $productRepository->findActiveEventTickets($event);
+        if (count($ticketProducts) === 0) {
+            $this->addFlash('error', 'No active ticket product found for "' . $event->getTitle() . '" — add one manually below.');
+            return;
+        }
+        if (count($ticketProducts) > 1) {
+            $this->addFlash('info', 'This event has more than one ticket type — choose the right one for "' . $event->getTitle() . '" below.');
+            return;
+        }
+
+        $product = $ticketProducts[0];
+
+        $row = new SalesOrderRow();
+        $row->setProduct($product);
+        $row->setQty(1);
+        $row->setListPriceAtSale($product->getPrice());
+        $row->setChargedPrice($product->getPrice());
+        $row->setVatCodeAtSale($product->getVatCode());
+        $row->setOccurrenceDate($occurrenceDate);
+        $order->addRow($row);
+        $em->persist($row);
+
+        $this->addFlash('success', 'Added ' . $product->getName() . ($occurrenceDate ? ' (' . $occurrenceDate->format('d M Y') . ')' : '') . ' to this order.');
     }
 
     #[Route('/{id}', name: 'app_admin_sale_show', requirements: ['id' => '\d+'])]

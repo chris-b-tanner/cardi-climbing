@@ -51,7 +51,11 @@ class EventRepository extends ServiceEntityRepository
     }
 
     /** @return Event[] */
-    public function search(string $query = ''): array
+    /** Filter value for search() meaning "open, no access method at all" rather than one of Event::ACCESS_*. */
+    public const ACCESS_FILTER_FREE = 'free';
+
+    /** @param string $accessMethod One of Event::ACCESS_*, self::ACCESS_FILTER_FREE for events with no access method at all, or '' for all events regardless. */
+    public function search(string $query = '', string $accessMethod = ''): array
     {
         $qb = $this->createQueryBuilder('e')
             ->orderBy('e.date', 'ASC');
@@ -59,6 +63,13 @@ class EventRepository extends ServiceEntityRepository
         if ($query !== '') {
             $qb->andWhere('e.title LIKE :q OR e.location LIKE :q')
                ->setParameter('q', '%' . $query . '%');
+        }
+
+        if ($accessMethod === self::ACCESS_FILTER_FREE) {
+            $qb->andWhere('e.accessMethods IS NULL');
+        } elseif ($accessMethod !== '') {
+            $qb->andWhere("e.accessMethods LIKE :access")
+               ->setParameter('access', '%' . $accessMethod . '%');
         }
 
         return $qb->getQuery()->getResult();

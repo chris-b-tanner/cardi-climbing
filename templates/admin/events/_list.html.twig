@@ -22,7 +22,9 @@
         {% for event in events %}
           <tr>
             <td>
-              <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">{{ event.title }}</a>
+              <a href="{{ path('app_admin_event_show', {id: event.id}) }}" class="admin-table__link">
+                {{ event.title }}
+              </a>
               {% if event.isSelfAccess %}
                 <i class="bi bi-lock-fill" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Self access (door PIN)"></i>
               {% endif %}
@@ -32,6 +34,7 @@
             </td>
             <td class="admin-table__muted">
               {% if event.isRecurring %}
+                <i class="bi bi-arrow-repeat"></i>
                 {{ event.date|date('d M Y') }} &ndash; {{ event.recurUntil ? event.recurUntil|date('d M Y') : 'Ongoing' }}
               {% else %}
                 {{ event.date|date('d M Y') }}

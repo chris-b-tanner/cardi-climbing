@@ -8,6 +8,8 @@
     <a href="{{ path('app_admin_event_show', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
   {% elseif certificationAudience %}
     <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost btn--sm">← {{ certificationAudience.certification.name }}</a>
+  {% elseif userAudience %}
+    <a href="{{ path('app_admin_user_show', {id: userAudience.user.id}) }}" class="btn btn--ghost btn--sm">← {{ userAudience.user.displayName ?: userAudience.user.email }}</a>
   {% else %}
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
   {% endif %}
@@ -34,7 +36,6 @@
           <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
             {{ eventAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about an event they're booked onto.
           </p>
-          <a href="{{ path('app_admin_email_compose') }}" style="display:inline-block;margin-top:0.6rem;font-size:0.8rem;color:var(--teal-dk);font-weight:600;">Switch to a general audience instead</a>
         {% elseif certificationAudience %}
           <input type="hidden" name="certificationId" value="{{ certificationAudience.certification.id }}">
           <p style="font-size:0.9rem;">
@@ -43,7 +44,14 @@
           <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
             {{ certificationAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about a certification they hold.
           </p>
-          <a href="{{ path('app_admin_email_compose') }}" style="display:inline-block;margin-top:0.6rem;font-size:0.8rem;color:var(--teal-dk);font-weight:600;">Switch to a general audience instead</a>
+        {% elseif userAudience %}
+          <input type="hidden" name="userId" value="{{ userAudience.user.id }}">
+          <p style="font-size:0.9rem;">
+            <strong>{{ userAudience.user.displayName ?: userAudience.user.email }}</strong>{% if userAudience.user.displayName %} ({{ userAudience.user.email }}){% endif %} only.
+          </p>
+          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
+            Sent regardless of newsletter opt-in, since it's addressed to this member directly.
+          </p>
         {% else %}
           <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <label class="audience-option">
@@ -91,7 +99,7 @@
 
       <div class="form-actions">
         <button type="submit" class="btn btn--teal" id="send-btn">Send email</button>
-        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% elseif certificationAudience %}{{ certificationAudience.recipients|length }} recipient(s){% endif %}</span>
+        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% elseif certificationAudience %}{{ certificationAudience.recipients|length }} recipient(s){% elseif userAudience %}{{ userAudience.recipients|length }} recipient(s){% endif %}</span>
       </div>
     </form>
   </div>
@@ -154,6 +162,7 @@
     const body = new FormData();
     body.append('subject', subjectEl.value || '(No subject)');
     body.append('body',    bodyEl.value    || '');
+    {% if userAudience %}body.append('userId', '{{ userAudience.user.id }}');{% endif %}
 
     fetch(previewUrl, { method: 'POST', body })
       .then(r => r.text())
@@ -169,8 +178,8 @@
   bodyEl.addEventListener('input',    schedulePreview);
 
   // ── Audience / recipient count ─────────────────────────────
-  {% if eventAudience or certificationAudience %}
-  // Fixed audience (event attendees / certification holders) — recipient count is already rendered server-side.
+  {% if eventAudience or certificationAudience or userAudience %}
+  // Fixed audience (event attendees / certification holders / single member) — recipient count is already rendered server-side.
   {% else %}
   function getSelectedTagIds() {
     return [...bulkTags].filter(c => c.checked).map(c => c.value);

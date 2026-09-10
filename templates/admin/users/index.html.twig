@@ -63,6 +63,8 @@
   let currentSort = {{ currentSort|json_encode|raw }};
   let currentDir  = {{ currentDir|json_encode|raw }};
   const context   = {{ context|json_encode|raw }};
+  const eventId        = {{ eventId|json_encode|raw }};
+  const occurrenceDate = {{ occurrenceDate|json_encode|raw }};
 
   const selected = new Set();
 
@@ -110,6 +112,8 @@
     if (currentSort !== 'name') params.set('sort', currentSort);
     if (currentDir !== 'asc')   params.set('dir', currentDir);
     if (context) params.set('context', context);
+    if (eventId) params.set('eventId', eventId);
+    if (occurrenceDate) params.set('occurrenceDate', occurrenceDate);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);

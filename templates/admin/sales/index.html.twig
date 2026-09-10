@@ -7,9 +7,15 @@
   <a href="{{ path('app_admin_users', {context: 'new_sale'}) }}" class="btn btn--teal btn--sm">+ New sale</a>
 </div>
 
-<div class="filter-form">
+<div class="filter-form" style="align-items:center;">
   <input type="search" id="search-q" placeholder="Search member…"
-         value="{{ currentQuery }}" aria-label="Search sales" autocomplete="off">
+         value="{{ currentQuery }}" aria-label="Search sales" autocomplete="off" style="flex:0 1 220px;">
+  <div class="pos-tabs" id="status-filters" style="margin-bottom:0;">
+    <button type="button" class="pos-tab{{ currentStatus == '' ? ' is-active' : '' }}" data-status="">All</button>
+    <button type="button" class="pos-tab{{ currentStatus == 'draft' ? ' is-active' : '' }}" data-status="draft">Draft</button>
+    <button type="button" class="pos-tab{{ currentStatus == 'complete' ? ' is-active' : '' }}" data-status="complete">Complete</button>
+    <button type="button" class="pos-tab{{ currentStatus == 'cancelled' ? ' is-active' : '' }}" data-status="cancelled">Cancelled</button>
+  </div>
 </div>
 
 <div id="results">
@@ -20,13 +26,16 @@
 {% block scripts %}
 <script>
   const searchInput = document.getElementById('search-q');
+  const statusTabs   = document.querySelectorAll('#status-filters .pos-tab');
   const results      = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_sales') }}';
+  let currentStatus  = '{{ currentStatus }}';
   let debounce;
 
   function fetchResults() {
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
+    if (currentStatus) params.set('status', currentStatus);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -41,6 +50,14 @@
   searchInput.addEventListener('input', () => {
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
+  });
+
+  statusTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentStatus = tab.dataset.status;
+      statusTabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      fetchResults();
+    });
   });
 </script>
 {% endblock %}

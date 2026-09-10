@@ -9,9 +9,16 @@
   {% endif %}
 </div>
 
-<div class="filter-form">
+<div class="filter-form" style="align-items:center;">
   <input type="search" id="search-q" placeholder="Search title or location…"
-         value="{{ currentQuery }}" aria-label="Search events" autocomplete="off">
+         value="{{ currentQuery }}" aria-label="Search events" autocomplete="off" style="flex:0 1 220px;">
+  <div class="pos-tabs" id="access-filters" style="margin-bottom:0;">
+    <button type="button" class="pos-tab{{ currentAccess == '' ? ' is-active' : '' }}" data-access="">All</button>
+    <button type="button" class="pos-tab{{ currentAccess == 'free' ? ' is-active' : '' }}" data-access="free">Free</button>
+    <button type="button" class="pos-tab{{ currentAccess == 'ticket' ? ' is-active' : '' }}" data-access="ticket">Ticket</button>
+    <button type="button" class="pos-tab{{ currentAccess == 'credit' ? ' is-active' : '' }}" data-access="credit">Credit</button>
+    <button type="button" class="pos-tab{{ currentAccess == 'membership' ? ' is-active' : '' }}" data-access="membership">Membership</button>
+  </div>
 </div>
 
 <div id="results">
@@ -21,14 +28,17 @@
 
 {% block scripts %}
 <script>
-  const searchInput = document.getElementById('search-q');
-  const results      = document.getElementById('results');
+  const searchInput   = document.getElementById('search-q');
+  const accessTabs    = document.querySelectorAll('#access-filters .pos-tab');
+  const results       = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_events') }}';
+  let currentAccess   = '{{ currentAccess }}';
   let debounce;
 
   function fetchResults() {
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
+    if (currentAccess) params.set('access', currentAccess);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -43,6 +53,14 @@
   searchInput.addEventListener('input', () => {
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
+  });
+
+  accessTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentAccess = tab.dataset.access;
+      accessTabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      fetchResults();
+    });
   });
 </script>
 {% endblock %}

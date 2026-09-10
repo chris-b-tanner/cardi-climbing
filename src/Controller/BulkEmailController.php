@@ -55,21 +55,40 @@ class BulkEmailController extends AbstractController
             $userCertificationRepository,
         );
 
+        $userAudience = ($eventAudience || $certificationAudience) ? null : $this->resolveUserAudience(
+            (int) $request->query->get('userId', 0),
+            $userRepository,
+        );
+
         return $this->render('admin/email/compose.html.twig', [
             'tags'                   => $tagRepository->findBy([], ['name' => 'ASC']),
             'totalOptedIn'           => count($userRepository->findForBulkEmail()),
             'eventAudience'          => $eventAudience,
             'certificationAudience'  => $certificationAudience,
+            'userAudience'           => $userAudience,
         ]);
     }
 
     #[Route('/preview', name: 'app_admin_email_preview', methods: ['POST'])]
-    public function preview(Request $request, Environment $twig): Response
+    public function preview(Request $request, UserRepository $userRepository, Environment $twig): Response
     {
-        $html = $twig->render('email/bulk.html.twig', [
+        $context = [
             'subject' => $request->request->get('subject', '(No subject)'),
             'body'    => $request->request->get('body', ''),
-        ]);
+        ];
+
+        // Only a single-member-scoped send has one definite recipient to greet by name in the
+        // preview — an event/certification/tag audience has many different first names, so the
+        // greeting stays generic ("Hi,") for those, same as before.
+        $userId = (int) $request->request->get('userId', 0);
+        if ($userId) {
+            $user = $userRepository->find($userId);
+            if ($user instanceof User) {
+                $context['user'] = $user;
+            }
+        }
+
+        $html = $twig->render('email/bulk.html.twig', $context);
 
         return new Response($html);
     }
@@ -97,11 +116,14 @@ class BulkEmailController extends AbstractController
         $scope             = (string) $request->request->get('scope', 'date');
         $occurrenceDateRaw = (string) $request->request->get('occurrenceDate', '');
         $certificationId   = (int) $request->request->get('certificationId', 0);
+        $userId            = (int) $request->request->get('userId', 0);
 
         if ($eventId) {
             $redirectParams = array_filter(['eventId' => $eventId, 'scope' => $scope, 'occurrenceDate' => $occurrenceDateRaw]);
         } elseif ($certificationId) {
             $redirectParams = ['certificationId' => $certificationId];
+        } elseif ($userId) {
+            $redirectParams = ['userId' => $userId];
         } else {
             $redirectParams = [];
         }
@@ -121,11 +143,14 @@ class BulkEmailController extends AbstractController
 
         $eventAudience = $this->resolveEventAudience($eventId, $scope, $occurrenceDateRaw, $eventRepository, $attendeeRepository);
         $certificationAudience = $eventAudience ? null : $this->resolveCertificationAudience($certificationId, $certificationRepository, $userCertificationRepository);
+        $userAudience = ($eventAudience || $certificationAudience) ? null : $this->resolveUserAudience($userId, $userRepository);
 
         if ($eventAudience) {
             $recipients = $eventAudience['recipients'];
         } elseif ($certificationAudience) {
             $recipients = $certificationAudience['recipients'];
+        } elseif ($userAudience) {
+            $recipients = $userAudience['recipients'];
         } else {
             $tagIds     = array_map('intval', array_filter($request->request->all('tagIds')));
             $recipients = $userRepository->findForBulkEmail($tagIds);
@@ -134,7 +159,7 @@ class BulkEmailController extends AbstractController
         if (!$recipients) {
             $message = $eventAudience
                 ? 'No members are booked onto that event/date.'
-                : ($certificationAudience ? 'No members hold that certification.' : 'No opted-in members matched that audience.');
+                : ($certificationAudience ? 'No members hold that certification.' : ($userAudience ? 'That member has no usable email address.' : 'No opted-in members matched that audience.'));
             $this->addFlash('error', $message);
             return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
         }
@@ -156,9 +181,10 @@ class BulkEmailController extends AbstractController
                 'user'    => $user,
             ];
 
-            // Event-attendee and certification-holder emails aren't a newsletter — no unsubscribe
-            // footer (omitting recipientEmail suppresses it, same as the booking confirmation email).
-            if (!$eventAudience && !$certificationAudience) {
+            // Event-attendee, certification-holder, and single-member emails aren't a newsletter —
+            // no unsubscribe footer (omitting recipientEmail suppresses it, same as the booking
+            // confirmation email).
+            if (!$eventAudience && !$certificationAudience && !$userAudience) {
                 $context['recipientEmail'] = $user->getEmail();
             }
 
@@ -262,6 +288,30 @@ class BulkEmailController extends AbstractController
         return [
             'certification' => $certification,
             'recipients'    => $userCertificationRepository->findHoldersForCertification($certification),
+        ];
+    }
+
+    /**
+     * Resolves the "email this one member" audience from request params (landed on from the
+     * envelope icon next to a member's email on their admin view page), or null when this isn't
+     * a single-member-scoped send.
+     *
+     * @return array{user: User, recipients: User[]}|null
+     */
+    private function resolveUserAudience(int $userId, UserRepository $userRepository): ?array
+    {
+        if (!$userId) {
+            return null;
+        }
+
+        $user = $userRepository->find($userId);
+        if (!$user instanceof User) {
+            return null;
+        }
+
+        return [
+            'user'       => $user,
+            'recipients' => $user->getEmail() ? [$user] : [],
         ];
     }
 }

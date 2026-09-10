@@ -73,15 +73,15 @@
       <div class="card__label">Email</div>
       <div class="card__value">
         {% if user.email %}
-          <a href="mailto:{{ user.email }}" style="color:var(--teal);">{{ user.email }}</a>
+          <a href="{{ path('app_admin_email_compose', {userId: user.id}) }}" style="color:var(--teal);">{{ user.email }}</a>
         {% elseif not user.email2 and not user.email3 %}
           —
         {% endif %}
         {% if user.email2 %}
-          <br><a href="mailto:{{ user.email2 }}" style="color:var(--teal);font-size:0.85rem;">{{ user.email2 }}</a>
+          <br>{{ user.email2 }}
         {% endif %}
         {% if user.email3 %}
-          <br><a href="mailto:{{ user.email3 }}" style="color:var(--teal);font-size:0.85rem;">{{ user.email3 }}</a>
+          <br>{{ user.email3 }}
         {% endif %}
       </div>
     </div>
@@ -337,7 +337,7 @@
                 <td class="admin-table__muted">{{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}</td>
                 <td class="admin-table__muted">{{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}</td>
                 <td><span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span></td>
-                <td><a href="{{ path('app_admin_booking_edit', {id: booking.id}) }}" class="admin-table__link">Edit</a></td>
+                <td><a href="{{ path('app_admin_booking_edit', {id: booking.id, returnTo: path('app_admin_user_show', {id: user.id})}) }}" class="admin-table__link">Edit</a></td>
               </tr>
             {% endfor %}
           </tbody>

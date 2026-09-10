@@ -1,10 +1,11 @@
 {% extends 'admin/base.html.twig' %}
 {% block title %}{{ event.title }}{% endblock %}
 
-{% macro attendee_table(attendees) %}
+{% macro attendee_table(attendees, returnUrl) %}
   {% if attendees is empty %}
     <p class="tag-badge--none">No one booked yet.</p>
   {% else %}
+    {% set attendees = attendees|sort((a, b) => (a.isStaffing ? 0 : 1) <=> (b.isStaffing ? 0 : 1)) %}
     <div class="table-scroll">
       <table class="admin-table">
         <thead>
@@ -22,12 +23,21 @@
             {% set pillClass = attendee.status == 'confirmed' ? ' status-pill--published' : (attendee.status == 'cancelled' ? ' status-pill--cancelled' : (attendee.status == 'waiting' ? ' status-pill--waiting' : '')) %}
             <tr data-name="{{ displayName|lower }}" data-email="{{ attendee.user.email|lower }}">
               <td>
-                <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
-                  {{ displayName ?: attendee.user.email }}
-                </a>
-                {% if attendee.isStaffing %}
-                  <br><span style="font-size:0.72rem;color:var(--muted);">{{ attendee.staffingRequirement.certification.name }} &middot; {{ attendee.staffingStatusLabel }}</span>
-                {% endif %}
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  {% if attendee.isStaffing %}
+                    <span style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;background:#ede9fe;color:#5b21b6;display:flex;align-items:center;justify-content:center;font-size:0.85rem;" title="Staffing this event">
+                      <i class="bi bi-person-fill"></i>
+                    </span>
+                  {% endif %}
+                  <div>
+                    <a href="{{ path('app_admin_user_show', {id: attendee.user.id}) }}" class="admin-table__link">
+                      {{ displayName ?: attendee.user.email }}
+                    </a>
+                    {% if attendee.isStaffing %}
+                      <br><span style="font-size:0.72rem;color:var(--muted);">{{ attendee.staffingRequirement.certification.name }} &middot; {{ attendee.staffingStatusLabel }}</span>
+                    {% endif %}
+                  </div>
+                </div>
               </td>
               <td><span class="status-pill{{ pillClass }}">{{ attendee.status|capitalize }}</span></td>
               <td class="admin-table__muted">{{ attendee.effectivePrice ? '£' ~ attendee.effectivePrice : 'Free' }}</td>
@@ -38,7 +48,7 @@
                   &mdash;
                 {% endif %}
               </td>
-              <td><a href="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" class="admin-table__link">Edit</a></td>
+              <td><a href="{{ path('app_admin_booking_edit', {id: attendee.id, returnTo: returnUrl}) }}" class="admin-table__link">Edit</a></td>
             </tr>
           {% endfor %}
         </tbody>
@@ -51,7 +61,11 @@
 <div class="page-header">
   <h1>
     <a href="{{ path('app_admin_events') }}" class="page-header__crumb">Events</a> &raquo;
+
     {{ event.title }} - {{ (event.isRecurring ? occurrenceDate : event.date)|date('d M Y') }}
+
+    {% if event.isRecurring %}<i class="bi bi-arrow-repeat"></i>{% endif %}
+
     <span class="status-pill{{ event.isPublished ? ' status-pill--published' : '' }}">
           {{ event.isPublished ? 'Published' : 'Draft' }}
         </span>
@@ -105,7 +119,7 @@
     {% endif %}
     {% if event.isRecurring %}
       <div style="color:var(--muted);font-size:0.85rem;">
-            (recurring{% if event.recurUntil %} until {{ event.recurUntil|date('d M Y') }}{% endif %})
+            <i class="bi bi-arrow-repeat"></i> {% if event.recurUntil %} until {{ event.recurUntil|date('d M Y') }}{% endif %}
           </div>
     {% endif %}
   </div>
@@ -194,6 +208,7 @@
       </div>
     </div>
 
+    {% set eventReturnUrl = path('app_admin_event_show', event.isRecurring ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id}) %}
     {% set confirmedAttendees = attendees|filter(a => a.status == 'confirmed') %}
     {% set pendingAttendees   = attendees|filter(a => a.status == 'pending') %}
     {% set waitingAttendees   = attendees|filter(a => a.status == 'waiting') %}
@@ -211,24 +226,29 @@
     </div>
 
     <div class="tab-panel" data-tab-panel="confirmed" style="display:none;">
-      {{ _self.attendee_table(confirmedAttendees) }}
+      {{ _self.attendee_table(confirmedAttendees, eventReturnUrl) }}
     </div>
     <div class="tab-panel" data-tab-panel="pending" style="display:none;">
-      {{ _self.attendee_table(pendingAttendees) }}
+      {{ _self.attendee_table(pendingAttendees, eventReturnUrl) }}
     </div>
     <div class="tab-panel" data-tab-panel="waiting" style="display:none;">
-      {{ _self.attendee_table(waitingAttendees) }}
+      {{ _self.attendee_table(waitingAttendees, eventReturnUrl) }}
     </div>
     <div class="tab-panel" data-tab-panel="cancelled" style="display:none;">
-      {{ _self.attendee_table(cancelledAttendees) }}
+      {{ _self.attendee_table(cancelledAttendees, eventReturnUrl) }}
     </div>
     <p id="attendee-search-empty" class="tag-badge--none" style="display:none;">No matching attendees.</p>
 
     {% if eventTicketProducts is not empty and is_granted('ROLE_ADMIN') %}
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;">
-        {% for product in eventTicketProducts %}
-          <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</a>
-        {% endfor %}
+      {% set addAttendeeParams = {context: 'new_sale', eventId: event.id} %}
+      {% if event.isRecurring %}{% set addAttendeeParams = addAttendeeParams|merge({occurrenceDate: occurrenceDate|date('Y-m-d')}) %}{% endif %}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem;justify-content:space-between;">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          {% for product in eventTicketProducts %}
+            <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="btn btn--ghost btn--sm">Edit {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %}</a>
+          {% endfor %}
+        </div>
+        <a href="{{ path('app_admin_users', addAttendeeParams) }}" class="btn btn--teal btn--sm">+ Add attendee</a>
       </div>
     {% endif %}
   </div>
