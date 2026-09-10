@@ -2,9 +2,12 @@
 
 {% block title %}Complete {{ record.certification.name }} — Y Wal{% endblock %}
 
+{% block nav %}{% include '_minimal_nav.html.twig' %}{% endblock %}
+{% block footer %}{% endblock %}
+
 {% block head %}
 <style>
-  .account-page { padding: 7rem 1rem 5rem; }
+  .account-page { padding: 2.5rem 1rem 5rem; }
   .account-wrap { max-width: 560px; margin: 0 auto; }
   .account-wrap h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
   .account-wrap .subtitle { color: var(--muted, #6b7280); font-size: 0.9rem; margin-bottom: 2rem; }
@@ -231,7 +234,6 @@
 {% endblock %}
 
 {% block scripts %}
-{{ parent() }}
 <script>
   (function () {
     var editToggle = document.getElementById('profile-edit-toggle');

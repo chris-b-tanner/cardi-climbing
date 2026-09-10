@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\EventStaffingRequirement;
+use App\Entity\EventTicketProduct;
 use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -468,6 +469,16 @@ class AdminEventController extends AbstractController
         $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_EVENT, $event->getId());
         if ($pinnedCount > 0) {
             $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
+        }
+
+        // A linked ticket product references the event with ON DELETE RESTRICT (a Product's sales
+        // history shouldn't be orphaned by deleting the event it happened to sell tickets to), so
+        // this has to be caught here with a helpful message rather than surfacing as a raw DB error.
+        $linkedTicketProducts = $em->getRepository(EventTicketProduct::class)->findBy(['event' => $event]);
+        if ($linkedTicketProducts) {
+            $names = implode(', ', array_map(static fn (EventTicketProduct $etp) => $etp->getProduct()->getName(), $linkedTicketProducts));
+            $this->addFlash('error', "Delete the linked ticket product first (Settings \u{2192} Products): {$names}.");
             return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
         }
 

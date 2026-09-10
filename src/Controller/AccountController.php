@@ -11,6 +11,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/account')]
@@ -104,6 +105,7 @@ class AccountController extends AbstractController
         Request $request,
         int $recordId,
         EntityManagerInterface $em,
+        TokenStorageInterface $tokenStorage,
     ): Response {
         /** @var User $user */
         $user   = $this->getUser();
@@ -182,7 +184,21 @@ class AccountController extends AbstractController
                 $record->setCompletedBy($user);
                 $em->flush();
 
-                $this->addFlash('success', $record->getCertification()->getName() . ' submitted — thank you! It\'s now awaiting approval, and you\'ll be emailed a copy once it\'s signed off.');
+                $followUp = $holder->getCertificationNotificationEmail()
+                    ? "you'll be emailed a copy once it's signed off."
+                    : 'check with reception once it\'s signed off.';
+                $successMessage = $record->getCertification()->getName() . ' submitted — thank you! It\'s now awaiting approval, ' . $followUp;
+
+                // A kiosk (shared/reception tablet) session must never stay signed in as whoever
+                // just used it — log straight back out rather than landing on their account.
+                if ($request->getSession()->get('kiosk_mode')) {
+                    $tokenStorage->setToken(null);
+                    $request->getSession()->invalidate();
+                    $this->addFlash('success', $successMessage);
+                    return $this->redirectToRoute('app_kiosk_certification');
+                }
+
+                $this->addFlash('success', $successMessage);
                 return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
             }
         }

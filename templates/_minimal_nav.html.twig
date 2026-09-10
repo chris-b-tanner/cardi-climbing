@@ -1,0 +1,14 @@
+{#
+  Stripped-down header for a locked-down flow (no way to navigate elsewhere) — just the brand and,
+  once signed in, who's signed in with a way to log out. Used by the certification wizard and the
+  kiosk entry page so someone can't wander off (or stay signed in as the wrong person) mid-flow.
+#}
+<header style="background:#fff;border-bottom:1px solid #e5e7eb;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;">
+  <span style="font-weight:700;font-size:1.1rem;color:#1a1a1a;">Y <span style="color:#2a9d8f;">Wal</span></span>
+  {% if app.user %}
+    <span style="font-size:0.875rem;color:#6b7280;">
+      {{ app.user.displayName ?: app.user.email }}
+      &middot; <a href="{{ path('app_logout') }}" style="color:#2a9d8f;text-decoration:none;">Log out</a>
+    </span>
+  {% endif %}
+</header>

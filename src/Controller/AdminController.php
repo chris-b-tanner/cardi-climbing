@@ -536,14 +536,6 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_certification_pick', ['id' => $user->getId()]);
         }
 
-        if (!$user->getCertificationNotificationEmail()) {
-            $message = $user->getParent()
-                ? 'This member\'s family has no email address on file — add one to their account or their parent\'s before assigning a certification, since a link to complete it needs to be emailed somewhere.'
-                : 'This member has no email address on file — add one before assigning a certification, since they need to be emailed a link to complete it.';
-            $this->addFlash('error', $message);
-            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
-        }
-
         $alreadyHeld = null;
         foreach ($user->getCertifications() as $record) {
             if ($record->getCertification() === $certification && !$record->isCancelled()) {
@@ -563,6 +555,14 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
             }
 
+            // No email on file (e.g. a walk-in added at reception with just a name) — there's
+            // nowhere to send an invite link, so this has to be completed via the kiosk instead:
+            // the record's own ID plus the holder's surname (see KioskController).
+            if (!$user->getCertificationNotificationEmail() && !trim($user->getLastName() ?? '')) {
+                $this->addFlash('error', 'Add a surname for this member first — it doubles as the kiosk PIN for completing this without an email on file.');
+                return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+            }
+
             /** @var User $admin */
             $admin = $this->getUser();
 
@@ -574,10 +574,24 @@ class AdminController extends AbstractController
             $em->persist($record);
             $em->flush();
 
-            $certificationMailer->sendInvitation($record);
+            $displayName = trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getCertificationNotificationEmail();
 
-            $recipient = $user->getParent() ? 'their parent has' : 'they\'ve';
-            $this->addFlash('success', $certification->getName() . ' added for ' . (trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')) ?: $user->getCertificationNotificationEmail()) . " — {$recipient} been emailed a link to complete it.");
+            $message = "{$certification->getName()} started for {$displayName}.";
+
+            if ($user->getCertificationNotificationEmail()) {
+                $certificationMailer->sendInvitation($record);
+                $recipient = $user->getParent() ? 'Their parent has' : 'They\'ve';
+                $message .= " {$recipient} been emailed a link to complete it.";
+            }
+
+            // Always offer the kiosk fallback too (a walk-in tablet at reception) — not just when
+            // there's no email — as long as there's a surname to use as the other half of the code.
+            if (trim($user->getLastName() ?? '')) {
+                $message .= " Or complete it on the kiosk: enter ID #{$record->getId()} and the surname \"{$user->getLastName()}\" (valid for 30 minutes).";
+            }
+
+            $this->addFlash('success', $message);
+
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 
@@ -630,17 +644,19 @@ class AdminController extends AbstractController
             return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
         }
 
-        if (!$user->getCertificationNotificationEmail()) {
-            $message = $user->getParent()
-                ? 'This member\'s family has no email address on file — add one to their account or their parent\'s before resending the invitation.'
-                : 'This member has no email address on file — add one before resending the invitation.';
-            $this->addFlash('error', $message);
-            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+        // Resets the kiosk claim window too (see KioskController) — resending is also how an admin
+        // resurrects a record whose 30-minute kiosk window (or emailed link) has lapsed, to
+        // complete it in person or back on the kiosk.
+        $record->setStartedAt(new \DateTimeImmutable());
+        $em->flush();
+
+        if ($user->getCertificationNotificationEmail()) {
+            $certificationMailer->sendInvitation($record);
+            $this->addFlash('success', 'Invitation email re-sent. The kiosk ID and surname will work again for the next 30 minutes too.');
+        } else {
+            $this->addFlash('success', "No email on file — the kiosk ID and surname will work again for the next 30 minutes: enter ID #{$record->getId()} and the surname \"{$user->getLastName()}\".");
         }
 
-        $certificationMailer->sendInvitation($record);
-
-        $this->addFlash('success', 'Invitation email re-sent.');
         return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
     }
 

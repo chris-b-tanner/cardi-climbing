@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ record.certification.name }}</h1>
+  <h1>{{ record.certification.name }} <span style="color:var(--muted);font-weight:400;">#{{ record.id }}</span></h1>
   <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Back to member</a>
 </div>
 
@@ -16,6 +16,10 @@
     <div>
       <div class="card__label">Member</div>
       <div class="card__value">{{ displayName ?: user.email }}</div>
+    </div>
+    <div>
+      <div class="card__label">ID</div>
+      <div class="card__value">#{{ record.id }}</div>
     </div>
     <div>
       <div class="card__label">Notification email</div>
@@ -114,7 +118,9 @@
     <div class="card__label" style="margin-bottom:0.6rem;">Awaiting completion</div>
     <p style="font-size:0.875rem;color:var(--muted);margin-bottom:0.75rem;">
       This induction has been started.
-      {% if user.parent %}
+      {% if not user.certificationNotificationEmail %}
+        No email on file — complete it on the kiosk instead: enter ID #{{ record.id }} and the surname "{{ user.lastName }}" (valid for 30 minutes of this being started, or last resent).
+      {% elseif user.parent %}
         Their parent has been emailed a link to log into their own account and complete the declarations and signature on {{ displayName ?: 'this member' }}'s behalf.
       {% else %}
         The member has been emailed a link to log into their account and complete the declarations and signature themselves from the Certifications tab.

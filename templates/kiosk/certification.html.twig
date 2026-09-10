@@ -1,0 +1,84 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Complete your induction — Y Wal{% endblock %}
+
+{% block nav %}{% include '_minimal_nav.html.twig' %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block head %}
+<style>
+  .account-page { padding: 2.5rem 1rem 5rem; }
+  .account-wrap { max-width: 420px; margin: 0 auto; }
+  .account-wrap h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .account-wrap .subtitle { color: var(--muted, #6b7280); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  .account-card {
+    background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+
+  .field { margin-bottom: 1rem; }
+  .account-card > .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: #6b7280; margin-bottom: 0.35rem;
+  }
+  .field input[type="text"],
+  .field input[type="number"] {
+    width: 100%; padding: 0.6rem 0.75rem;
+    border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: 0.9375rem; font-family: inherit; color: #1a1a1a;
+  }
+  .field input:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
+
+  .account-actions { margin-top: 1.5rem; }
+  .account-actions .btn { padding: 0.6rem 1.4rem; width: 100%; text-align: center; }
+
+  .alert--success {
+    background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
+  }
+  .alert--error {
+    background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="account-page">
+  <div class="account-wrap">
+    <h1>Complete your induction</h1>
+    <p class="subtitle">Enter the ID reception gave you, along with your surname, to get started.</p>
+
+    {% for msg in app.flashes('success') %}
+      <div class="alert--success">{{ msg }}</div>
+    {% endfor %}
+    {% if error %}
+      <div class="alert--error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_kiosk_certification') }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('kiosk_certification') }}">
+
+      <div class="account-card">
+        <div class="field">
+          <label for="recordId">ID</label>
+          <input type="number" id="recordId" name="recordId" inputmode="numeric" autocomplete="off" required autofocus>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="surname">Surname</label>
+          <input type="text" id="surname" name="surname" autocomplete="off" required>
+        </div>
+      </div>
+
+      <div class="account-actions">
+        <button type="submit" class="btn btn--teal">Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

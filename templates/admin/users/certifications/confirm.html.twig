@@ -43,9 +43,16 @@
       This will start an induction record for <strong>{{ certification.name }}</strong>, marked as in progress and
       started today by you. It won't show as complete until it's signed off.
     </p>
-    <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">
-      More options for this step (e.g. marking it complete straight away) will be added here later.
-    </p>
+    {% if user.certificationNotificationEmail %}
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">
+        {{ displayName ?: 'This member' }} will be emailed a link to complete it.
+      </p>
+    {% endif %}
+    {% if user.lastName %}
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;">
+        You'll also be shown an ID to enter on the kiosk instead, along with {{ displayName ?: 'their' }} surname — valid for 30 minutes.
+      </p>
+    {% endif %}
   </div>
 
   <div class="form-actions">

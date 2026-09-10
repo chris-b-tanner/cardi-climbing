@@ -115,13 +115,14 @@ class AdminBookingController extends AbstractController
                 // Checking someone in for a session that's already running (or about to, within
                 // 15 minutes) is a real, right-now attendance — stamp it as such. A session safely
                 // in the future is just a booking/reservation; it isn't attended yet.
-                $result = $bookingService->createBooking(
+                $checkInNow = $this->isCheckInWindow($event, $occurrenceDate);
+                $result     = $bookingService->createBooking(
                     $event,
                     $user,
                     $occurrenceDate,
                     status: $status,
                     addedBy: $admin,
-                    checkInNow: $this->isCheckInWindow($event, $occurrenceDate),
+                    checkInNow: $checkInNow,
                 );
 
                 if (is_string($result)) {
@@ -131,7 +132,7 @@ class AdminBookingController extends AbstractController
                         $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
                     }
 
-                    $this->addFlash('success', 'Member checked in.');
+                    $this->addFlash('success', $checkInNow ? 'Member checked in.' : 'Member booked.');
                     return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
                 }
             }
