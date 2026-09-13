@@ -20,6 +20,16 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         parent::__construct($registry, User::class);
     }
 
+    /** How many real contacts are on file — everyone who hasn't been archived — for the "Community supporters" stat on the homepage. */
+    public function countActive(): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.deletedAt IS NULL')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function upgradePassword(PasswordAuthenticatedUserInterface $user, string $newHashedPassword): void
     {
         if (!$user instanceof User) {
