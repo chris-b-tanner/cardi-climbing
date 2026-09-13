@@ -190,7 +190,7 @@
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
-      {% set confirmedCount = attendees|filter(a => a.status == 'confirmed')|length %}
+      {% set confirmedCount = attendees|filter(a => a.status == 'confirmed' and not a.isStaffing)|length %}
       {% set placesLeft = event.maxAttendees ? max(event.maxAttendees - confirmedCount, 0) : null %}
       <div class="card__label" style="margin-bottom:0;">
         Attendees ({{ confirmedCount }}){% if placesLeft is not null %}, {{ placesLeft }} place{{ placesLeft == 1 ? '' : 's' }} left{% endif %}{% if event.isRecurring %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}
@@ -361,13 +361,6 @@
     <div id="staffing-picker-results" style="display:flex;flex-direction:column;gap:0.3rem;max-height:260px;overflow-y:auto;"></div>
   </div>
 </div>
-
-<form id="staffing-add-form" method="post" action="{{ path('app_admin_event_staffing_add', {id: event.id}) }}" style="display:none;">
-  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_staffing_' ~ event.id) }}">
-  <input type="hidden" name="requirementId" id="staffing-add-requirement-id">
-  <input type="hidden" name="userId" id="staffing-add-user-id">
-  {% if event.isRecurring %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDate|date('Y-m-d') }}">{% endif %}
-</form>
 {% endif %}
 
   <div class="card">
@@ -465,6 +458,7 @@
   const staffingPickerSearch   = document.getElementById('staffing-picker-search');
   const staffingPickerResults  = document.getElementById('staffing-picker-results');
   const staffingSearchUrl      = {{ path('app_admin_event_staffing_search', {id: event.id})|json_encode|raw }};
+  const staffingNewUrl         = {{ path('app_admin_event_staffing_new', {id: event.id})|json_encode|raw }};
   const staffingOccurrenceDate = {{ (event.isRecurring ? occurrenceDate|date('Y-m-d') : null)|json_encode|raw }};
   let staffingSearchDebounce;
   let staffingRequirementId;
@@ -493,8 +487,9 @@
           btn.className = 'member-search-item';
           btn.textContent = result.label;
           btn.addEventListener('click', () => {
-            document.getElementById('staffing-add-user-id').value = result.id;
-            document.getElementById('staffing-add-form').requestSubmit();
+            const params = new URLSearchParams({requirementId: staffingRequirementId, userId: result.id});
+            if (staffingOccurrenceDate) params.set('occurrenceDate', staffingOccurrenceDate);
+            window.location.href = `${staffingNewUrl}?${params}`;
           });
           staffingPickerResults.appendChild(btn);
         });
@@ -505,7 +500,6 @@
     trigger.addEventListener('click', (e) => {
       e.preventDefault();
       staffingRequirementId = trigger.dataset.requirementId;
-      document.getElementById('staffing-add-requirement-id').value = staffingRequirementId;
       staffingPickerTitle.textContent = 'Add ' + trigger.dataset.certificationName;
       staffingPickerSearch.value = '';
       staffingPickerModal.style.display = 'flex';

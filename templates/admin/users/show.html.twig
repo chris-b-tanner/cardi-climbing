@@ -183,13 +183,32 @@
 
 <div class="card">
   <div class="card__label" style="margin-bottom:0.6rem;">Tags</div>
-  {% if user.tags is empty %}
-    <span class="tag-badge--none">No tags assigned</span>
-  {% else %}
+  <div id="tag-list" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.3rem;">
+    <span class="tag-badge--none" id="tag-list-empty"{% if user.tags is not empty %} style="display:none;"{% endif %}>No tags assigned</span>
     {% for tag in user.tags %}
-      <span class="tag-badge">{{ tag.name }}</span>
+      <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}">
+        {{ tag.name }}
+        <button type="button" class="tag-badge__remove" data-tag-id="{{ tag.id }}" aria-label="Remove tag {{ tag.name }}">&times;</button>
+      </span>
     {% endfor %}
-  {% endif %}
+    {% if allTags is empty %}
+      <a href="{{ path('app_admin_settings_tag_new') }}" style="font-size:0.8rem;font-weight:600;color:var(--teal-dk);">+ Add tag</a>
+    {% else %}
+      <div class="tag-picker" id="tag-picker">
+        <button type="button" class="tag-picker__trigger" id="tag-picker-trigger" aria-haspopup="listbox" aria-expanded="false">+ Add tag</button>
+        <div class="tag-picker__menu" id="tag-picker-menu" style="display:none;" role="listbox" aria-label="Choose a tag to add">
+          <input type="text" id="tag-picker-search" class="tag-picker__search" placeholder="Search tags…" autocomplete="off">
+          <div id="tag-picker-list" class="tag-picker__list">
+            {% for tag in allTags %}
+              <button type="button" class="tag-picker__item{% if user.hasTag(tag) %} is-added is-hidden{% endif %}" data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name|lower }}" role="option">{{ tag.name }}</button>
+            {% endfor %}
+          </div>
+          <p class="tag-picker__empty" id="tag-picker-empty" style="display:none;">No matching tags.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <p id="tag-error" class="flash flash--error" style="display:none;margin-top:0.6rem;margin-bottom:0;"></p>
 </div>
 
 {% if user.memo %}
@@ -526,6 +545,147 @@
       }
     }
     if (defaultTab) selectTab(defaultTab);
+  })();
+
+  // ── Quick tag add/remove from the contact view ──────────────────────────
+  (function () {
+    const picker   = document.getElementById('tag-picker');
+    if (!picker) return; // no tags exist system-wide — the "+ Add tag" link points at tag settings instead
+
+    const trigger    = document.getElementById('tag-picker-trigger');
+    const menu       = document.getElementById('tag-picker-menu');
+    const search     = document.getElementById('tag-picker-search');
+    const list       = document.getElementById('tag-picker-list');
+    const emptyMsg   = document.getElementById('tag-picker-empty');
+    const tagList    = document.getElementById('tag-list');
+    const tagListEmpty = document.getElementById('tag-list-empty');
+    const errorBox   = document.getElementById('tag-error');
+    const addUrl     = {{ path('app_admin_user_tag_add', {id: user.id})|json_encode|raw }};
+    const removeUrl  = {{ path('app_admin_user_tag_remove', {id: user.id})|json_encode|raw }};
+    const csrfToken  = {{ csrf_token('admin_user_tags_' ~ user.id)|json_encode|raw }};
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.style.display = 'block';
+    }
+
+    function clearError() {
+      errorBox.style.display = 'none';
+    }
+
+    function openMenu() {
+      menu.style.display = 'block';
+      trigger.setAttribute('aria-expanded', 'true');
+      search.value = '';
+      filterItems('');
+      search.focus();
+    }
+
+    function closeMenu() {
+      menu.style.display = 'none';
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function filterItems(query) {
+      const q = query.trim().toLowerCase();
+      let anyVisible = false;
+      list.querySelectorAll('.tag-picker__item').forEach(item => {
+        const matches = !item.classList.contains('is-added') && item.dataset.tagName.includes(q);
+        item.classList.toggle('is-hidden', !matches);
+        if (matches) anyVisible = true;
+      });
+      emptyMsg.style.display = anyVisible ? 'none' : 'block';
+    }
+
+    trigger.addEventListener('click', () => {
+      if (menu.style.display === 'none') openMenu(); else closeMenu();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!picker.contains(e.target)) closeMenu();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menu.style.display !== 'none') {
+        closeMenu();
+        trigger.focus();
+      }
+    });
+
+    search.addEventListener('input', () => filterItems(search.value));
+
+    list.addEventListener('click', (e) => {
+      const item = e.target.closest('.tag-picker__item');
+      if (!item || item.classList.contains('is-added')) return;
+
+      clearError();
+      item.disabled = true;
+
+      fetch(addUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _csrf_token: csrfToken, tagId: item.dataset.tagId }),
+      })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          item.disabled = false;
+          if (!ok) {
+            showError(data.error || 'Could not add that tag.');
+            return;
+          }
+
+          item.classList.add('is-added', 'is-hidden');
+
+          const chip = document.createElement('span');
+          chip.className = 'tag-badge tag-badge--removable';
+          chip.dataset.tagId = data.id;
+          chip.innerHTML = data.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))
+            + ' <button type="button" class="tag-badge__remove" data-tag-id="' + data.id + '" aria-label="Remove tag ' + data.name.replace(/"/g, '&quot;') + '">&times;</button>';
+          tagList.insertBefore(chip, picker);
+          tagListEmpty.style.display = 'none';
+
+          closeMenu();
+        })
+        .catch(() => {
+          item.disabled = false;
+          showError('Could not add that tag.');
+        });
+    });
+
+    tagList.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('.tag-badge__remove');
+      if (!removeBtn) return;
+
+      clearError();
+      removeBtn.disabled = true;
+
+      fetch(removeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _csrf_token: csrfToken, tagId: removeBtn.dataset.tagId }),
+      })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            removeBtn.disabled = false;
+            showError(data.error || 'Could not remove that tag.');
+            return;
+          }
+
+          removeBtn.closest('.tag-badge').remove();
+
+          const restoredItem = list.querySelector('.tag-picker__item[data-tag-id="' + data.id + '"]');
+          if (restoredItem) restoredItem.classList.remove('is-added');
+
+          if (!tagList.querySelector('.tag-badge--removable')) {
+            tagListEmpty.style.display = '';
+          }
+        })
+        .catch(() => {
+          removeBtn.disabled = false;
+          showError('Could not remove that tag.');
+        });
+    });
   })();
 </script>
 {% endblock %}

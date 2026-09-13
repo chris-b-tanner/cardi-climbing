@@ -152,7 +152,16 @@ class BulkEmailController extends AbstractController
         } elseif ($userAudience) {
             $recipients = $userAudience['recipients'];
         } else {
-            $tagIds     = array_map('intval', array_filter($request->request->all('tagIds')));
+            $tagIds = array_map('intval', array_filter($request->request->all('tagIds')));
+
+            // Only ROLE_ADMIN may blast the whole opted-in membership; any other team member must
+            // narrow to a tag (or use one of the fixed audiences above — a single member, an
+            // event/occurrence, or a certification).
+            if (!$tagIds && !$this->isGranted('ROLE_ADMIN')) {
+                $this->addFlash('error', 'Only an admin can send to the general membership — filter by tag, or send from a specific member, event, or certification page instead.');
+                return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
+            }
+
             $recipients = $userRepository->findForBulkEmail($tagIds);
         }
 

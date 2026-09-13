@@ -7,9 +7,17 @@
   <a href="{{ path('app_admin_settings_product_new') }}" class="btn btn--teal btn--sm">+ New product</a>
 </div>
 
-<div class="filter-form">
+<div class="filter-form" style="align-items:center;">
   <input type="search" id="search-q" placeholder="Search products…"
-         value="{{ currentQuery }}" aria-label="Search products" autocomplete="off">
+         value="{{ currentQuery }}" aria-label="Search products" autocomplete="off" style="flex:0 1 220px;">
+  <div class="pos-tabs" id="type-filters" style="margin-bottom:0;">
+    <button type="button" class="pos-tab{{ currentType == '' ? ' is-active' : '' }}" data-type="">All</button>
+    <button type="button" class="pos-tab{{ currentType == 'stock' ? ' is-active' : '' }}" data-type="stock">Stock</button>
+    <button type="button" class="pos-tab{{ currentType == 'service' ? ' is-active' : '' }}" data-type="service">Service</button>
+    <button type="button" class="pos-tab{{ currentType == 'credit' ? ' is-active' : '' }}" data-type="credit">Credit</button>
+    <button type="button" class="pos-tab{{ currentType == 'membership' ? ' is-active' : '' }}" data-type="membership">Membership</button>
+    <button type="button" class="pos-tab{{ currentType == 'event_ticket' ? ' is-active' : '' }}" data-type="event_ticket">Event ticket</button>
+  </div>
 </div>
 
 <div id="results">
@@ -60,13 +68,16 @@
 </style>
 <script>
   const searchInput = document.getElementById('search-q');
+  const typeTabs     = document.querySelectorAll('#type-filters .pos-tab');
   const results      = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_settings_products') }}';
+  let currentType    = '{{ currentType }}';
   let debounce;
 
   function fetchResults() {
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
+    if (currentType) params.set('type', currentType);
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -81,6 +92,14 @@
   searchInput.addEventListener('input', () => {
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
+  });
+
+  typeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentType = tab.dataset.type;
+      typeTabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      fetchResults();
+    });
   });
 
   // ── Stock adjustment modal — delegated so it also works on rows loaded via search ──

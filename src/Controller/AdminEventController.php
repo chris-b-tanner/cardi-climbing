@@ -15,6 +15,7 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
+use App\Service\BookingMailer;
 use App\Service\DoorAccessService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -239,10 +240,55 @@ class AdminEventController extends AbstractController
     }
 
     /**
+     * Intermediate "how should this assignment start?" page — landed on after picking a candidate
+     * in the staffing search modal, before any Attendee row exists yet. Lets the admin choose
+     * between putting the candidate straight on duty (confirmed) or sending them an emailed invite
+     * to confirm or decline it themselves (pending) — see addStaffMember() for what each does.
+     */
+    #[Route('/{id}/staffing/new', name: 'app_admin_event_staffing_new', requirements: ['id' => '\d+'])]
+    public function newStaffMember(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+    ): Response {
+        $showParams        = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->query->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $candidate = $this->resolveStaffingCandidate(
+            $event,
+            (int) $request->query->get('requirementId'),
+            (int) $request->query->get('userId'),
+            $occurrenceDateRaw,
+            $em,
+            $userRepository,
+            $attendeeRepository,
+        );
+        if (!$candidate) {
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+        [$requirement, $candidateUser, $storedOccurrenceDate] = $candidate;
+
+        return $this->render('admin/events/staffing_new.html.twig', [
+            'event'             => $event,
+            'requirement'       => $requirement,
+            'candidate'         => $candidateUser,
+            'occurrenceDate'    => $storedOccurrenceDate,
+            'occurrenceDateRaw' => $occurrenceDateRaw,
+        ]);
+    }
+
+    /**
      * Adds {userId} straight onto {requirementId}'s duty roster as a brand-new, staff-only
-     * attendee (confirmed, no capacity/credit checks — those govern ordinary attendee seats, not
-     * staffing a session) — for someone who isn't already booked onto this occurrence. An
-     * already-booked holder is put on duty via assignStaffing() instead.
+     * attendee (no capacity/credit checks — those govern ordinary attendee seats, not staffing a
+     * session) — for someone who isn't already booked onto this occurrence. An already-booked
+     * holder is put on duty via assignStaffing() instead. Reached from the "choose a status" page
+     * (newStaffMember() above): {staffingStatus} 'approved' puts them straight on duty; 'pending'
+     * instead emails them a magic link to confirm or decline the assignment themselves.
      */
     #[Route('/{id}/staffing/add', name: 'app_admin_event_staffing_add', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function addStaffMember(
@@ -252,6 +298,7 @@ class AdminEventController extends AbstractController
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
         DoorAccessService $doorAccessService,
+        BookingMailer $bookingMailer,
     ): Response {
         if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -264,29 +311,23 @@ class AdminEventController extends AbstractController
             $showParams['date'] = $occurrenceDateRaw;
         }
 
-        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->request->get('requirementId'));
-        $user        = $userRepository->find((int) $request->request->get('userId'));
-
-        if (!$requirement || $requirement->getEvent() !== $event || !$user) {
-            $this->addFlash('error', 'Could not find that member or staffing role.');
+        $candidate = $this->resolveStaffingCandidate(
+            $event,
+            (int) $request->request->get('requirementId'),
+            (int) $request->request->get('userId'),
+            $occurrenceDateRaw,
+            $em,
+            $userRepository,
+            $attendeeRepository,
+        );
+        if (!$candidate) {
             return $this->redirectToRoute('app_admin_event_show', $showParams);
         }
+        [$requirement, $user, $storedOccurrenceDate] = $candidate;
 
-        if (!$user->hasCertification($requirement->getCertification())) {
-            $this->addFlash('error', 'That member does not hold the required certification.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
-        }
-
-        $occurrenceDate = $this->parseOccurrenceDate($occurrenceDateRaw) ?? $event->getDate();
-        if ($event->isRecurring() && !$event->isValidForDate($occurrenceDate)) {
-            $this->addFlash('error', 'That date is not a valid occurrence of this event.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
-        }
-        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
-
-        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
-            $this->addFlash('error', 'That member is already attending this event.');
-            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        $staffingStatus = $request->request->get('staffingStatus', Attendee::STAFFING_APPROVED);
+        if (!in_array($staffingStatus, [Attendee::STAFFING_PENDING, Attendee::STAFFING_APPROVED], true)) {
+            $staffingStatus = Attendee::STAFFING_APPROVED;
         }
 
         /** @var User $admin */
@@ -296,17 +337,70 @@ class AdminEventController extends AbstractController
         $attendee->setEvent($event);
         $attendee->setUser($user);
         $attendee->setOccurrenceDate($storedOccurrenceDate);
-        $attendee->setStatus(Attendee::STATUS_CONFIRMED);
+        // A pending invite isn't a real booking yet — it only becomes one (confirmed) once the
+        // instructor accepts, or cancelled if they decline; see AccountController::respondToStaffing()
+        // and AdminBookingController::approveStaffing()/declineStaffing().
+        $attendee->setStatus($staffingStatus === Attendee::STAFFING_PENDING ? Attendee::STATUS_PENDING : Attendee::STATUS_CONFIRMED);
         $attendee->setAddedBy($admin);
         $attendee->setStaffingRequirement($requirement);
-        $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+        $attendee->setStaffingStatus($staffingStatus);
 
         $em->persist($attendee);
+        // No-op while pending — generatePinIfNeeded() only issues one once status is confirmed.
         $doorAccessService->generatePinIfNeeded($attendee);
         $em->flush();
 
-        $this->addFlash('success', $user->getDisplayName() . ' added as ' . $requirement->getCertification()->getName() . '.');
+        if ($staffingStatus === Attendee::STAFFING_PENDING) {
+            $bookingMailer->sendStaffingInvite($attendee);
+            $this->addFlash('success', $user->getDisplayName() . ' invited as ' . $requirement->getCertification()->getName() . ' — awaiting their confirmation.');
+        } else {
+            $this->addFlash('success', $user->getDisplayName() . ' added as ' . $requirement->getCertification()->getName() . '.');
+        }
         return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    /**
+     * Shared validation for a candidate staff assignment (used by both the "choose a status" page
+     * and the actual add), so a request sent straight to the POST route without going through the
+     * intermediate page first still gets the same checks.
+     *
+     * @return array{0: EventStaffingRequirement, 1: User, 2: ?\DateTimeImmutable}|null
+     */
+    private function resolveStaffingCandidate(
+        Event $event,
+        int $requirementId,
+        int $userId,
+        string $occurrenceDateRaw,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+    ): ?array {
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find($requirementId);
+        $user        = $userRepository->find($userId);
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$user) {
+            $this->addFlash('error', 'Could not find that member or staffing role.');
+            return null;
+        }
+
+        if (!$user->hasCertification($requirement->getCertification())) {
+            $this->addFlash('error', 'That member does not hold the required certification.');
+            return null;
+        }
+
+        $occurrenceDate = $this->parseOccurrenceDate($occurrenceDateRaw) ?? $event->getDate();
+        if ($event->isRecurring() && !$event->isValidForDate($occurrenceDate)) {
+            $this->addFlash('error', 'That date is not a valid occurrence of this event.');
+            return null;
+        }
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
+            $this->addFlash('error', 'That member is already attending this event.');
+            return null;
+        }
+
+        return [$requirement, $user, $storedOccurrenceDate];
     }
 
     private function parseOccurrenceDate(string $raw): ?\DateTimeImmutable

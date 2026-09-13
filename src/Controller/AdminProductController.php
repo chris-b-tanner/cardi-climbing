@@ -52,19 +52,25 @@ class AdminProductController extends AbstractController
     #[Route('', name: 'app_admin_settings_products')]
     public function index(Request $request, ProductRepository $productRepository): Response
     {
-        $query    = trim($request->query->get('q', ''));
-        $products = $productRepository->search($query);
+        $query = trim($request->query->get('q', ''));
+        $type  = $request->query->get('type', '');
+        if (!in_array($type, self::TYPES, true)) {
+            $type = '';
+        }
+        $products = $productRepository->search($query, $type);
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/settings/products/_list.html.twig', [
                 'products'     => $products,
                 'currentQuery' => $query,
+                'currentType'  => $type,
             ]);
         }
 
         return $this->render('admin/settings/products/index.html.twig', [
             'products'     => $products,
             'currentQuery' => $query,
+            'currentType'  => $type,
         ]);
     }
 

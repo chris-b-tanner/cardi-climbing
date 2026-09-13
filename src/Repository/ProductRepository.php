@@ -18,7 +18,8 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /** @return Product[] */
-    public function search(string $query = ''): array
+    /** @param string $type One of Product::TYPE_*, or '' for all types. */
+    public function search(string $query = '', string $type = ''): array
     {
         $qb = $this->createQueryBuilder('p')
             ->orderBy('p.name', 'ASC')
@@ -27,6 +28,11 @@ class ProductRepository extends ServiceEntityRepository
         if ($query !== '') {
             $qb->andWhere('p.name LIKE :q OR p.variantValue LIKE :q')
                 ->setParameter('q', '%' . $query . '%');
+        }
+
+        if ($type !== '') {
+            $qb->andWhere('p.productType = :type')
+                ->setParameter('type', $type);
         }
 
         return $qb->getQuery()->getResult();

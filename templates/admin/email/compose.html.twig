@@ -52,7 +52,7 @@
           <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
             Sent regardless of newsletter opt-in, since it's addressed to this member directly.
           </p>
-        {% else %}
+        {% elseif is_granted('ROLE_ADMIN') %}
           <div style="display:flex;flex-direction:column;gap:0.5rem;">
             <label class="audience-option">
               <input type="radio" name="audience" value="all" id="aud-all" checked>
@@ -77,6 +77,27 @@
               </div>
             {% endif %}
           </div>
+        {% elseif tags is not empty %}
+          {# Non-admin team member: no "all opted-in" option — tags are the only general-purpose audience available. #}
+          <p style="font-size:0.85rem;color:var(--muted);margin:0 0 0.6rem;">
+            Only an admin can email the whole membership — choose one or more tags to define your audience.
+          </p>
+          <div id="tag-panel">
+            <div class="tag-grid" style="margin-bottom:0.5rem;">
+              {% for tag in tags %}
+                <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
+                       value="{{ tag.id }}" class="tag-check bulk-tag">
+                <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
+              {% endfor %}
+            </div>
+            <div style="font-size:0.8rem;color:var(--muted);">
+              Recipients: <strong id="tag-count">0</strong> opted-in member(s)
+            </div>
+          </div>
+        {% else %}
+          <p style="font-size:0.85rem;color:var(--muted);">
+            No tags are set up, so there's no limited audience available here. Ask an admin to send to the general membership, or send from a specific member, event, or certification page instead.
+          </p>
         {% endif %}
       </div>
 
@@ -220,16 +241,24 @@
       refreshCount();
     });
 
-    bulkTags.forEach(c => {
-      c.disabled = true; // disabled until tag mode selected
-      c.addEventListener('change', () => {
-        clearTimeout(countDebounce);
-        countDebounce = setTimeout(refreshCount, 200);
-      });
-    });
+    bulkTags.forEach(c => { c.disabled = true; }); // disabled until tag mode selected
   }
 
-  updateSendLabel({{ totalOptedIn }});
+  // Wired unconditionally: for an admin toggling into "Filter by tag" mode, and for a non-admin
+  // team member (tags are their only audience option, always visible, never gated behind a radio).
+  bulkTags.forEach(c => {
+    c.addEventListener('change', () => {
+      clearTimeout(countDebounce);
+      countDebounce = setTimeout(refreshCount, 200);
+    });
+  });
+
+  updateSendLabel({{ is_granted('ROLE_ADMIN') ? totalOptedIn : 0 }});
+  {% endif %}
+
+  {% if not is_granted('ROLE_ADMIN') and tags is empty and not eventAudience and not certificationAudience and not userAudience %}
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-btn').title = 'No audience available — ask an admin, or send from a member/event/certification page.';
   {% endif %}
 
   // ── Send confirmation ──────────────────────────────────────

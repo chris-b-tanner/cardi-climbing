@@ -91,4 +91,31 @@ class UserService
         $this->em->persist($note);
         $this->em->flush();
     }
+
+    /**
+     * GDPR paper trail: records a Note if {user}'s primary email actually changed from
+     * {previousEmail} to whatever is currently set on it — call this after setEmail() (so it logs
+     * the real new value) but works from either of the two places a contact can change their own
+     * details: the admin contact edit screen, and the member's own account page.
+     */
+    public function recordEmailChangeIfNeeded(User $user, ?string $previousEmail, ?User $actor = null): void
+    {
+        if ($user->getEmail() === $previousEmail) {
+            return;
+        }
+
+        $from = $previousEmail !== null && $previousEmail !== '' ? $previousEmail : '(none)';
+        $to   = $user->getEmail() !== null && $user->getEmail() !== '' ? $user->getEmail() : '(none)';
+        $this->addNote($user, "Primary email changed from {$from} to {$to}.", $actor);
+    }
+
+    /** GDPR paper trail: records a Note if {user}'s mailing-list opt-in actually changed from {previousOptIn} to its current value. Call this after setOptIn(). */
+    public function recordOptInChangeIfNeeded(User $user, bool $previousOptIn, ?User $actor = null): void
+    {
+        if ($user->isOptIn() === $previousOptIn) {
+            return;
+        }
+
+        $this->addNote($user, $user->isOptIn() ? 'Opted in to the mailing list.' : 'Opted out of the mailing list.', $actor);
+    }
 }

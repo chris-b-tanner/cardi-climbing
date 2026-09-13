@@ -36,13 +36,19 @@ class AttendeeRepository extends ServiceEntityRepository
         return $qb->getQuery()->getOneOrNullResult();
     }
 
-    /** How many non-cancelled bookings exist for the given event/occurrence. */
+    /**
+     * How many non-cancelled, non-staffing bookings exist for the given event/occurrence — i.e.
+     * how many of maxAttendees' seats are actually taken. Staff aren't an audience seat, so they're
+     * excluded here, not just from the admin display — this is the real capacity gate every booking
+     * path (public booking, cart checkout, admin reinstate) checks against.
+     */
     public function countActiveForOccurrence(Event $event, ?\DateTimeImmutable $occurrenceDate): int
     {
         $qb = $this->createQueryBuilder('a')
             ->select('COUNT(a.id)')
             ->where('a.event = :event')
             ->andWhere('a.status != :cancelled')
+            ->andWhere('a.staffingRequirement IS NULL')
             ->setParameter('event', $event)
             ->setParameter('cancelled', Attendee::STATUS_CANCELLED);
 
@@ -103,9 +109,13 @@ class AttendeeRepository extends ServiceEntityRepository
             ->innerJoin('a.staffingRequirement', 'r')->addSelect('r')
             ->innerJoin('r.certification', 'c')->addSelect('c')
             ->where('a.event = :event')
-            ->andWhere('a.status != :cancelled')
+            // A declined staffing invite is cancelled as a booking (it never becomes a real one),
+            // but it should still show up here under "Declined" — only a plain cancelled booking
+            // (not a staffing one at all) should drop out.
+            ->andWhere('a.status != :cancelled OR a.staffingStatus = :declined')
             ->setParameter('event', $event)
             ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->setParameter('declined', Attendee::STAFFING_DECLINED)
             ->orderBy('c.name', 'ASC')
             ->addOrderBy('a.createdAt', 'ASC');
 

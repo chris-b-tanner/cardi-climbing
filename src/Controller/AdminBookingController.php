@@ -280,15 +280,15 @@ class AdminBookingController extends AbstractController
     }
 
     #[Route('/{id}/staffing/approve', name: 'app_admin_booking_staffing_approve', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function approveStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    public function approveStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em, BookingService $bookingService): Response
     {
-        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_APPROVED, 'Member approved as on duty.');
+        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_APPROVED, 'Member approved as on duty.', $bookingService);
     }
 
     #[Route('/{id}/staffing/decline', name: 'app_admin_booking_staffing_decline', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function declineStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em): Response
+    public function declineStaffing(Request $request, Attendee $attendee, EntityManagerInterface $em, BookingService $bookingService): Response
     {
-        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_DECLINED, 'Staffing request declined.');
+        return $this->setStaffingStatus($request, $attendee, $em, Attendee::STAFFING_DECLINED, 'Staffing request declined.', $bookingService);
     }
 
     /** Clears the staffing designation entirely — the booking itself is left untouched. */
@@ -308,7 +308,43 @@ class AdminBookingController extends AbstractController
         return $this->redirectToEventShow($attendee);
     }
 
-    private function setStaffingStatus(Request $request, Attendee $attendee, EntityManagerInterface $em, string $status, string $successMessage): Response
+    /**
+     * Re-sends the staffing invite email with a fresh magic link — for a still-pending invite the
+     * instructor may have lost, or to give someone a second chance after they declined. Resets the
+     * attendee back to pending either way, exactly like a brand-new invite from the event page.
+     */
+    #[Route('/{id}/staffing/restart-invite', name: 'app_admin_booking_staffing_restart_invite', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function restartStaffingInvite(Request $request, Attendee $attendee, EntityManagerInterface $em, BookingMailer $bookingMailer): Response
+    {
+        $returnTo = $this->resolveReturnTo($request, $attendee);
+
+        if (!$this->isCsrfTokenValid('admin_booking_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirect($returnTo);
+        }
+
+        if (!$attendee->isStaffing()) {
+            $this->addFlash('error', 'This booking is not a staffing request.');
+            return $this->redirect($returnTo);
+        }
+
+        $attendee->setStaffingStatus(Attendee::STAFFING_PENDING);
+        $attendee->setStatus(Attendee::STATUS_PENDING);
+        $em->flush();
+
+        $bookingMailer->sendStaffingInvite($attendee);
+
+        $this->addFlash('success', 'Invite resent to ' . $attendee->getUser()->getDisplayName() . '.');
+        return $this->redirect($returnTo);
+    }
+
+    /**
+     * A pending staffing invite isn't a real booking until it's answered: approving it moves the
+     * underlying attendee to confirmed (issuing a door PIN if the event needs one); declining it
+     * cancels the attendee row outright, same as the instructor doing either themselves via
+     * AccountController::respondToStaffing().
+     */
+    private function setStaffingStatus(Request $request, Attendee $attendee, EntityManagerInterface $em, string $status, string $successMessage, BookingService $bookingService): Response
     {
         if (!$this->isCsrfTokenValid('admin_booking_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -321,7 +357,17 @@ class AdminBookingController extends AbstractController
         }
 
         $attendee->setStaffingStatus($status);
-        $em->flush();
+        if ($status === Attendee::STAFFING_APPROVED) {
+            $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED);
+            if ($error) {
+                $this->addFlash('error', $error);
+                return $this->redirectToEventShow($attendee);
+            }
+        } elseif ($status === Attendee::STAFFING_DECLINED) {
+            $bookingService->cancelBooking($attendee);
+        } else {
+            $em->flush();
+        }
 
         $this->addFlash('success', $successMessage);
         return $this->redirectToEventShow($attendee);

@@ -120,7 +120,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -131,7 +131,63 @@ class AdminController extends AbstractController
             'duplicates' => $duplicates,
             'bookings'   => $attendeeRepository->findAllForUser($user),
             'notes'      => $noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()),
+            'allTags'    => $tagRepository->findBy([], ['name' => 'ASC']),
         ]);
+    }
+
+    /** Quick-add a tag from the contact view screen, without dropping into the full edit form. */
+    #[Route('/users/{id}/tags/add', name: 'app_admin_user_tag_add', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addTag(Request $request, User $user, TagRepository $tagRepository, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->isCsrfTokenValid('admin_user_tags_' . $user->getId(), $this->csrfTokenFromRequest($request))) {
+            return new JsonResponse(['error' => 'Access denied.'], 403);
+        }
+
+        $tag = $tagRepository->find((int) $this->paramFromRequest($request, 'tagId'));
+        if (!$tag) {
+            return new JsonResponse(['error' => 'Tag not found.'], 404);
+        }
+
+        $user->addTag($tag);
+        $em->flush();
+
+        return new JsonResponse(['id' => $tag->getId(), 'name' => $tag->getName()]);
+    }
+
+    /** Quick-remove a tag from the contact view screen, without dropping into the full edit form. */
+    #[Route('/users/{id}/tags/remove', name: 'app_admin_user_tag_remove', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function removeTag(Request $request, User $user, TagRepository $tagRepository, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$this->isCsrfTokenValid('admin_user_tags_' . $user->getId(), $this->csrfTokenFromRequest($request))) {
+            return new JsonResponse(['error' => 'Access denied.'], 403);
+        }
+
+        $tag = $tagRepository->find((int) $this->paramFromRequest($request, 'tagId'));
+        if (!$tag) {
+            return new JsonResponse(['error' => 'Tag not found.'], 404);
+        }
+
+        $user->removeTag($tag);
+        $em->flush();
+
+        return new JsonResponse(['id' => $tag->getId()]);
+    }
+
+    /** Reads a named param from either a JSON body or a form-encoded one, so an action can be called by a plain fetch() as well as a form submit. */
+    private function paramFromRequest(Request $request, string $key): string
+    {
+        if ($request->request->has($key)) {
+            return $request->request->get($key, '');
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        return is_array($payload) ? (string) ($payload[$key] ?? '') : '';
+    }
+
+    /** Reads the CSRF token from either a JSON body or a form-encoded one. */
+    private function csrfTokenFromRequest(Request $request): string
+    {
+        return $this->paramFromRequest($request, '_csrf_token');
     }
 
     #[Route('/users/{id}/edit', name: 'app_admin_user_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
@@ -142,6 +198,7 @@ class AdminController extends AbstractController
         TagRepository $tagRepository,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
+        UserService $userService,
     ): Response {
         $allTags = $tagRepository->findBy([], ['name' => 'ASC']);
         $canHaveDependents = $user->getParent() === null && $user->getEmail() !== null;
@@ -151,6 +208,12 @@ class AdminController extends AbstractController
                 $this->addFlash('error', 'Access denied.');
                 return $this->redirectToRoute('app_home');
             }
+
+            // Captured before any setters run below, so recordEmailChangeIfNeeded()/
+            // recordOptInChangeIfNeeded() can tell whether this edit actually changed either —
+            // a GDPR-relevant event we log regardless of which of the two edit screens made it.
+            $previousEmail = $user->getEmail();
+            $previousOptIn = $user->isOptIn();
 
             $newEmail = trim($request->request->get('email', '')) ?: null;
 
@@ -221,6 +284,11 @@ class AdminController extends AbstractController
             }
 
             $em->flush();
+
+            /** @var User $admin */
+            $admin = $this->getUser();
+            $userService->recordEmailChangeIfNeeded($user, $previousEmail, $admin);
+            $userService->recordOptInChangeIfNeeded($user, $previousOptIn, $admin);
 
             $this->addFlash('success', 'Member updated.');
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);

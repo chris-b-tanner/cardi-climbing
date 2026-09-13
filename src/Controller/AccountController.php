@@ -2,10 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Attendee;
 use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
+use App\Service\BookingService;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,6 +27,7 @@ class AccountController extends AbstractController
         EntityManagerInterface $em,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
+        UserService $userService,
     ): Response {
         /** @var User $user */
         $user  = $this->getUser();
@@ -34,6 +38,10 @@ class AccountController extends AbstractController
                 $this->addFlash('error', 'Access denied.');
                 return $this->redirectToRoute('app_home');
             }
+
+            // Captured before any setters run below — see AdminController::editUser() for why.
+            $previousEmail = $user->getEmail();
+            $previousOptIn = $user->isOptIn();
 
             $newEmail = strtolower(trim($request->request->get('email', '')));
 
@@ -63,6 +71,9 @@ class AccountController extends AbstractController
                 $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
 
                 $em->flush();
+
+                $userService->recordEmailChangeIfNeeded($user, $previousEmail, $user);
+                $userService->recordOptInChangeIfNeeded($user, $previousOptIn, $user);
 
                 $this->addFlash('success', 'Your details have been updated.');
                 return $this->redirect($this->resolveReturnTo($request));
@@ -208,6 +219,58 @@ class AccountController extends AbstractController
             'declarations'         => $declarations,
             'error'                => $error,
             'missingProfileFields' => $missingProfileFields,
+        ]);
+    }
+
+    /**
+     * A staff member's own response to a pending staffing assignment an admin pre-arranged for
+     * them — reached via the tokenised link in BookingMailer::sendStaffingInvite(). Confirming sets
+     * them approved (and grants door access if the event needs it); declining just records that
+     * they said no — the same staffingStatus states an admin can set from the event page, just
+     * self-service instead.
+     */
+    #[Route('/staffing/{id}', name: 'app_account_staffing_respond', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function respondToStaffing(Request $request, Attendee $attendee, BookingService $bookingService): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if ($attendee->getUser() !== $user || !$attendee->isStaffing()) {
+            $this->addFlash('error', 'That staffing request could not be found.');
+            return $this->redirectToRoute('app_account');
+        }
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('account_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            if (!$attendee->isStaffingPending()) {
+                $this->addFlash('error', 'This request has already been responded to.');
+                return $this->redirectToRoute('app_account_staffing_respond', ['id' => $attendee->getId()]);
+            }
+
+            $action = $request->request->get('action');
+            if ($action === 'confirm') {
+                $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+                $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED);
+                if ($error) {
+                    $this->addFlash('error', $error);
+                } else {
+                    $this->addFlash('success', "You're confirmed — thanks for staffing this session.");
+                }
+            } elseif ($action === 'decline') {
+                $attendee->setStaffingStatus(Attendee::STAFFING_DECLINED);
+                $bookingService->cancelBooking($attendee);
+                $this->addFlash('success', "Thanks for letting us know — you've been marked as unavailable for this session.");
+            }
+
+            return $this->redirectToRoute('app_account_staffing_respond', ['id' => $attendee->getId()]);
+        }
+
+        return $this->render('account/staffing_respond.html.twig', [
+            'attendee' => $attendee,
         ]);
     }
 

@@ -1,0 +1,79 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Add staff — {{ event.title }}{% endblock %}
+
+{% block content %}
+{% set showParams = event.isRecurring and occurrenceDate ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id} %}
+<div class="page-header">
+  <h1>Add staff</h1>
+  <a href="{{ path('app_admin_event_show', showParams) }}" class="btn btn--ghost btn--sm">← {{ event.title }}</a>
+</div>
+
+<div class="card" style="max-width:560px;">
+  <div class="card__label" style="margin-bottom:0.75rem;">Assignment</div>
+  <div class="detail-grid" style="margin-bottom:1rem;">
+    <div>
+      <div class="card__label">Member</div>
+      <div class="card__value">{{ candidate.displayName }}</div>
+    </div>
+    <div>
+      <div class="card__label">Role</div>
+      <div class="card__value">{{ requirement.certification.name }}</div>
+    </div>
+    <div style="grid-column:1 / -1;">
+      <div class="card__label">Event</div>
+      <div class="card__value">{{ event.title }}{% if occurrenceDate %} &mdash; {{ occurrenceDate|date('d M Y') }}{% endif %}</div>
+    </div>
+  </div>
+
+  <form method="post" action="{{ path('app_admin_event_staffing_add', {id: event.id}) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_event_staffing_' ~ event.id) }}">
+    <input type="hidden" name="requirementId" value="{{ requirement.id }}">
+    <input type="hidden" name="userId" value="{{ candidate.id }}">
+    {% if occurrenceDateRaw %}<input type="hidden" name="occurrenceDate" value="{{ occurrenceDateRaw }}">{% endif %}
+
+    <div class="card__label" style="margin-bottom:0.6rem;">Assignment status</div>
+    <div class="staffing-status-tiles">
+      <label class="staffing-status-tile">
+        <input type="radio" name="staffingStatus" value="approved" checked>
+        <span class="staffing-status-tile__title">Confirmed</span>
+        <span class="staffing-status-tile__desc">Added straight to the roster — on duty immediately, no confirmation needed.</span>
+      </label>
+      <label class="staffing-status-tile">
+        <input type="radio" name="staffingStatus" value="pending">
+        <span class="staffing-status-tile__title">Pending</span>
+        <span class="staffing-status-tile__desc">{{ candidate.firstName ?: 'They' }} will be emailed a link to confirm or decline before being put on duty.</span>
+      </label>
+    </div>
+
+    <div class="form-actions" style="margin-top:1.25rem;">
+      <button type="submit" class="btn btn--teal">Add staff member</button>
+      <a href="{{ path('app_admin_event_show', showParams) }}" class="btn btn--ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .staffing-status-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  @media (max-width: 480px) { .staffing-status-tiles { grid-template-columns: 1fr; } }
+
+  .staffing-status-tile {
+    display: flex; flex-direction: column; gap: 0.3rem;
+    border: 2px solid var(--border); border-radius: var(--radius);
+    padding: 0.85rem 1rem; cursor: pointer; position: relative;
+  }
+  .staffing-status-tile input[type="radio"] {
+    position: absolute; top: 0.85rem; right: 0.85rem; accent-color: var(--teal); margin: 0;
+  }
+  .staffing-status-tile:has(input:checked) {
+    border-color: var(--teal); background: #f0fdfa;
+  }
+  .staffing-status-tile__title { font-weight: 600; font-size: 0.9375rem; padding-right: 1.5rem; }
+  .staffing-status-tile__desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+</style>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}Can you help staff {{ event.title }}? — Y Wal{% endblock %}
+
+{% block emailBody %}
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 8px;">
+    Can you help staff this session?
+  </h1>
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 28px;">
+    Y Wal &mdash; Members area
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Hi{% if user.firstName %} {{ user.firstName }}{% endif %},
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 24px;">
+    We'd like you to staff <strong style="color:#141414;">{{ event.title }}</strong> as
+    {{ attendee.staffingRequirement.certification.name }}. Please confirm or decline using the link below.
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;border:1px solid #e4e2dc;">
+    {% if attendee.occurrenceDate %}
+      <tr>
+        <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;width:100px;border-bottom:1px solid #e4e2dc;">Date</td>
+        <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#141414;font-weight:600;border-bottom:1px solid #e4e2dc;">{{ attendee.occurrenceDate|date('l j F Y') }}</td>
+      </tr>
+    {% endif %}
+    <tr>
+      <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;border-bottom:1px solid #e4e2dc;">Time</td>
+      <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#141414;font-weight:600;border-bottom:1px solid #e4e2dc;">{{ event.timeFrom }}&ndash;{{ event.timeTo }}</td>
+    </tr>
+    <tr>
+      <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;">Location</td>
+      <td style="padding:10px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#141414;font-weight:600;">{{ event.location }}</td>
+    </tr>
+  </table>
+
+  <!-- CTA button -->
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:32px 0;">
+    <tr>
+      <td style="background-color:#1e4f41;">
+        <a href="{{ respondUrl }}"
+           style="display:inline-block;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#ffffff;text-decoration:none;padding:14px 32px;border:2px solid #1e4f41;">
+          Respond to this request
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#9a9895;line-height:1.7;margin:0 0 24px;">
+    This link will log you straight in — no password needed.
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;margin:0;">
+    If the button above doesn&rsquo;t work, copy and paste this link into your browser:<br>
+    <a href="{{ respondUrl }}" style="color:#1e4f41;word-break:break-all;">{{ respondUrl }}</a>
+  </p>
+{% endblock %}

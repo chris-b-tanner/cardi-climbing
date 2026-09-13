@@ -59,6 +59,30 @@
   </div>
 </form>
 
+{% if attendee.isStaffing %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card__label" style="margin-bottom:0.75rem;">Staffing</div>
+    <div class="detail-grid" style="margin-bottom:{{ attendee.staffingStatus in ['pending', 'declined'] ? '1rem' : '0' }};">
+      <div>
+        <div class="card__label">Role</div>
+        <div class="card__value">{{ attendee.staffingRequirement.certification.name }}</div>
+      </div>
+      <div>
+        <div class="card__label">Invite status</div>
+        <div class="card__value">{{ attendee.staffingStatusLabel }}</div>
+      </div>
+    </div>
+    {% if attendee.staffingStatus in ['pending', 'declined'] %}
+      <form method="post" action="{{ path('app_admin_booking_staffing_restart_invite', {id: attendee.id}) }}"
+            onsubmit="return confirm('{{ attendee.staffingStatus == 'pending' ? 'Resend' : 'Restart' }} the staffing invite email to ' + {{ displayName|json_encode|raw }} + '?');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_booking_staffing_' ~ attendee.id) }}">
+        <input type="hidden" name="returnTo" value="{{ returnTo }}">
+        <button type="submit" class="btn btn--ghost btn--sm">{{ attendee.staffingStatus == 'pending' ? 'Resend invite' : 'Restart invite' }}</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+
 {% if attendee.event.isSelfAccess %}
   <div class="card" style="margin-top:1.5rem;">
     <div class="card__label" style="margin-bottom:0.75rem;">Door access</div>
