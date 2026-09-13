@@ -70,7 +70,6 @@
           <th>ID</th>
           <th>Name</th>
           <th>Email</th>
-          <th>Company</th>
           <th>Phone</th>
           <th>Tags</th>
         </tr>
@@ -82,7 +81,6 @@
             <td>#{{ user.id }}</td>
             <td>{{ displayName ?: '—' }}</td>
             <td>{{ user.email ?: '—' }}</td>
-            <td>{{ user.company ?: '—' }}</td>
             <td>{{ user.phone ? (user.phone|uk_phone) : '—' }}</td>
             <td>
               {%- for tag in user.tags -%}

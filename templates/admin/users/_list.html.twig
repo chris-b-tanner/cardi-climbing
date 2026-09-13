@@ -19,7 +19,6 @@
               {% endif %}
             </th>
           {% endfor %}
-          <th>Company</th>
           <th>Phone</th>
           <th>Tags</th>
           {% if context == 'new_sale' %}<th></th>{% endif %}
@@ -50,7 +49,6 @@
               {% endif %}
             </td>
             <td class="admin-table__muted">{{ user.email ?: '—' }}</td>
-            <td class="admin-table__muted">{{ user.company ?: '—' }}</td>
             <td class="admin-table__muted">{{ user.phone ? (user.phone|uk_phone) : '—' }}</td>
             <td>
               {% for tag in user.tags %}

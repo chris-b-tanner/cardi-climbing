@@ -105,7 +105,7 @@ class AdminBookingController extends AbstractController
 
             if (!$error) {
                 $status = $request->request->get('status', Attendee::STATUS_CONFIRMED);
-                if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING], true)) {
+                if (!in_array($status, [Attendee::STATUS_CONFIRMED, Attendee::STATUS_PENDING, Attendee::STATUS_WAITING], true)) {
                     $status = Attendee::STATUS_CONFIRMED;
                 }
 
@@ -128,11 +128,19 @@ class AdminBookingController extends AbstractController
                 if (is_string($result)) {
                     $error = $result;
                 } else {
-                    if ($request->request->has('sendEmail') && $user->getEmail()) {
+                    // The confirmation email says "you're booked" / "confirmed" — sending it for a
+                    // waiting-list entry would be actively wrong, so skip it regardless of the
+                    // checkbox until there's a waiting-list-specific email to send instead.
+                    if ($status !== Attendee::STATUS_WAITING && $request->request->has('sendEmail') && $user->getEmail()) {
                         $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
                     }
 
-                    $this->addFlash('success', $checkInNow ? 'Member checked in.' : 'Member booked.');
+                    $successMessage = match (true) {
+                        $status === Attendee::STATUS_WAITING => 'Member added to the waiting list.',
+                        $checkInNow                          => 'Member checked in.',
+                        default                               => 'Member booked.',
+                    };
+                    $this->addFlash('success', $successMessage);
                     return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
                 }
             }

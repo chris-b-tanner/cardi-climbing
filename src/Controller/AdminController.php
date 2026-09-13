@@ -97,13 +97,12 @@ class AdminController extends AbstractController
         $users = $userRepository->search($query, $tagId, null, $sort, $dir);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['ID', 'Name', 'Email', 'Company', 'Phone', 'Tags']);
+        fputcsv($handle, ['ID', 'Name', 'Email', 'Phone', 'Tags']);
         foreach ($users as $user) {
             fputcsv($handle, [
                 $user->getId(),
                 $user->getDisplayName(),
                 $user->getEmail(),
-                $user->getCompany(),
                 $ukPhoneFormatter->format($user->getPhone()),
                 implode('; ', array_map(static fn($tag) => $tag->getName(), $user->getTags()->toArray())),
             ]);

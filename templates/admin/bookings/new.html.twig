@@ -54,11 +54,12 @@
             <p class="checkin-empty">No events</p>
           {% else %}
             {% for occ in day.events %}
-              <button type="button" class="checkin-event{{ (occ.isFull or occ.bookedByUser or occ.accessMessage) ? ' is-disabled' : '' }}{{ occ.isRestricted ? ' checkin-event--restricted' : '' }}"
+              <button type="button" class="checkin-event{{ (occ.bookedByUser or occ.accessMessage) ? ' is-disabled' : '' }}{{ occ.isRestricted ? ' checkin-event--restricted' : '' }}{{ occ.isFull ? ' checkin-event--full' : '' }}"
                       data-event-id="{{ occ.event.id }}"
                       data-occurrence-date="{{ occ.date|date('Y-m-d') }}"
                       data-checkin-window="{{ occ.isCheckInWindow ? '1' : '0' }}"
-                      {% if occ.isFull or occ.bookedByUser or occ.isRestricted or occ.accessMessage %}disabled{% endif %}>
+                      data-is-full="{{ occ.isFull ? '1' : '0' }}"
+                      {% if occ.bookedByUser or occ.isRestricted or occ.accessMessage %}disabled{% endif %}>
                 <div class="checkin-event__time">{{ occ.event.timeFrom }}&ndash;{{ occ.event.timeTo }}</div>
                 <div class="checkin-event__title">{{ occ.event.title }}</div>
                 {% if occ.bookedByUser %}
@@ -70,7 +71,7 @@
                 {% elseif occ.accessMessage %}
                   <div class="checkin-event__meta">{{ occ.accessMessage }}</div>
                 {% elseif occ.isFull %}
-                  <div class="checkin-event__meta">Full</div>
+                  <div class="checkin-event__meta">Full &mdash; waiting list</div>
                 {% elseif occ.spotsLeft is not null %}
                   <div class="checkin-event__meta">{{ occ.spotsLeft }} left</div>
                 {% endif %}
@@ -82,12 +83,18 @@
     </div>
   </div>
 
+  <div id="fullEventNotice" class="flash flash--info" style="display:none;">
+    This event is full — the status below has been set to <strong>Waiting</strong>. Change it if you want to book them in anyway.
+  </div>
+
   <div class="card">
     <div class="form-group" style="margin-bottom:0;">
       <label for="status">Status</label>
+      {% set submittedStatus = app.request.request.get('status', 'confirmed') %}
       <select id="status" name="status" class="form-control">
-        <option value="confirmed">Confirmed</option>
-        <option value="pending">Pending</option>
+        <option value="confirmed"{% if submittedStatus == 'confirmed' %} selected{% endif %}>Confirmed</option>
+        <option value="pending"{% if submittedStatus == 'pending' %} selected{% endif %}>Pending</option>
+        <option value="waiting"{% if submittedStatus == 'waiting' %} selected{% endif %}>Waiting</option>
       </select>
     </div>
   </div>
@@ -135,6 +142,9 @@
   .checkin-event--restricted { background: #fefce8; border-color: #fde047; }
   .checkin-event--restricted:disabled, .checkin-event--restricted.is-disabled { opacity: 1; }
   .checkin-event--restricted .checkin-event__meta { color: #854d0e; font-weight: 600; }
+  .checkin-event--full { background: #fef2f2; border-color: #fecaca; }
+  .checkin-event--full .checkin-event__meta { color: #b91c1c; font-weight: 600; }
+  .checkin-event--full.is-selected { border-color: var(--teal); background: #f0fdfa; box-shadow: 0 0 0 1px var(--teal); }
   .checkin-event__time { font-size: 0.7rem; color: var(--muted); }
   .checkin-event__title { font-size: 0.82rem; font-weight: 600; color: var(--black); }
   .checkin-event__meta { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
@@ -150,11 +160,39 @@
   const occurrenceDateInput = document.getElementById('occurrenceDate');
   const eventButtons        = document.querySelectorAll('.checkin-event');
   const checkinSubmit       = document.getElementById('checkinSubmit');
+  const statusSelect        = document.getElementById('status');
+  const fullEventNotice     = document.getElementById('fullEventNotice');
+
+  // Tracks whether the current "waiting" value was set automatically for a full event (so
+  // selecting a non-full event afterwards can safely revert it) rather than chosen deliberately
+  // by the admin, which should be left alone.
+  let statusAutoSetToWaiting = false;
 
   function updateSubmitLabel(btn) {
     checkinSubmit.disabled = false;
     checkinSubmit.textContent = btn.dataset.checkinWindow === '1' ? 'Check in now' : 'Book future event';
   }
+
+  function updateFullEventState(btn, adjustStatus = true) {
+    const isFull = btn.dataset.isFull === '1';
+    fullEventNotice.style.display = isFull ? 'block' : 'none';
+
+    if (!adjustStatus) return;
+
+    if (isFull && statusSelect.value !== 'waiting') {
+      statusSelect.value = 'waiting';
+      statusAutoSetToWaiting = true;
+    } else if (!isFull && statusAutoSetToWaiting) {
+      statusSelect.value = 'confirmed';
+      statusAutoSetToWaiting = false;
+    }
+  }
+
+  // A manual change away from "waiting" (or to it) is a deliberate choice — stop treating it as
+  // something we can silently revert later.
+  statusSelect.addEventListener('change', () => {
+    statusAutoSetToWaiting = false;
+  });
 
   eventButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -162,6 +200,7 @@
       eventIdInput.value = btn.dataset.eventId;
       occurrenceDateInput.value = btn.dataset.occurrenceDate;
       updateSubmitLabel(btn);
+      updateFullEventState(btn);
     });
   });
 
@@ -172,6 +211,10 @@
     if (preselected) {
       preselected.classList.add('is-selected');
       updateSubmitLabel(preselected);
+      // Show the notice if relevant, but don't touch the status select here — it was already
+      // rendered with whatever was actually submitted (including a deliberate manual override),
+      // and re-running the auto-set logic could silently overwrite that.
+      updateFullEventState(preselected, false);
     }
   }
 </script>

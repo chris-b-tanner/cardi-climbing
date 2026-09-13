@@ -69,7 +69,10 @@ class BookingService
             return 'This member is already booked onto this event.';
         }
 
-        if ($event->getMaxAttendees() !== null
+        // A waiting-list booking is expected to exceed capacity — that's the point of it — so only
+        // confirmed/pending statuses are actually blocked by a full event.
+        if ($status !== Attendee::STATUS_WAITING
+            && $event->getMaxAttendees() !== null
             && $this->attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
         ) {
             return 'Sorry, this event is fully booked.';
