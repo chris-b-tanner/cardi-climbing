@@ -1,0 +1,28 @@
+Worth explicitly avoiding (found as real
+  bugs/anti-patterns in that codebase):
+  - checkInPOST()/checkOutPOST() retry with a blocking
+    delay(2000) inside a for loop — up to 20+ seconds
+    of blocked execution per failed attempt. Directly
+    contradicts the "never block loop()" rule already
+    in my spec; called it out explicitly as what not to
+    do.
+  - incrementCheckoutRetryCount() silently discards a
+    pending record after 3 failed retries. Fine for a
+    kiosk where a human can just try again;
+    unacceptable for a door-access event, which is the
+    only record someone entered. Confirmed my "retry
+    indefinitely, capacity-bounded not attempt-bounded"
+    design is the right divergence.
+  - _messages.h's getNextPendingMessage() deletes the
+    file as soon as it's read into memory, before the
+    send is confirmed — a textbook data-loss bug,
+    exactly the failure mode this whole feature exists
+    to prevent. Added an explicit "never delete before
+    ack" rule to the spec, regardless of which storage
+    shape gets built.
+  - Timestamps/filenames built from millis() rather
+    than wall-clock time — resets to 0 on reboot, wraps
+    at ~49 days, unsuitable for anything that must
+    survive or compare across a reset. Annotated the
+    PendingEvent.timestamp field to make clear this is
+    deliberately SNTP wall-clock, not millis().

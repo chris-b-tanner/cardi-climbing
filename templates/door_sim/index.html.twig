@@ -101,6 +101,34 @@
   .debug-panel .no  { color: #ff7b72; }
   .debug-panel .empty { color: #6b7a90; font-style: italic; }
   .debug-panel .placeholder { color: #6b7a90; font-style: italic; }
+
+  .door-unit {
+    background: #1c2420; border: 1px solid #33403a; border-radius: 18px;
+    padding: 1.5rem; width: 300px; max-width: calc(100vw - 2rem);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    color: #e8ede9;
+  }
+  .door-unit .brand { margin-bottom: 1rem; }
+  .door-unit__row { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.5rem; }
+  .door-unit__row span:first-child { color: #9fb0a6; }
+  .door-unit__stage {
+    text-align: center; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    font-size: 0.9rem; padding: 0.6rem; border-radius: 8px; margin: 0.75rem 0; background: #05100a;
+  }
+  .door-unit__stage--authorized { color: #ffd166; }
+  .door-unit__stage--open       { color: #7ee7e0; }
+  .door-unit__stage--alarm      { color: #ff7b72; background: #2a0f0f; animation: pulse 0.8s infinite; }
+  .door-unit__stage--closed     { color: #7ee787; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  .door-unit__actions { display: flex; gap: 0.6rem; margin-top: 0.75rem; }
+  .door-unit__actions .key { flex: 1; padding: 0.75rem 0; font-size: 0.85rem; }
+  .door-unit__elapsed { text-align: center; font-size: 0.7rem; color: #6b7a70; margin-top: 0.5rem; }
+  .unexpected-btn {
+    display: block; width: 100%; margin-top: 1rem; padding: 0.6rem; border-radius: 10px;
+    background: #2a0f0f; border: 1px solid #4a1f1f; color: #ff9b93; font-weight: 700;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+  }
+  .unexpected-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -137,7 +165,21 @@
     <button class="key key--fn" id="key-enter">Enter</button>
   </div>
 
-  <p class="footer-note">Enter the 6-digit PIN from a booking confirmation.<br>Using a real PIN here checks that booking in for real.</p>
+  <p class="footer-note">Enter the 6-digit PIN from a booking confirmation, or a keyholder's disarm PIN.<br>Using a real PIN here logs a real access attempt.</p>
+
+  <button type="button" class="unexpected-btn" id="unexpected-open-btn">⚠ Simulate unexpected open (no PIN)</button>
+</div>
+
+<div class="door-unit" id="door-unit" style="display:none;">
+  <div class="brand">Door position sensor</div>
+  <div class="door-unit__row"><span>Access type</span><span id="door-type">—</span></div>
+  <div class="door-unit__row"><span>Event ID</span><span id="door-event-id" style="font-family:monospace;font-size:0.65rem;">—</span></div>
+  <div class="door-unit__stage" id="door-stage">Authorized</div>
+  <div class="door-unit__actions">
+    <button class="key key--fn" id="door-open-btn">Simulate open</button>
+    <button class="key key--fn" id="door-close-btn" disabled>Simulate close</button>
+  </div>
+  <div class="door-unit__elapsed" id="door-elapsed"></div>
 </div>
 
 {% if debug %}
@@ -150,14 +192,30 @@
 
 <script>
 (function () {
-  const attemptUrl = {{ path('app_door_sim_attempt', {secret: secret})|json_encode|raw }};
-  const debugMode  = {{ debug ? 'true' : 'false' }};
+  const attemptUrl    = {{ path('app_door_sim_attempt', {secret: secret})|json_encode|raw }};
+  const doorOpenUrl   = {{ path('app_door_sim_door_open', {secret: secret})|json_encode|raw }};
+  const doorCloseUrl  = {{ path('app_door_sim_door_close', {secret: secret})|json_encode|raw }};
+  const debugMode     = {{ debug ? 'true' : 'false' }};
+  const alarmThresholdS = {{ alarmThresholdS }};
 
   const dotsEl      = document.getElementById('dots');
   const screenEl    = document.getElementById('screen');
   const keysEl      = document.getElementById('keys');
   const ledEl       = document.getElementById('led');
   const debugPanel  = document.getElementById('debug-panel');
+
+  const doorUnitEl    = document.getElementById('door-unit');
+  const doorTypeEl    = document.getElementById('door-type');
+  const doorEventIdEl = document.getElementById('door-event-id');
+  const doorStageEl   = document.getElementById('door-stage');
+  const doorOpenBtn   = document.getElementById('door-open-btn');
+  const doorCloseBtn  = document.getElementById('door-close-btn');
+  const doorElapsedEl = document.getElementById('door-elapsed');
+  const unexpectedBtn = document.getElementById('unexpected-open-btn');
+
+  function newEventId() {
+    return (crypto.randomUUID ? crypto.randomUUID() : 'sim-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+  }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -183,6 +241,19 @@
       html += '</table>';
     } else {
       html += '<p class="empty">No active, near-future credentials found for this door at all.</p>';
+    }
+    html += '</div>';
+
+    html += '<div class="row"><strong>Keyholder disarm PINs (' + debug.keyholders.length + '):</strong>';
+    if (debug.keyholders.length) {
+      html += '<table><tr><th>user_id</th><th>pin</th><th>pin match</th></tr>';
+      debug.keyholders.forEach(k => {
+        html += '<tr><td>' + k.user_id + '</td><td>' + escapeHtml(k.pin) + '</td>'
+          + '<td class="' + (k.matches_pin ? 'yes">yes' : 'no">no') + '</td></tr>';
+      });
+      html += '</table>';
+    } else {
+      html += '<p class="empty">No keyholders configured.</p>';
     }
     html += '</div>';
 
@@ -262,11 +333,12 @@
   function submit() {
     setKeysDisabled(true);
     const attemptedPin = entered;
+    const eventId = newEventId();
 
     fetch(attemptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: attemptedPin, debug: debugMode }),
+      body: JSON.stringify({ pin: attemptedPin, eventId: eventId, debug: debugMode }),
     })
       .then(r => r.json())
       .then(data => {
@@ -276,7 +348,8 @@
           fails = 0;
           flashLed('granted');
           showMessage((data.name ? 'Welcome, ' + data.name : 'Access granted'), 'screen__message--granted');
-          setTimeout(() => { setKeysDisabled(false); reset(); }, 4000);
+          setTimeout(() => { setKeysDisabled(false); reset(); }, 1500);
+          openDoorPanel(eventId, data.accessType);
         } else {
           fails++;
           flashLed('denied');
@@ -296,6 +369,100 @@
         setTimeout(() => { setKeysDisabled(false); reset(); }, 1500);
       });
   }
+
+  // ── Door position sensor simulation ──────────────────────────
+  let doorEventId = null;
+  let doorOpenedAt = null;
+  let doorTimer = null;
+
+  function stopDoorTimer() {
+    if (doorTimer) { clearInterval(doorTimer); doorTimer = null; }
+  }
+
+  function setDoorStage(label, cls) {
+    doorStageEl.textContent = label;
+    doorStageEl.className = 'door-unit__stage door-unit__stage--' + cls;
+  }
+
+  function openDoorPanel(eventId, accessType) {
+    doorEventId = eventId;
+    doorOpenedAt = null;
+    doorUnitEl.style.display = '';
+    doorTypeEl.textContent = accessType === 'keyholder' ? 'Keyholder (no relay)' : 'Attendee (relay pulsed)';
+    doorEventIdEl.textContent = eventId;
+    setDoorStage('Authorized', 'authorized');
+    doorOpenBtn.disabled = false;
+    doorCloseBtn.disabled = true;
+    doorElapsedEl.textContent = '';
+    unexpectedBtn.disabled = true;
+  }
+
+  function closeDoorPanelAfterDelay() {
+    setTimeout(() => {
+      doorUnitEl.style.display = 'none';
+      doorEventId = null;
+      unexpectedBtn.disabled = false;
+    }, 2500);
+  }
+
+  doorOpenBtn.addEventListener('click', () => {
+    if (!doorEventId) return;
+    doorOpenBtn.disabled = true;
+
+    fetch(doorOpenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: doorEventId }),
+    })
+      .then(r => r.json())
+      .then(() => {
+        doorOpenedAt = Date.now();
+        const isUnexpected = doorTypeEl.textContent === 'Unexpected (no PIN)';
+        setDoorStage(isUnexpected ? 'ALARM — open now!' : 'Open', isUnexpected ? 'alarm' : 'open');
+        doorCloseBtn.disabled = false;
+
+        doorTimer = setInterval(() => {
+          const elapsedS = Math.floor((Date.now() - doorOpenedAt) / 1000);
+          doorElapsedEl.textContent = 'Open for ' + elapsedS + 's';
+          if (!isUnexpected && elapsedS > alarmThresholdS) {
+            setDoorStage('ALARM — beeper sounding', 'alarm');
+          }
+        }, 500);
+      });
+  });
+
+  doorCloseBtn.addEventListener('click', () => {
+    if (!doorEventId) return;
+    doorCloseBtn.disabled = true;
+    stopDoorTimer();
+
+    fetch(doorCloseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: doorEventId }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        setDoorStage('Closed (' + data.durationS + 's open)', 'closed');
+        doorElapsedEl.textContent = data.wasAlarmed ? 'Beeper stopped.' : '';
+        closeDoorPanelAfterDelay();
+      });
+  });
+
+  unexpectedBtn.addEventListener('click', () => {
+    if (doorEventId) return;
+    const eventId = newEventId();
+    doorEventId = eventId;
+    doorOpenedAt = null;
+    doorUnitEl.style.display = '';
+    doorTypeEl.textContent = 'Unexpected (no PIN)';
+    doorEventIdEl.textContent = eventId;
+    setDoorStage('Nothing authorized', 'alarm');
+    doorOpenBtn.disabled = false;
+    doorCloseBtn.disabled = true;
+    doorElapsedEl.textContent = '';
+    unexpectedBtn.disabled = true;
+  });
 
   keysEl.addEventListener('click', (e) => {
     if (locked) return;

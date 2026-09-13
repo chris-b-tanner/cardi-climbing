@@ -79,6 +79,23 @@
           <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">You can't change your own role.</p>
         {% endif %}
       </div>
+      <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
+        <label for="keyholderPin">Keyholder disarm PIN</label>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <input type="text" id="keyholderPin" name="keyholderPin" class="form-control"
+                 value="{{ user.keyholderPin }}" maxlength="6" pattern="\d{6}"
+                 placeholder="Not a keyholder" autocomplete="off" style="max-width:10rem;">
+          <button type="button" id="generateKeyholderPin" class="btn btn--ghost btn--sm">Generate</button>
+          {% if user.keyholderPin %}
+            <button type="button" id="clearKeyholderPin" class="btn btn--ghost btn--sm">Clear</button>
+          {% endif %}
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
+          For staff who can already open a self-access door with a physical key. Typing this on the
+          keypad never unlocks anything — it just tells the door not to sound the unexpected-open
+          alarm for a few seconds. Leave blank for everyone else.
+        </p>
+      </div>
     {% endif %}
   </div>
 
@@ -223,6 +240,24 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  (function () {
+    const input   = document.getElementById('keyholderPin');
+    const genBtn  = document.getElementById('generateKeyholderPin');
+    const clrBtn  = document.getElementById('clearKeyholderPin');
+    if (!input || !genBtn) return;
+
+    genBtn.addEventListener('click', () => {
+      fetch('{{ path('app_admin_user_keyholder_pin_generate', {id: user.id}) }}')
+        .then(r => r.json())
+        .then(data => { if (data.pin) input.value = data.pin; });
+    });
+
+    if (clrBtn) {
+      clrBtn.addEventListener('click', () => { input.value = ''; });
+    }
+  })();
+</script>
 {% if canHaveDependents %}
 <script>
   // ── Dependent search ────────────────────────────────────────

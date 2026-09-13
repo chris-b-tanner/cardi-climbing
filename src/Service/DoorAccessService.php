@@ -2,9 +2,12 @@
 
 namespace App\Service;
 
+use App\Entity\AccessEvent;
 use App\Entity\Attendee;
 use App\Entity\User;
+use App\Repository\AccessEventRepository;
 use App\Repository\AttendeeRepository;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -12,6 +15,12 @@ use Doctrine\ORM\EntityManagerInterface;
  * isSelfAccess gets a 6-digit PIN valid for its session window (event/occurrence start–end,
  * plus a grace period); the attendee's own id doubles as the door credential_id, so there's no
  * separate credential table. Single door for now (door_id 1, hardcoded per the spec).
+ *
+ * Every door interaction — attendee PIN, keyholder disarm PIN, an unexpected open, or a denial —
+ * is also recorded as an AccessEvent row (§ Access event log), keyed on the device's own
+ * client-generated event_id and updated in place as its stage advances. That's the detailed log;
+ * `attendee.checkedInAt`/`checkedInBy`/`checkedInMethod` stay the attendee's own "attendance
+ * complete" summary field, set only once the matching event reaches door_closed.
  */
 class DoorAccessService
 {
@@ -28,9 +37,21 @@ class DoorAccessService
 
     public const SUPPORTED_DOOR_ID = 1;
 
+    /**
+     * Per-request/per-command cache of AccessEvent rows created but not yet flushed, keyed on
+     * event_id. Needed because a batch can carry more than one stage for the same event_id before
+     * anything is flushed — a fresh DB query wouldn't see an unflushed insert from earlier in the
+     * same batch and would otherwise create (and then fail to insert) a second row for it.
+     *
+     * @var array<string, AccessEvent>
+     */
+    private array $pendingAccessEvents = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly AttendeeRepository $attendeeRepository,
+        private readonly UserRepository $userRepository,
+        private readonly AccessEventRepository $accessEventRepository,
     ) {}
 
     /** Issues a PIN for {attendee} if its event is self-access and it doesn't already have an active one. A no-op otherwise (e.g. a normal event, or a cancelled/pending booking). */
@@ -75,23 +96,57 @@ class DoorAccessService
     }
 
     /**
-     * Applies a `credential_used` door event — idempotent: re-delivering the same event for an
-     * already-used credential just leaves it as used rather than erroring, since the door queues
-     * and retries events until acknowledged.
+     * Applies one stage of an `attendee_access` event — idempotent and upsert-keyed on
+     * {eventId}: a stage only ever advances (see AccessEvent::advanceStage()), so a retried or
+     * reordered POST for a stage already applied is a harmless no-op. Only `door_closed` marks
+     * the attendee as checked in; `authorized` already flips the PIN to used regardless, since
+     * reuse-prevention doesn't wait on the physical outcome.
      */
-    public function markUsedViaDoor(Attendee $attendee, \DateTimeImmutable $timestamp): void
+    public function applyAttendeeAccessEvent(string $eventId, string $stage, Attendee $attendee, \DateTimeImmutable $timestamp): void
     {
-        if ($attendee->isCheckedIn()) {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_ATTENDEE_ACCESS);
+        $event->setAttendee($attendee);
+
+        if (!$event->advanceStage($stage, $timestamp)) {
             return;
         }
 
-        $attendee->setCheckedInAt($timestamp);
-        $attendee->setCheckedInBy(null);
-        $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_PIN);
-        $attendee->setPinStatus(Attendee::PIN_STATUS_USED);
+        if ($stage === AccessEvent::STAGE_AUTHORIZED && $attendee->getPinStatus() !== Attendee::PIN_STATUS_USED) {
+            $attendee->setPinStatus(Attendee::PIN_STATUS_USED);
+        }
+
+        if ($stage === AccessEvent::STAGE_DOOR_CLOSED && !$attendee->isCheckedIn()) {
+            $attendee->setCheckedInAt($timestamp);
+            $attendee->setCheckedInBy(null);
+            $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_PIN);
+        }
     }
 
-    /** Manual reception check-in. @throws \InvalidArgumentException if already checked in (via either channel) */
+    /** Applies one stage of a `keyholder_access` event — same upsert/stage rules as attendee_access, but there's no attendee row to update: the AccessEvent row is the complete record. */
+    public function applyKeyholderAccessEvent(string $eventId, string $stage, User $keyholder, \DateTimeImmutable $timestamp): void
+    {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_KEYHOLDER_ACCESS);
+        $event->setKeyholderUser($keyholder);
+        $event->advanceStage($stage, $timestamp);
+    }
+
+    /** Applies one stage of an `unexpected_open` event — a door observed opening with nothing authorized. No `authorized` stage exists for this type; it starts straight at `door_open`. */
+    public function applyUnexpectedOpenEvent(string $eventId, string $stage, \DateTimeImmutable $timestamp): void
+    {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_UNEXPECTED_OPEN);
+        $event->advanceStage($stage, $timestamp);
+    }
+
+    /** Records a denied attempt — single-stage, no progression. {attendee} is null if the PIN didn't resolve to anything at all. */
+    public function applyAccessDenied(string $eventId, ?Attendee $attendee, ?string $reason, \DateTimeImmutable $timestamp): void
+    {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_ACCESS_DENIED);
+        $event->setAttendee($attendee);
+        $event->setDeniedReason($reason);
+        $event->recordDeniedAt($timestamp);
+    }
+
+    /** Manual reception check-in. No AccessEvent is created for this — there's no door hardware involved, just a staff member confirming attendance directly. @throws \InvalidArgumentException if already checked in (via either channel) */
     public function checkInManually(Attendee $attendee, User $staff): void
     {
         if ($attendee->isCheckedIn()) {
@@ -109,7 +164,8 @@ class DoorAccessService
 
     /**
      * Issues a fresh PIN for {attendee} — e.g. the door opened but the member didn't get through
-     * in time. Same session window; the old PIN simply stops validating once regenerated.
+     * in time. Same session window; the old PIN simply stops validating once regenerated. Doesn't
+     * touch the old AccessEvent row — it stays as history of the stuck attempt.
      *
      * @throws \InvalidArgumentException if the session window (including grace) has already fully lapsed
      */
@@ -166,6 +222,57 @@ class DoorAccessService
         return $credentials;
     }
 
+    /**
+     * The keyholder disarm PINs a door should hold right now — same "authoritative full replace"
+     * treatment as findCredentialsForDoor(), synced on the same poll (see § Keyholder disarm PIN).
+     * No valid_from/valid_until: a standing credential, not a per-booking one.
+     *
+     * @return array<int, array{user_id: int, pin: string}>
+     */
+    public function findKeyholdersForDoor(int $doorId): array
+    {
+        if ($doorId !== self::SUPPORTED_DOOR_ID) {
+            return [];
+        }
+
+        return array_map(
+            static fn(User $user) => ['user_id' => $user->getId(), 'pin' => $user->getKeyholderPin()],
+            $this->userRepository->findKeyholders(),
+        );
+    }
+
+    /** Generates a unique 6-digit keyholder PIN, excluding both other active keyholder PINs and currently-active attendee PINs — the two pools must never collide (§ PIN lifecycle). */
+    public function generateUniqueKeyholderPin(?int $excludeUserId = null): string
+    {
+        for ($i = 0; $i < 20; $i++) {
+            $pin = str_pad((string) random_int(0, 10 ** self::PIN_LENGTH - 1), self::PIN_LENGTH, '0', STR_PAD_LEFT);
+
+            if (!$this->attendeeRepository->pinIsActive($pin) && !$this->userRepository->keyholderPinExists($pin, $excludeUserId)) {
+                return $pin;
+            }
+        }
+
+        throw new \RuntimeException('Could not generate a unique keyholder PIN after 20 attempts.');
+    }
+
+    private function upsertAccessEvent(string $eventId, string $type): AccessEvent
+    {
+        if (isset($this->pendingAccessEvents[$eventId])) {
+            return $this->pendingAccessEvents[$eventId];
+        }
+
+        $event = $this->accessEventRepository->findOneByEventId($eventId);
+
+        if ($event === null) {
+            $event = new AccessEvent($eventId, $type);
+            $this->em->persist($event);
+        }
+
+        $this->pendingAccessEvents[$eventId] = $event;
+
+        return $event;
+    }
+
     private function sessionStart(Attendee $attendee): \DateTimeImmutable
     {
         return $this->combine($attendee, $attendee->getEvent()->getTimeFrom());
@@ -197,7 +304,7 @@ class DoorAccessService
         for ($i = 0; $i < 20; $i++) {
             $pin = str_pad((string) random_int(0, 10 ** self::PIN_LENGTH - 1), self::PIN_LENGTH, '0', STR_PAD_LEFT);
 
-            if (!$this->attendeeRepository->pinIsActive($pin)) {
+            if (!$this->attendeeRepository->pinIsActive($pin) && !$this->userRepository->keyholderPinExists($pin)) {
                 return $pin;
             }
         }

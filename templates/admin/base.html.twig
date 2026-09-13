@@ -493,6 +493,14 @@
            class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_tag' ? ' is-active' : '' }}">
           <i class="bi bi-bookmark"></i> Tags
         </a>
+        <a href="{{ path('app_admin_settings_access_log') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_access_log' ? ' is-active' : '' }}">
+          <i class="bi bi-door-open"></i> Access log
+        </a>
+        <a href="{{ path('app_admin_settings_door_log') }}"
+           class="admin-subnav__link{{ currentRoute starts with 'app_admin_settings_door_log' ? ' is-active' : '' }}">
+          <i class="bi bi-terminal"></i> Door log
+        </a>
       </div>
     {% endif %}
 

@@ -105,6 +105,30 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return $qb->getQuery()->getResult();
     }
 
+    /** Everyone with an active keyholder disarm PIN — see door-access-spec.md § Keyholder disarm PIN. */
+    public function findKeyholders(): array
+    {
+        return $this->createQueryBuilder('u')
+            ->where('u.keyholderPin IS NOT NULL')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** Whether {pin} is already someone's active keyholder PIN — checked when generating an attendee PIN too, since the two pools must never collide (see § PIN lifecycle). */
+    public function keyholderPinExists(string $pin, ?int $excludeUserId = null): bool
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.keyholderPin = :pin')
+            ->setParameter('pin', $pin);
+
+        if ($excludeUserId !== null) {
+            $qb->andWhere('u.id != :excludeId')->setParameter('excludeId', $excludeUserId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
     public function findByAnyEmail(string $email): ?User
     {
         return $this->createQueryBuilder('u')

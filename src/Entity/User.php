@@ -51,6 +51,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $phone = null;
 
+    /** 6-digit door-disarm PIN for a keyholder (someone who can already open a self-access door with a physical key) — see door-access-spec.md § Keyholder disarm PIN. Never triggers the relay; only suppresses the unexpected-open alarm briefly. Null for everyone else. */
+    #[ORM\Column(length: 6, nullable: true, unique: true)]
+    private ?string $keyholderPin = null;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $addressLine1 = null;
 
@@ -294,6 +298,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getPhone(): ?string { return $this->phone; }
     public function setPhone(?string $phone): static { $this->phone = $phone; return $this; }
+
+    public function getKeyholderPin(): ?string { return $this->keyholderPin; }
+    public function setKeyholderPin(?string $keyholderPin): static { $this->keyholderPin = $keyholderPin; return $this; }
+    public function isKeyholder(): bool { return $this->keyholderPin !== null; }
 
     public function getAddressLine1(): ?string { return $this->addressLine1; }
     public function setAddressLine1(?string $addressLine1): static { $this->addressLine1 = $addressLine1; return $this; }

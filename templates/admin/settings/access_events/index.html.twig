@@ -1,0 +1,81 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Access log — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Door access log</h1>
+</div>
+
+{% if events is empty %}
+  <div class="empty">
+    <strong>No access activity yet</strong>
+    Door events (attendee PINs, keyholder disarms, denied attempts, and unexpected opens) will show up here as they come in.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Door</th>
+          <th>Type</th>
+          <th>Who</th>
+          <th>Stage</th>
+          <th>Authorized</th>
+          <th>Door open</th>
+          <th>Door closed</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td class="admin-table__muted">{{ event.doorId }}</td>
+            <td>
+              {% if event.type == 'access_denied' or event.type == 'unexpected_open' %}
+                <span class="status-pill status-pill--cancelled">
+                  {{ event.type == 'access_denied' ? 'Denied' : 'Unexpected open' }}
+                </span>
+              {% else %}
+                {{ event.type == 'keyholder_access' ? 'Keyholder' : 'Attendee' }}
+              {% endif %}
+            </td>
+            <td>
+              {% if event.attendee %}
+                <a href="{{ path('app_admin_user_show', {id: event.attendee.user.id}) }}" class="admin-table__link">
+                  {{ event.attendee.user.displayName }}
+                </a>
+                <span class="admin-table__muted">— {{ event.attendee.event.title }}</span>
+              {% elseif event.keyholderUser %}
+                <a href="{{ path('app_admin_user_show', {id: event.keyholderUser.id}) }}" class="admin-table__link">
+                  {{ event.keyholderUser.displayName }}
+                </a>
+              {% else %}
+                <span class="admin-table__muted">—</span>
+              {% endif %}
+              {% if event.deniedReason %}
+                <span class="admin-table__muted">({{ event.deniedReason }})</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if event.stage == 'door_closed' %}
+                <span class="status-pill status-pill--published">Door closed</span>
+              {% elseif event.stage == 'door_open' %}
+                <span class="status-pill status-pill--waiting">Door open</span>
+              {% elseif event.stage == 'authorized' %}
+                <span class="status-pill status-pill--pending">Authorized</span>
+              {% else %}
+                <span class="admin-table__muted">—</span>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ event.authorizedAt ? event.authorizedAt|date('d M Y H:i') : '—' }}</td>
+            <td class="admin-table__muted">{{ event.doorOpenAt ? event.doorOpenAt|date('d M Y H:i') : '—' }}</td>
+            <td class="admin-table__muted">{{ event.doorClosedAt ? event.doorClosedAt|date('d M Y H:i') : '—' }}</td>
+            <td class="admin-table__muted">{{ event.updatedAt|date('d M Y H:i') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;">Showing the most recent {{ events|length }} events.</p>
+{% endif %}
+{% endblock %}

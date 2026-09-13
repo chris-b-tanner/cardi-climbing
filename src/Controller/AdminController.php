@@ -16,6 +16,7 @@ use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
+use App\Service\DoorAccessService;
 use App\Service\UkPhoneFormatter;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -307,6 +308,19 @@ class AdminController extends AbstractController
                     }
                     $user->setRoles([$role]);
                 }
+
+                $keyholderPin = trim($request->request->get('keyholderPin', ''));
+                if ($keyholderPin === '') {
+                    $user->setKeyholderPin(null);
+                } elseif (!preg_match('/^\d{6}$/', $keyholderPin)) {
+                    $this->addFlash('error', 'Keyholder PIN must be exactly 6 digits.');
+                    return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                } elseif ($attendeeRepository->pinIsActive($keyholderPin) || $userRepository->keyholderPinExists($keyholderPin, $user->getId())) {
+                    $this->addFlash('error', 'That PIN is already in use — choose another or generate one.');
+                    return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                } else {
+                    $user->setKeyholderPin($keyholderPin);
+                }
             }
 
             $submittedTagIds = array_map('intval', $request->request->all('tags'));
@@ -356,6 +370,14 @@ class AdminController extends AbstractController
             'canHaveDependents' => $canHaveDependents,
             'bookings'          => $attendeeRepository->findAllForUser($user),
         ]);
+    }
+
+    /** Suggests a fresh, unused 6-digit keyholder PIN for the edit form's "Generate" button — not saved until the form is submitted. Admin only. */
+    #[Route('/users/{id}/keyholder-pin/generate', name: 'app_admin_user_keyholder_pin_generate', requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function generateKeyholderPin(User $user, DoorAccessService $doorAccessService): JsonResponse
+    {
+        return new JsonResponse(['pin' => $doorAccessService->generateUniqueKeyholderPin($user->getId())]);
     }
 
     /** Search members eligible to be recorded as a dependent of {id} — excludes the member themselves and anyone who already has dependents of their own. */

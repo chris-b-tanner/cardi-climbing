@@ -2,9 +2,15 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\AccessEvent;
 use App\Entity\Attendee;
+use App\Entity\DoorLog;
+use App\Entity\User;
 use App\Repository\AttendeeRepository;
+use App\Repository\DoorLogRepository;
+use App\Repository\UserRepository;
 use App\Service\DoorAccessService;
+use App\Service\DoorAlertMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,10 +29,16 @@ class DoorController extends AbstractController
         private readonly string $doorApiKey,
         private readonly DoorAccessService $doorAccessService,
         private readonly AttendeeRepository $attendeeRepository,
+        private readonly UserRepository $userRepository,
+        private readonly DoorLogRepository $doorLogRepository,
+        private readonly DoorAlertMailer $doorAlertMailer,
         private readonly EntityManagerInterface $em,
     ) {}
 
-    /** Active + near-future (next 2h) PIN credentials for this door — an authoritative full replace of the device's local cache on every poll. */
+    /** Per-door cooldown between alert emails — a stuck sensor generating repeat alert-worthy entries shouldn't flood an inbox (see § Server-side alerting). */
+    private const ALERT_COOLDOWN_MINUTES = 10;
+
+    /** Active + near-future (next 2h) PIN credentials, plus keyholder disarm PINs, for this door — an authoritative full replace of the device's local cache on every poll. */
     #[Route('/credentials', name: 'app_api_door_credentials', requirements: ['doorId' => '\d+'], methods: ['GET'])]
     public function credentials(Request $request, int $doorId): Response
     {
@@ -51,7 +63,9 @@ class DoorController extends AbstractController
             $this->doorAccessService->findCredentialsForDoor($doorId, $now),
         );
 
-        $etag = '"' . md5(json_encode($credentials)) . '"';
+        $keyholders = $this->doorAccessService->findKeyholdersForDoor($doorId);
+
+        $etag = '"' . md5(json_encode([$credentials, $keyholders])) . '"';
 
         if ($request->headers->get('If-None-Match') === $etag) {
             return new Response(null, 304, ['ETag' => $etag]);
@@ -60,10 +74,15 @@ class DoorController extends AbstractController
         return new JsonResponse([
             'server_time' => $now->format('Y-m-d\TH:i:s\Z'),
             'credentials' => $credentials,
+            'keyholders'  => $keyholders,
         ], 200, ['ETag' => $etag]);
     }
 
-    /** Batched, idempotent door events — credential_used marks the attendee checked in; access_denied is just acknowledged (nothing to persist for it in this slim schema). */
+    /**
+     * Batched, idempotent door events — attendee_access/keyholder_access/unexpected_open arrive in
+     * up to three POSTs per event_id (one per stage), upserted onto one AccessEvent row each;
+     * access_denied is a single-stage write. See door-access-spec.md § Access event log.
+     */
     #[Route('/events', name: 'app_api_door_events', requirements: ['doorId' => '\d+'], methods: ['POST'])]
     public function events(Request $request, int $doorId): Response
     {
@@ -88,20 +107,82 @@ class DoorController extends AbstractController
                 continue;
             }
 
-            if ($type === 'credential_used') {
-                $this->applyCredentialUsed($event);
-            } elseif ($type === 'access_denied') {
-                error_log(sprintf(
-                    'Door %d access denied: credential_id=%s reason=%s',
-                    $doorId,
-                    $event['credential_id'] ?? 'unknown',
-                    $event['reason'] ?? 'unknown',
-                ));
+            match ($type) {
+                AccessEvent::TYPE_ATTENDEE_ACCESS  => $this->applyAttendeeAccess($eventId, $event),
+                AccessEvent::TYPE_KEYHOLDER_ACCESS => $this->applyKeyholderAccess($eventId, $event),
+                AccessEvent::TYPE_UNEXPECTED_OPEN  => $this->applyUnexpectedOpen($eventId, $event),
+                AccessEvent::TYPE_ACCESS_DENIED    => $this->applyAccessDenied($eventId, $doorId, $event),
+                default => null,
+            };
+
+            // Every recognised event_id is acknowledged regardless of whether it resolved to
+            // anything — the device just needs this to stop retrying it.
+            $accepted[] = $eventId;
+        }
+
+        $this->em->flush();
+
+        return new JsonResponse(['accepted' => $accepted], 202);
+    }
+
+    /**
+     * Batched, idempotent diagnostic log entries — see door-access-firmware-spec.md § Diagnostic
+     * log for the full category/level/reason taxonomy. Unlike /events, a log entry never mutates
+     * a booking/attendee row — it's purely for remote visibility once the device has no serial
+     * console attached. Idempotent on log_id: a retried upload of one already stored is a no-op,
+     * not a duplicate row.
+     */
+    #[Route('/logs', name: 'app_api_door_logs', requirements: ['doorId' => '\d+'], methods: ['POST'])]
+    public function logs(Request $request, int $doorId): Response
+    {
+        if ($denied = $this->checkDeviceAuth($request)) {
+            return $denied;
+        }
+
+        $payload = json_decode($request->getContent(), true);
+        $logs    = is_array($payload['logs'] ?? null) ? $payload['logs'] : [];
+
+        $accepted = [];
+        // Guards against a single batch carrying more than one alert-worthy entry (e.g. a device
+        // catching up after an outage) — the DB cooldown check alone wouldn't see an entry from
+        // earlier in the same, still-unflushed batch.
+        $alertSentThisRequest = false;
+
+        foreach ($logs as $log) {
+            $logId = $log['log_id'] ?? null;
+
+            if (!is_string($logId) || $logId === '') {
+                continue;
             }
 
-            // Every recognised event_id is acknowledged regardless of whether the credential still
-            // resolves to anything — the device just needs this to stop retrying it.
-            $accepted[] = $eventId;
+            if ($this->doorLogRepository->findOneByLogId($logId) === null) {
+                $level    = is_string($log['level'] ?? null) ? $log['level'] : DoorLog::LEVEL_INFO;
+                $category = is_string($log['category'] ?? null) ? $log['category'] : 'hardware';
+                $reason   = is_string($log['reason'] ?? null) ? $log['reason'] : 'unknown';
+                $message  = is_string($log['message'] ?? null) ? $log['message'] : '';
+                $timestamp = $this->parseTimestamp($log['timestamp'] ?? null) ?? new \DateTimeImmutable();
+                $context   = is_array($log['context'] ?? null) ? $log['context'] : null;
+
+                $entry = new DoorLog($logId, $level, $category, $reason, $message, $timestamp, $doorId);
+                $entry->setContext($context);
+                $this->em->persist($entry);
+
+                // Server-side alerting — see door-access-spec.md § Server-side alerting: an
+                // explicit allowlist of reasons (not "every error"), deduped by never re-sending
+                // for a log_id already stored, and rate-limited per door so a stuck sensor can't
+                // flood the inbox.
+                if (!$alertSentThisRequest && $entry->isAlertWorthy()
+                    && !$this->doorLogRepository->hasRecentAlert($doorId, new \DateTimeImmutable('-' . self::ALERT_COOLDOWN_MINUTES . ' minutes'))
+                ) {
+                    $entry->markAlertSent();
+                    $this->doorAlertMailer->sendAlert($entry);
+                    $alertSentThisRequest = true;
+                }
+            }
+
+            // Every recognised log_id is acknowledged regardless of whether it was new or already
+            // stored — the device just needs this to stop retrying it.
+            $accepted[] = $logId;
         }
 
         $this->em->flush();
@@ -131,18 +212,69 @@ class DoorController extends AbstractController
         return new Response(null, 204);
     }
 
-    private function applyCredentialUsed(array $event): void
+    private function applyAttendeeAccess(string $eventId, array $event): void
     {
+        $stage        = $event['stage'] ?? null;
         $credentialId = (int) ($event['credential_id'] ?? 0);
         $attendee     = $credentialId ? $this->attendeeRepository->find($credentialId) : null;
 
-        if (!$attendee instanceof Attendee) {
+        if (!is_string($stage) || !$attendee instanceof Attendee) {
             return;
         }
 
-        $timestamp = $this->parseTimestamp($event['timestamp'] ?? null) ?? new \DateTimeImmutable();
+        $timestamp = $this->timestampForStage($event, $stage);
+        $this->doorAccessService->applyAttendeeAccessEvent($eventId, $stage, $attendee, $timestamp);
+    }
 
-        $this->doorAccessService->markUsedViaDoor($attendee, $timestamp);
+    private function applyKeyholderAccess(string $eventId, array $event): void
+    {
+        $stage  = $event['stage'] ?? null;
+        $userId = (int) ($event['user_id'] ?? 0);
+        $user   = $userId ? $this->userRepository->find($userId) : null;
+
+        if (!is_string($stage) || !$user instanceof User) {
+            return;
+        }
+
+        $timestamp = $this->timestampForStage($event, $stage);
+        $this->doorAccessService->applyKeyholderAccessEvent($eventId, $stage, $user, $timestamp);
+    }
+
+    private function applyUnexpectedOpen(string $eventId, array $event): void
+    {
+        $stage = $event['stage'] ?? null;
+
+        if (!is_string($stage)) {
+            return;
+        }
+
+        $timestamp = $this->timestampForStage($event, $stage);
+        $this->doorAccessService->applyUnexpectedOpenEvent($eventId, $stage, $timestamp);
+    }
+
+    private function applyAccessDenied(string $eventId, int $doorId, array $event): void
+    {
+        $credentialId = (int) ($event['credential_id'] ?? 0);
+        $attendee     = $credentialId ? $this->attendeeRepository->find($credentialId) : null;
+        $reason       = is_string($event['reason'] ?? null) ? $event['reason'] : null;
+        $timestamp    = $this->parseTimestamp($event['timestamp'] ?? null) ?? new \DateTimeImmutable();
+
+        $this->doorAccessService->applyAccessDenied($eventId, $attendee, $reason, $timestamp);
+
+        error_log(sprintf('Door %d access denied: credential_id=%s reason=%s', $doorId, $credentialId ?: 'unknown', $reason ?? 'unknown'));
+    }
+
+    /** Picks whichever timestamp field matches {stage} out of the event payload, falling back to now. */
+    private function timestampForStage(array $event, string $stage): \DateTimeImmutable
+    {
+        $field = match ($stage) {
+            AccessEvent::STAGE_AUTHORIZED  => 'authorized_at',
+            AccessEvent::STAGE_DOOR_OPEN   => 'door_open_at',
+            AccessEvent::STAGE_DOOR_CLOSED => 'door_closed_at',
+            default => null,
+        };
+
+        return ($field !== null ? $this->parseTimestamp($event[$field] ?? null) : null) ?? new \DateTimeImmutable();
     }
 
     private function parseTimestamp(?string $raw): ?\DateTimeImmutable

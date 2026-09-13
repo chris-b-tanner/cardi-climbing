@@ -1,0 +1,60 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Door log — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Door diagnostic log</h1>
+</div>
+
+{% if logs is empty %}
+  <div class="empty">
+    <strong>No log entries yet</strong>
+    Firmware updates, failed PINs, boot/reset reasons, and other non-routine device activity will show up here as they're uploaded.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Door</th>
+          <th>Level</th>
+          <th>Category</th>
+          <th>Reason</th>
+          <th>Message</th>
+          <th>Device time</th>
+          <th>Received</th>
+          <th>Alerted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+          <tr>
+            <td class="admin-table__muted">{{ log.doorId }}</td>
+            <td>
+              {% if log.level == 'error' %}
+                <span class="status-pill status-pill--cancelled">Error</span>
+              {% elseif log.level == 'warn' %}
+                <span class="status-pill status-pill--pending">Warn</span>
+              {% else %}
+                <span class="status-pill status-pill--published">Info</span>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ log.category }}</td>
+            <td><code>{{ log.reason }}</code></td>
+            <td>
+              {{ log.message }}
+              {% if log.context %}
+                <br><span class="admin-table__muted" style="font-size:0.75rem;">{{ log.context|json_encode }}</span>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ log.timestamp|date('d M Y H:i:s') }}</td>
+            <td class="admin-table__muted">{{ log.receivedAt|date('d M Y H:i:s') }}</td>
+            <td class="admin-table__muted">{{ log.alertSentAt ? log.alertSentAt|date('d M Y H:i') : '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;">Showing the most recent {{ logs|length }} entries.</p>
+{% endif %}
+{% endblock %}
