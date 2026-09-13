@@ -7,7 +7,10 @@
   {% if context == 'new_sale' %}
     <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Cancel</a>
   {% else %}
-    <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+    <div class="btn-row">
+      <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Email members</a>
+      <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+    </div>
   {% endif %}
 </div>
 

@@ -465,7 +465,6 @@
 
   <div class="admin-main">
     <div class="admin-topbar">
-      <a href="{{ path('app_admin_email_compose') }}" class="admin-topbar__link">Email members</a>
       {% if app.user %}
         <span class="admin-topbar__user">{{ app.user.firstName ?? app.user.email }}</span>
       {% endif %}

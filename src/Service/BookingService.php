@@ -34,8 +34,10 @@ class BookingService
      *        occurrence of a recurring event, and not in the past for a self-serve booking).
      * @param string $status Attendee::STATUS_CONFIRMED or ::STATUS_PENDING — self-serve bookings
      *        are always confirmed; only the admin check-in screen offers pending.
-     * @param ?User $addedBy Set when an admin is creating this booking on the member's behalf
-     *        (drives Attendee::addedBy); null for a self-serve booking.
+     * @param ?User $addedBy Set when a staff member is creating this booking on the member's
+     *        behalf (drives Attendee::addedBy); null for a self-serve booking. When this user holds
+     *        ROLE_ADMIN, a full event no longer blocks a confirmed/pending booking — admins are
+     *        allowed to knowingly oversubscribe an event; anyone else still can't.
      * @param bool $checkInNow Stamps checkedInAt/checkedInBy/checkedInMethod immediately — for
      *        the admin check-in screen's "this session is running (or about to)" case. Requires
      *        $addedBy, since a self-serve booking is never a staff-witnessed attendance.
@@ -69,9 +71,14 @@ class BookingService
             return 'This member is already booked onto this event.';
         }
 
-        // A waiting-list booking is expected to exceed capacity — that's the point of it — so only
-        // confirmed/pending statuses are actually blocked by a full event.
+        // A waiting-list booking is expected to exceed capacity — that's the point of it — and an
+        // admin is allowed to knowingly oversubscribe an event, so only a confirmed/pending
+        // booking made by a non-admin (self-serve, guest, or ordinary team member) is actually
+        // blocked by a full event.
+        $isAdmin = $addedBy !== null && in_array(User::ROLE_ADMIN, $addedBy->getRoles(), true);
+
         if ($status !== Attendee::STATUS_WAITING
+            && !$isAdmin
             && $event->getMaxAttendees() !== null
             && $this->attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate) >= $event->getMaxAttendees()
         ) {
@@ -133,12 +140,15 @@ class BookingService
      * cancelled (switching an already-active booking between statuses doesn't add a new seat) and
      * the target isn't "waiting" (which never claims a seat — that's the point of it).
      */
-    public function reinstateBooking(Attendee $attendee, string $status): ?string
+    /** @param ?User $actor Set when a staff member is making this change; an admin among them may reinstate into a full event (see createBooking()'s $addedBy doc for the same rule). */
+    public function reinstateBooking(Attendee $attendee, string $status, ?User $actor = null): ?string
     {
-        $event = $attendee->getEvent();
+        $event   = $attendee->getEvent();
+        $isAdmin = $actor !== null && in_array(User::ROLE_ADMIN, $actor->getRoles(), true);
 
         if ($attendee->isCancelled()
             && $status !== Attendee::STATUS_WAITING
+            && !$isAdmin
             && $event->getMaxAttendees() !== null
             && $this->attendeeRepository->countActiveForOccurrence($event, $attendee->getOccurrenceDate()) >= $event->getMaxAttendees()
         ) {

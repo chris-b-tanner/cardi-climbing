@@ -253,7 +253,9 @@ class AdminBookingController extends AbstractController
                 if ($status === Attendee::STATUS_CANCELLED) {
                     $bookingService->cancelBooking($attendee);
                 } else {
-                    $error = $bookingService->reinstateBooking($attendee, $status);
+                    /** @var User $admin */
+                    $admin = $this->getUser();
+                    $error = $bookingService->reinstateBooking($attendee, $status, $admin);
                 }
 
                 if (!$error) {
@@ -366,7 +368,9 @@ class AdminBookingController extends AbstractController
 
         $attendee->setStaffingStatus($status);
         if ($status === Attendee::STAFFING_APPROVED) {
-            $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED);
+            /** @var User $admin */
+            $admin = $this->getUser();
+            $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED, $admin);
             if ($error) {
                 $this->addFlash('error', $error);
                 return $this->redirectToEventShow($attendee);
