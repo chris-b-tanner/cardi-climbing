@@ -1,0 +1,113 @@
+{% extends 'base.html.twig' %}
+
+{% set landingUrl = app.request.schemeAndHttpHost ~ path('app_event_landing', event.isRecurring ? {id: event.id, date: date|date('Y-m-d')} : {id: event.id}) %}
+{% set dateTimeLocation = (date|date('l j F')) ~ ' · ' ~ event.timeFrom ~ '–' ~ event.timeTo ~ ' · ' ~ event.location %}
+{% set rawDescription = event.description ? (event.description|replace({"\r\n": ' ', "\n": ' '})|striptags|trim) : '' %}
+{% set shareDescription = rawDescription
+  ? dateTimeLocation ~ ' — ' ~ (rawDescription|length > 120 ? (rawDescription|slice(0, 117)|trim ~ '…') : rawDescription)
+  : dateTimeLocation %}
+
+{% block title %}{{ event.title }} — Y Wal{% endblock %}
+{% block meta_description %}{{ shareDescription }}{% endblock %}
+{% block canonical_url %}{{ landingUrl }}{% endblock %}
+{% block og_url %}{{ landingUrl }}{% endblock %}
+{% block og_title %}{{ event.title }} — Y Wal{% endblock %}
+{% block og_description %}{{ shareDescription }}{% endblock %}
+
+{% block head %}
+  {# Event-specific structured data, alongside the site-wide organisation schema in the base
+     layout — gives platforms that read schema.org data (Google rich results, some link-preview
+     tools) the event's actual date/time/location rather than just the generic site description. #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    "name": {{ event.title|json_encode|raw }},
+    "startDate": {{ event.combineDateAndTime(date, event.timeFrom)|date('c')|json_encode|raw }},
+    "endDate": {{ event.combineDateAndTime(date, event.timeTo)|date('c')|json_encode|raw }},
+    "eventStatus": "https://schema.org/EventScheduled",
+    "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+    "location": {
+      "@type": "Place",
+      "name": {{ event.location|json_encode|raw }},
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Cardigan",
+        "addressRegion": "Ceredigion",
+        "addressCountry": "GB"
+      }
+    },
+    {% if rawDescription %}"description": {{ rawDescription|json_encode|raw }},{% endif %}
+    "url": {{ landingUrl|json_encode|raw }},
+    "organizer": {
+      "@type": "Organization",
+      "name": "Y Wal",
+      "url": "https://www.cardiganclimbing.org"
+    }
+  }
+  </script>
+{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <a href="{{ path('app_events') }}" class="event-show__back">&larr; {{ 'events_back_to_calendar'|trans }}</a>
+    <h1 class="page-hero__h1">
+      {{ event.title }}
+      {% if isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
+    </h1>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap">
+    <div class="event-show__wrap">
+
+      {% include 'event/_preview.html.twig' with {title: false} %}
+
+      <div class="event-landing__share">
+        <button type="button" id="event-share-btn" class="event-landing__share-btn"
+                data-url="{{ landingUrl }}"
+                data-title="{{ event.title }}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"></line><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line></svg>
+          {{ 'events_share'|trans }}
+        </button>
+        <span id="event-share-feedback" class="event-landing__share-feedback" aria-live="polite"></span>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const shareBtn  = document.getElementById('event-share-btn');
+    const feedback  = document.getElementById('event-share-feedback');
+    if (!shareBtn) return;
+
+    shareBtn.addEventListener('click', async () => {
+      const url   = shareBtn.dataset.url;
+      const title = shareBtn.dataset.title;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, url });
+        } catch (e) {
+          // User cancelled the share sheet — nothing to do.
+        }
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(url);
+        feedback.textContent = {{ 'events_link_copied'|trans|json_encode|raw }};
+      } catch (e) {
+        feedback.textContent = url;
+      }
+      setTimeout(() => { feedback.textContent = ''; }, 3000);
+    });
+  })();
+</script>
+{% endblock %}

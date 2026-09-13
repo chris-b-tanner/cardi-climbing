@@ -187,13 +187,58 @@ class EventController extends AbstractController
         $user = $this->getUser();
 
         $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
-        $view['eventTicketProducts'] = $eventTicketProducts = $productRepository->findActiveEventTickets($event);
+        $view = array_merge($view, $this->buildTicketContext($event, $storedOccurrenceDate, $user, $productRepository, $cartService));
+        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
+
+        return $this->render('event/_preview.html.twig', $view);
+    }
+
+    /**
+     * A shareable public landing page for a single event — the same content as the calendar's
+     * preview modal (including the ticket-purchase flow, unlike the simpler show() page), so a
+     * link to this page works standalone for someone arriving from outside the calendar (a shared
+     * link, a poster QR code, etc). For a recurring event, {date} picks which occurrence is shown,
+     * same as preview()/show() — falling back to the next upcoming occurrence when omitted.
+     */
+    #[Route('/events/{id}/details', name: 'app_event_landing', requirements: ['id' => '\d+'])]
+    public function landing(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, CartService $cartService): Response
+    {
+        if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
+            throw $this->createNotFoundException('Event not found.');
+        }
+
+        $today          = new \DateTimeImmutable('today');
+        $requestedDate  = $this->parseDate($request->query->get('date', ''));
+        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
+
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        $stats = [
+            'count'        => $event->getMaxAttendees() !== null
+                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
+                : 0,
+            'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
+        ];
+
+        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
+        $view = array_merge($view, $this->buildTicketContext($event, $storedOccurrenceDate, $user, $productRepository, $cartService));
+        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
+
+        return $this->render('event/landing.html.twig', $view);
+    }
+
+    /** The ticket-purchase context the preview modal and the public landing page both need — which active ticket products this event has, which of them {user} qualifies for, and how many are already in their cart for this occurrence. */
+    private function buildTicketContext(Event $event, ?\DateTimeImmutable $storedOccurrenceDate, ?User $user, ProductRepository $productRepository, CartService $cartService): array
+    {
+        $eventTicketProducts = $productRepository->findActiveEventTickets($event);
 
         $ticketAccess = [];
         foreach ($eventTicketProducts as $ticketProduct) {
             $ticketAccess[$ticketProduct->getId()] = $this->userQualifiesForTicket($user, $ticketProduct);
         }
-        $view['ticketAccess'] = $ticketAccess;
 
         $cartTicketCount = 0;
         if ($user !== null) {
@@ -203,10 +248,12 @@ class EventController extends AbstractController
                 }
             }
         }
-        $view['cartTicketCount'] = $cartTicketCount;
-        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
 
-        return $this->render('event/_preview.html.twig', $view);
+        return [
+            'eventTicketProducts' => $eventTicketProducts,
+            'ticketAccess'        => $ticketAccess,
+            'cartTicketCount'     => $cartTicketCount,
+        ];
     }
 
     #[Route('/events/{id}/book', name: 'app_event_book', requirements: ['id' => '\d+'], methods: ['POST'])]

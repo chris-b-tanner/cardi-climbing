@@ -70,11 +70,12 @@
           {{ event.isPublished ? 'Published' : 'Draft' }}
         </span>
   </h1>
-  {% if is_granted('ROLE_ADMIN') %}
-    <div class="btn-row">
+  <div class="btn-row">
+    <a href="{{ path('app_event_landing', event.isRecurring ? {id: event.id, date: occurrenceDate|date('Y-m-d')} : {id: event.id}) }}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener"><i class="bi bi-share-fill"></i> View on website</a>
+    {% if is_granted('ROLE_ADMIN') %}
       <a href="{{ path('app_admin_event_edit', {id: event.id}) }}" class="btn btn--teal btn--sm">Edit</a>
-    </div>
-  {% endif %}
+    {% endif %}
+  </div>
 </div>
 
 {% if event.acceptsTicket and eventTicketProducts is empty %}

@@ -1,8 +1,12 @@
-{# Preview modal fragment for the calendar — fetched via AJAX, no layout of its own. #}
-<h2 class="event-preview__title">
-  {{ event.title }}
-  {% if isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
-</h2>
+{# Preview modal fragment for the calendar — fetched via AJAX, no layout of its own. Also reused
+   by the public event landing page (event/landing.html.twig), which passes title:false since it
+   already renders its own <h1> above this include. #}
+{% if title is not defined or title %}
+  <h2 class="event-preview__title">
+    {{ event.title }}
+    {% if isDraft %}<span class="agenda-event__status">Draft</span>{% endif %}
+  </h2>
+{% endif %}
 
 {% if is_granted('ROLE_ADMIN') %}
   <p style="margin:0 0 1rem;">

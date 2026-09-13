@@ -1050,3 +1050,16 @@ p + p { margin-top: 1rem; }
 }
 .event-show__optin-label input { width: 1rem; height: 1rem; accent-color: var(--teal); }
 .event-show__guest-form .form-actions .btn { width: auto; }
+
+.event-landing__share {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+}
+.event-landing__share-btn {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  background: none; border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.45rem 1rem; font-family: inherit; font-size: 0.85rem; font-weight: 600;
+  color: var(--muted); cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.event-landing__share-btn:hover { border-color: var(--teal); color: var(--teal-dk); }
+.event-landing__share-feedback { font-size: 0.82rem; color: var(--teal-dk); font-weight: 600; }
