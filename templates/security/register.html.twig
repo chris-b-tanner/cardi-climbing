@@ -1,0 +1,201 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Create an account — Y Wal{% endblock %}
+
+{% block nav %}
+<header class="auth-header">
+  <div class="wrap">
+    <a href="/" class="nav__logo">{{ 'nav_logo'|trans|raw }}</a>
+  </div>
+</header>
+{% endblock %}
+
+{% block head %}
+<style>
+  .register-page { padding: 3rem 1.5rem 5rem; background: var(--offwhite); }
+  .register-wrap { max-width: 620px; margin: 0 auto; }
+  .register-wrap h1 {
+    font-family: var(--f-head); font-size: 2rem; font-weight: 700;
+    text-transform: uppercase; line-height: 1.05; color: var(--black); margin-bottom: 0.4rem;
+  }
+  .register-wrap .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  .account-card {
+    background: var(--white); border: 1px solid var(--border);
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .account-card__title {
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); margin-bottom: 1rem;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
+
+  .field { margin-bottom: 1rem; }
+  .account-card > .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); margin-bottom: 0.35rem;
+  }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="tel"],
+  .field input[type="password"],
+  .field input[type="date"] {
+    width: 100%; padding: 0.6rem 0.75rem; box-sizing: border-box;
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.9375rem; font-family: inherit; color: var(--black);
+  }
+  .field input:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: transparent; }
+  .field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; }
+
+  .optin-label {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.875rem; color: var(--black); cursor: pointer;
+  }
+  .optin-label input { width: 1rem; height: 1rem; accent-color: var(--teal); }
+
+  .register-footer {
+    margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+    text-align: center; font-size: 0.85rem; color: var(--muted);
+  }
+  .register-footer a { color: var(--teal); }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="register-page">
+  <div class="register-wrap">
+    <h1>Create an account</h1>
+    <p class="subtitle">Join Y Wal to book onto events, buy memberships and credits, and manage your certifications online.</p>
+
+    {% if error %}
+      <div class="alert alert--error">
+        {{ error }}
+        {% if duplicateEmail %}
+          <a href="{{ path('app_login') }}">Sign in</a> instead, or
+          <a href="{{ path('app_forgot_password_request') }}">reset your password</a> if you're not sure you have one set.
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ path('app_register') }}" novalidate>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('register') }}">
+
+      <div class="account-card">
+        <div class="account-card__title">Personal details</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="firstName">First name</label>
+            <input type="text" id="firstName" name="firstName" value="{{ input.firstName }}" autocomplete="given-name" required>
+          </div>
+          <div class="field">
+            <label for="lastName">Last name</label>
+            <input type="text" id="lastName" name="lastName" value="{{ input.lastName }}" autocomplete="family-name" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="company">Company</label>
+          <input type="text" id="company" name="company" value="{{ input.company }}" autocomplete="organization">
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" value="{{ input.email }}" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="phone">Phone number</label>
+          <input type="tel" id="phone" name="phone" value="{{ input.phone }}" autocomplete="tel">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="dateOfBirth">Date of birth</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" value="{{ input.dateOfBirth }}" autocomplete="bday">
+        </div>
+      </div>
+
+      <div class="account-card">
+        <label class="optin-label">
+          <input type="checkbox" name="optIn" value="1"{% if input.optIn %} checked{% endif %}>
+          Keep me updated about Y Wal news
+        </label>
+        <p class="field-hint" style="margin-top:0.5rem;margin-left:1.6rem;">
+          We really value being able to keep in touch with our community — it helps us understand demand and work together with you to make the wall come to fruition.
+        </p>
+      </div>
+
+      <div class="account-card">
+        <div class="account-card__title">Emergency contact</div>
+        <div class="field">
+          <label for="emergencyContactName">Contact name</label>
+          <input type="text" id="emergencyContactName" name="emergencyContactName" value="{{ input.emergencyContactName }}" autocomplete="off">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="emergencyContactPhone">Contact phone number</label>
+          <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone" value="{{ input.emergencyContactPhone }}" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="account-card">
+        <div class="account-card__title">Address</div>
+        <div class="field">
+          <label for="addressLine1">Address line 1</label>
+          <input type="text" id="addressLine1" name="addressLine1" value="{{ input.addressLine1 }}" autocomplete="address-line1">
+        </div>
+        <div class="field">
+          <label for="addressLine2">Address line 2</label>
+          <input type="text" id="addressLine2" name="addressLine2" value="{{ input.addressLine2 }}" autocomplete="address-line2">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="town">Town / City</label>
+            <input type="text" id="town" name="town" value="{{ input.town }}" autocomplete="address-level2">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="postcode">Postcode</label>
+            <input type="text" id="postcode" name="postcode" value="{{ input.postcode }}" autocomplete="postal-code">
+          </div>
+        </div>
+      </div>
+
+      <div class="account-card" style="margin-bottom:0;">
+        <div class="account-card__title">Password</div>
+        <div class="field">
+          <label for="password">Choose a password</label>
+          <input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required>
+          <p class="field-hint">At least 8 characters.</p>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="passwordConfirm">Confirm password</label>
+          <input type="password" id="passwordConfirm" name="passwordConfirm" autocomplete="new-password" minlength="8" required>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn--teal">Create account</button>
+      </div>
+    </form>
+
+    <div class="register-footer">
+      Already have an account? <a href="{{ path('app_login') }}">Sign in</a>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const password        = document.getElementById('password');
+    const passwordConfirm = document.getElementById('passwordConfirm');
+
+    function checkMatch() {
+      passwordConfirm.setCustomValidity(
+        passwordConfirm.value && passwordConfirm.value !== password.value ? "Those passwords don't match." : ''
+      );
+    }
+
+    password.addEventListener('input', checkMatch);
+    passwordConfirm.addEventListener('input', checkMatch);
+  })();
+</script>
+{% endblock %}
