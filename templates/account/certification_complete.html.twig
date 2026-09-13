@@ -156,8 +156,8 @@
             <div class="profile-summary" id="profile-summary">
               <div><span class="profile-summary__label">Name:</span> {{ (holder.firstName ~ ' ' ~ holder.lastName)|trim ?: '—' }}</div>
               <div><span class="profile-summary__label">Date of birth:</span> {{ holder.dateOfBirth ? holder.dateOfBirth|date('d M Y') : '—' }}</div>
-              <div><span class="profile-summary__label">Phone:</span> {{ holder.phone ?: '—' }}</div>
-              <div><span class="profile-summary__label">Emergency contact:</span> {{ holder.emergencyContactName ?: '—' }}{% if holder.emergencyContactPhone %} &middot; {{ holder.emergencyContactPhone }}{% endif %}</div>
+              <div><span class="profile-summary__label">Phone:</span> {{ holder.phone ? (holder.phone|uk_phone) : '—' }}</div>
+              <div><span class="profile-summary__label">Emergency contact:</span> {{ holder.emergencyContactName ?: '—' }}{% if holder.emergencyContactPhone %} &middot; {{ holder.emergencyContactPhone|uk_phone }}{% endif %}</div>
               <div><span class="profile-summary__label">Address:</span> {{ [holder.addressLine1, holder.addressLine2, holder.town, holder.postcode]|filter(v => v)|join(', ') ?: '—' }}</div>
             </div>
             {% if canEditProfile %}

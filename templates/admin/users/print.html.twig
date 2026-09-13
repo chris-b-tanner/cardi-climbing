@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Members — Y Wal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      padding: 2rem;
+    }
+    .print-bar {
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .print-bar button, .print-bar a {
+      font-family: inherit; font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #fff; color: #1a1a1a;
+      text-decoration: none; cursor: pointer;
+    }
+    .print-bar button { background: #2a9d8f; color: #fff; border-color: #2a9d8f; }
+    h1 { font-size: 1.35rem; margin-bottom: 0.2rem; }
+    .subtitle { color: #6b7280; font-size: 0.9375rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+    th, td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid #e5e7eb; }
+    th {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280; background: #f9fafb;
+    }
+    .count { margin-top: 1rem; font-size: 0.8125rem; color: #6b7280; }
+    .empty { color: #6b7280; font-size: 0.9375rem; }
+
+    @media print {
+      body { padding: 0; }
+      .print-bar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <a href="{{ path('app_admin_users') }}">&larr; Back to members</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+
+  <h1>Members</h1>
+  <p class="subtitle">
+    {%- if currentQuery and tag -%}
+      Matching &ldquo;{{ currentQuery }}&rdquo;, tagged {{ tag.name }}
+    {%- elseif currentQuery -%}
+      Matching &ldquo;{{ currentQuery }}&rdquo;
+    {%- elseif tag -%}
+      Tagged {{ tag.name }}
+    {%- else -%}
+      All members
+    {%- endif -%}
+  </p>
+
+  {% if users is empty %}
+    <p class="empty">No members match this filter.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Company</th>
+          <th>Phone</th>
+          <th>Tags</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          {% set displayName = user.displayName %}
+          <tr>
+            <td>#{{ user.id }}</td>
+            <td>{{ displayName ?: '—' }}</td>
+            <td>{{ user.email ?: '—' }}</td>
+            <td>{{ user.company ?: '—' }}</td>
+            <td>{{ user.phone ? (user.phone|uk_phone) : '—' }}</td>
+            <td>
+              {%- for tag in user.tags -%}
+                {{ tag.name }}{% if not loop.last %}, {% endif %}
+              {%- else -%}
+                &mdash;
+              {%- endfor -%}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="count">{{ users|length }} {{ users|length == 1 ? 'member' : 'members' }}</p>
+  {% endif %}
+
+</body>
+</html>

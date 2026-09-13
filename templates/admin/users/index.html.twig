@@ -20,6 +20,12 @@
       <option value="{{ tag.id }}"{% if currentTagId == tag.id %} selected{% endif %}>{{ tag.name }}</option>
     {% endfor %}
   </select>
+  {% if context != 'new_sale' %}
+    <div style="margin-left:auto;display:flex;gap:0.5rem;">
+      <a id="print-link" href="{{ path('app_admin_users_print') }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm"><i class="bi bi-printer"></i> Print</a>
+      <a id="csv-link" href="{{ path('app_admin_users_export') }}" class="btn btn--ghost btn--sm"><i class="bi bi-file-earmark-spreadsheet"></i> Export CSV</a>
+    </div>
+  {% endif %}
 </div>
 
 {% if context != 'new_sale' %}
@@ -58,6 +64,10 @@
   const mergeClear  = document.getElementById('merge-clear');
   const endpoint    = '{{ path('app_admin_users') }}';
   const mergeUrl    = '{{ path('app_admin_user_merge') }}';
+  const printLink   = document.getElementById('print-link');
+  const csvLink     = document.getElementById('csv-link');
+  const printBaseUrl = {{ context != 'new_sale' ? path('app_admin_users_print')|json_encode|raw : 'null' }};
+  const csvBaseUrl    = {{ context != 'new_sale' ? path('app_admin_users_export')|json_encode|raw : 'null' }};
   let debounce;
 
   let currentSort = {{ currentSort|json_encode|raw }};
@@ -117,6 +127,12 @@
 
     const qs = params.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+    // Print/CSV only ever need q/tag/sort/dir — in the non-new_sale context where they're shown,
+    // context/eventId/occurrenceDate are never set on `params` in the first place, so `qs` is
+    // already exactly that filter set.
+    if (printLink) printLink.href = `${printBaseUrl}${qs ? '?' + qs : ''}`;
+    if (csvLink)   csvLink.href   = `${csvBaseUrl}${qs ? '?' + qs : ''}`;
 
     fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },

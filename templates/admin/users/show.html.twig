@@ -89,7 +89,7 @@
       <div class="card__label">Phone</div>
       <div class="card__value">
         {% if user.phone %}
-          <a href="tel:{{ user.phone }}" style="color:var(--teal);">{{ user.phone }}</a>
+          <a href="tel:{{ user.phone|tel_link }}" style="color:var(--teal);">{{ user.phone|uk_phone }}</a>
         {% else %}—{% endif %}
       </div>
     </div>
@@ -125,7 +125,7 @@
   {% if user.emergencyContactName or user.emergencyContactPhone %}
     <div class="card__value" style="line-height:1.8;">
       {% if user.emergencyContactName %}<span>{{ user.emergencyContactName }}</span><br>{% endif %}
-      {% if user.emergencyContactPhone %}<a href="tel:{{ user.emergencyContactPhone }}" style="color:var(--teal);">{{ user.emergencyContactPhone }}</a>{% endif %}
+      {% if user.emergencyContactPhone %}<a href="tel:{{ user.emergencyContactPhone|tel_link }}" style="color:var(--teal);">{{ user.emergencyContactPhone|uk_phone }}</a>{% endif %}
     </div>
   {% else %}
     <div class="duplicate-warning" style="margin-bottom:0;">

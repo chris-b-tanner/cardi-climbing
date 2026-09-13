@@ -35,7 +35,7 @@
           </div>
           {% if user.phone %}
             <div class="merge-card__detail">
-              <span class="card__label" style="display:inline;">Phone</span> {{ user.phone }}
+              <span class="card__label" style="display:inline;">Phone</span> {{ user.phone|uk_phone }}
             </div>
           {% endif %}
           {% if user.firstName or user.lastName %}

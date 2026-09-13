@@ -2,9 +2,11 @@
 
 namespace App\Twig;
 
+use App\Service\UkPhoneFormatter;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 class AppExtension extends AbstractExtension
@@ -12,12 +14,21 @@ class AppExtension extends AbstractExtension
     public function __construct(
         private readonly UrlGeneratorInterface $router,
         #[Autowire('%kernel.secret%')] private readonly string $appSecret,
+        private readonly UkPhoneFormatter $ukPhoneFormatter,
     ) {}
 
     public function getFunctions(): array
     {
         return [
             new TwigFunction('unsubscribe_url', $this->unsubscribeUrl(...)),
+        ];
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            new TwigFilter('uk_phone', $this->ukPhoneFormatter->format(...)),
+            new TwigFilter('tel_link', $this->ukPhoneFormatter->dialable(...)),
         ];
     }
 

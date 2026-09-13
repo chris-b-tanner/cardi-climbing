@@ -16,6 +16,7 @@ use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
+use App\Service\UkPhoneFormatter;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Exception\ApiErrorException;
@@ -34,12 +35,7 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        $query   = trim($request->query->get('q', ''));
-        $tagId   = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
-            ? (int) $request->query->get('tag')
-            : null;
-        $sort    = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
-        $dir     = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
+        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
         $context        = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
         // Carried through from the event view's "Add attendee" button so the sale created from
         // the "Choose" form below already knows which event/occurrence to add as a line item.
@@ -73,6 +69,67 @@ class AdminController extends AbstractController
             'eventId'        => $eventId,
             'occurrenceDate' => $occurrenceDate,
         ]);
+    }
+
+    /**
+     * A print-friendly page listing whichever members the current search/tag filter matches — same
+     * filter params as the main list, read straight off the query string so the "Print" button just
+     * needs to carry the page's current filter state through unchanged.
+     */
+    #[Route('/users/print', name: 'app_admin_users_print')]
+    public function printUsers(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
+    {
+        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
+        $tag = $tagId !== null ? $tagRepository->find($tagId) : null;
+
+        return $this->render('admin/users/print.html.twig', [
+            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir),
+            'currentQuery' => $query,
+            'tag'          => $tag,
+        ]);
+    }
+
+    /** Exports whichever members the current search/tag filter matches as a CSV — same filter params as the main list and the print view. */
+    #[Route('/users/export.csv', name: 'app_admin_users_export')]
+    public function exportUsers(Request $request, UserRepository $userRepository, UkPhoneFormatter $ukPhoneFormatter): Response
+    {
+        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
+        $users = $userRepository->search($query, $tagId, null, $sort, $dir);
+
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, ['ID', 'Name', 'Email', 'Company', 'Phone', 'Tags']);
+        foreach ($users as $user) {
+            fputcsv($handle, [
+                $user->getId(),
+                $user->getDisplayName(),
+                $user->getEmail(),
+                $user->getCompany(),
+                $ukPhoneFormatter->format($user->getPhone()),
+                implode('; ', array_map(static fn($tag) => $tag->getName(), $user->getTags()->toArray())),
+            ]);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $response = new Response($csv);
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="members-' . (new \DateTimeImmutable())->format('Y-m-d') . '.csv"');
+
+        return $response;
+    }
+
+    /** @return array{0: string, 1: ?int, 2: string, 3: string} [query, tagId, sort, dir] — the filter set shared by the members list, its print view, and its CSV export. */
+    private function resolveUserFilters(Request $request): array
+    {
+        $query = trim($request->query->get('q', ''));
+        $tagId = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
+            ? (int) $request->query->get('tag')
+            : null;
+        $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
+        $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
+
+        return [$query, $tagId, $sort, $dir];
     }
 
     #[Route('/users/new', name: 'app_admin_user_new', methods: ['GET', 'POST'])]
