@@ -88,7 +88,8 @@ class BulkEmailController extends AbstractController
             }
         }
 
-        $html = $twig->render('email/bulk.html.twig', $context);
+        $useBlankLayout = $request->request->getBoolean('useBlankLayout');
+        $html = $twig->render($useBlankLayout ? 'email/bulk_blank.html.twig' : 'email/bulk.html.twig', $context);
 
         return new Response($html);
     }
@@ -173,6 +174,10 @@ class BulkEmailController extends AbstractController
             return $this->redirectToRoute('app_admin_email_compose', $redirectParams);
         }
 
+        $useBlankLayout = $request->request->getBoolean('useBlankLayout');
+        $htmlTemplate   = $useBlankLayout ? 'email/bulk_blank.html.twig' : 'email/bulk.html.twig';
+        $textTemplate   = $useBlankLayout ? 'email/bulk_blank.txt.twig' : 'email/bulk.txt.twig';
+
         $sent    = 0;
         $skipped = [];
 
@@ -201,8 +206,8 @@ class BulkEmailController extends AbstractController
                 ->from(new Address($this->mailerFrom, $this->mailerFromName))
                 ->to($user->getEmail())
                 ->subject($subject)
-                ->htmlTemplate('email/bulk.html.twig')
-                ->textTemplate('email/bulk.txt.twig')
+                ->htmlTemplate($htmlTemplate)
+                ->textTemplate($textTemplate)
                 ->context($context);
 
             try {

@@ -102,6 +102,16 @@
       </div>
 
       <div class="card">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
+            <input type="checkbox" name="useBlankLayout" id="useBlankLayout" value="1"
+                   style="width:1rem;height:1rem;accent-color:var(--teal);">
+            Use blank (personal) layout instead of the Y Wal template
+          </label>
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
+            Skips the logo/branded header and footer — just the message, for a more personal-feeling email.
+          </p>
+        </div>
         <div class="form-group">
           <label for="subject">Subject</label>
           <input type="text" id="subject" name="subject" class="form-control"
@@ -166,6 +176,7 @@
 <script>
   const subjectEl  = document.getElementById('subject');
   const bodyEl     = document.getElementById('body');
+  const blankLayoutEl = document.getElementById('useBlankLayout');
   const frame      = document.getElementById('preview-frame');
   const audAll     = document.getElementById('aud-all');
   const audTags    = document.getElementById('aud-tags');
@@ -183,6 +194,7 @@
     const body = new FormData();
     body.append('subject', subjectEl.value || '(No subject)');
     body.append('body',    bodyEl.value    || '');
+    body.append('useBlankLayout', blankLayoutEl.checked ? '1' : '0');
     {% if userAudience %}body.append('userId', '{{ userAudience.user.id }}');{% endif %}
 
     fetch(previewUrl, { method: 'POST', body })
@@ -197,6 +209,7 @@
 
   subjectEl.addEventListener('input', schedulePreview);
   bodyEl.addEventListener('input',    schedulePreview);
+  blankLayoutEl.addEventListener('change', refreshPreview);
 
   // ── Audience / recipient count ─────────────────────────────
   {% if eventAudience or certificationAudience or userAudience %}
