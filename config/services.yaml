@@ -15,6 +15,7 @@ services:
             string $stripeTerminalReaderId: '%env(STRIPE_TERMINAL_READER_ID)%'
             string $doorApiKey: '%env(DOOR_API_KEY)%'
             string $doorSimSecret: '%env(DOOR_SIM_SECRET)%'
+            int $doorMinFirmwareVersion: '%env(int:DOOR_MIN_FIRMWARE_VERSION)%'
 
     _instanceof:
         App\Service\Fulfilment\FulfilmentHandlerInterface:

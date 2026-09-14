@@ -27,6 +27,7 @@ class DoorController extends AbstractController
 {
     public function __construct(
         private readonly string $doorApiKey,
+        private readonly int $doorMinFirmwareVersion,
         private readonly DoorAccessService $doorAccessService,
         private readonly AttendeeRepository $attendeeRepository,
         private readonly UserRepository $userRepository,
@@ -67,15 +68,21 @@ class DoorController extends AbstractController
 
         $etag = '"' . md5(json_encode([$credentials, $keyholders])) . '"';
 
+        // A 304 has no body by definition, so min_firmware_version can't ride in the JSON here —
+        // carried as a header instead, so an OTA update is never missed just because credentials
+        // happened not to change on a given poll (the common case).
+        $firmwareHeaders = ['X-Min-Firmware-Version' => (string) $this->doorMinFirmwareVersion];
+
         if ($request->headers->get('If-None-Match') === $etag) {
-            return new Response(null, 304, ['ETag' => $etag]);
+            return new Response(null, 304, ['ETag' => $etag] + $firmwareHeaders);
         }
 
         return new JsonResponse([
-            'server_time' => $now->format('Y-m-d\TH:i:s\Z'),
-            'credentials' => $credentials,
-            'keyholders'  => $keyholders,
-        ], 200, ['ETag' => $etag]);
+            'server_time'          => $now->format('Y-m-d\TH:i:s\Z'),
+            'min_firmware_version' => $this->doorMinFirmwareVersion,
+            'credentials'          => $credentials,
+            'keyholders'           => $keyholders,
+        ], 200, ['ETag' => $etag] + $firmwareHeaders);
     }
 
     /**
@@ -122,7 +129,10 @@ class DoorController extends AbstractController
 
         $this->em->flush();
 
-        return new JsonResponse(['accepted' => $accepted], 202);
+        return new JsonResponse([
+            'accepted'             => $accepted,
+            'min_firmware_version' => $this->doorMinFirmwareVersion,
+        ], 202);
     }
 
     /**
@@ -187,10 +197,18 @@ class DoorController extends AbstractController
 
         $this->em->flush();
 
-        return new JsonResponse(['accepted' => $accepted], 202);
+        return new JsonResponse([
+            'accepted'             => $accepted,
+            'min_firmware_version' => $this->doorMinFirmwareVersion,
+        ], 202);
     }
 
-    /** Device health check-in — logged for ops visibility, nothing persisted (no door/device table yet, per the spec's single-door assumption). */
+    /**
+     * Device health check-in — logged for ops visibility, nothing persisted (no door/device table
+     * yet, per the spec's single-door assumption). Was a bare 204 originally, but every response
+     * needs to carry min_firmware_version (§ OTA), and a 204 can't have a body — so this is now a
+     * 200 with a minimal JSON body instead.
+     */
     #[Route('/heartbeat', name: 'app_api_door_heartbeat', requirements: ['doorId' => '\d+'], methods: ['POST'])]
     public function heartbeat(Request $request, int $doorId): Response
     {
@@ -209,7 +227,7 @@ class DoorController extends AbstractController
             $payload['cached_credential_count'] ?? '?',
         ));
 
-        return new Response(null, 204);
+        return new JsonResponse(['min_firmware_version' => $this->doorMinFirmwareVersion], 200);
     }
 
     private function applyAttendeeAccess(string $eventId, array $event): void

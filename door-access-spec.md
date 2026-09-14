@@ -218,6 +218,9 @@ was newer than what the server already had; a client doesn't need to distinguish
 ```json
 { "firmware_version": "1.2.0", "uptime_s": 83920, "relay_state": "locked", "last_successful_sync": "...", "cached_credential_count": 2 }
 ```
+Response: `200 { "min_firmware_version": 2026091400 }` — was a bare `204` originally, but every
+response needs to carry `min_firmware_version` (§ OTA note above) and a `204` can't have a body,
+so this now always returns a minimal JSON body instead.
 
 ### `POST /v1/doors/{door_id}/logs`
 
@@ -319,11 +322,20 @@ Reject if already checked in (idempotent 409 or return existing check-in, your c
 
 ## Firmware (ESP32-S3-ETH)
 
-Moved to its own file — see `door-access-firmware-spec.md` for the full device-side brief
-(PlatformIO/Arduino project structure, credential sync/keypad/relay logic, and the OTA design for
-shipping firmware + SPIFFS updates over the same API). This file stays the server-side source of
-truth (schema, PIN lifecycle, API contract); the firmware doc restates the API-facing bits it
-depends on so it can be handed to a build agent on its own.
+Moved to its own file, `door-access-firmware-spec.md` — that document now lives in the actual
+PlatformIO project this firmware is built from, not this repo:
+
+```
+/Documents/PlatformIO/Projects/y-wal/spec.md
+```
+
+(referenced by that name throughout this file — every `door-access-firmware-spec.md` mention
+below means that path). It covers the full device-side brief (PlatformIO/Arduino project
+structure, credential sync/keypad/relay logic, and the OTA design for shipping firmware + SPIFFS
+updates over the same API). This file (in the `CardiClimbing` server repo,
+`/Users/admin/Documents/CardiClimbing/door-access-spec.md`) stays the server-side source of truth
+— schema, PIN lifecycle, API contract; the firmware doc restates the API-facing bits it depends on
+so it can be handed to a build agent on its own, and cross-references back to this exact path.
 
 ## Non-negotiable physical check
 
