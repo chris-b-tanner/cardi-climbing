@@ -1,0 +1,47 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+</div>
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.25rem;">Opted-in members</div>
+  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+    <span style="font-size:2rem;font-weight:700;color:var(--black);">{{ totalOptedIn }}</span>
+    {% set change = totalOptedIn - sixWeeksAgoCount %}
+    {% if change != 0 %}
+      <span style="font-size:0.9rem;color:{{ change > 0 ? '#16a34a' : 'var(--red)' }};font-weight:600;">
+        {{ change > 0 ? '+' ~ change : change }} in the last 6 weeks
+      </span>
+    {% else %}
+      <span style="font-size:0.9rem;color:var(--muted);">No change in the last 6 weeks</span>
+    {% endif %}
+  </div>
+
+  <div class="table-scroll">
+    <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" width="100%" style="max-width:{{ chart.width }}px;display:block;">
+      {% for y in chart.yAxis %}
+        <line x1="0" y1="{{ y.y }}" x2="{{ chart.width }}" y2="{{ y.y }}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"></line>
+        <text x="0" y="{{ y.y - 4 }}" font-size="10" fill="var(--muted)">{{ y.label }}</text>
+      {% endfor %}
+
+      <polyline points="{{ chart.polyline }}" fill="none" stroke="var(--teal)" stroke-width="2"></polyline>
+
+      {% for point in chart.points %}
+        <circle cx="{{ point.x }}" cy="{{ point.y }}" r="2.5" fill="var(--teal)">
+          <title>{{ point.date|date('d M Y') }}: {{ point.count }} opted in</title>
+        </circle>
+      {% endfor %}
+
+      {% for tick in chart.xAxis %}
+        <text x="{{ tick.x }}" y="{{ chart.height }}" font-size="10" fill="var(--muted)" text-anchor="middle">{{ tick.label }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+  <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
+    One dot per day, based on who's currently opted in — this shows when today's opted-in members joined, not a day-by-day history of opt-in status.
+  </p>
+</div>
+{% endblock %}

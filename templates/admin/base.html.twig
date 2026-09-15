@@ -399,6 +399,12 @@
     </a>
     <ul class="admin-nav">
       <li>
+        <a href="{{ path('app_admin_dashboard') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_dashboard' ? ' is-active' : '' }}">
+          <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
+      </li>
+      <li>
         <a href="{{ path('app_admin_users') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_user' ? ' is-active' : '' }}">
           <i class="bi bi-person-badge"></i> Members
