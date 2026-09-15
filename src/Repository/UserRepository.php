@@ -50,6 +50,18 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         );
     }
 
+    /** Same idea as findOptedInCreatedDates(), but every non-archived contact regardless of opt-in/email — the dashboard's "total members" line. */
+    public function findAllCreatedDates(): array
+    {
+        return array_map(
+            static fn(User $u) => $u->getCreatedAt(),
+            $this->createQueryBuilder('u')
+                ->where('u.deletedAt IS NULL')
+                ->getQuery()
+                ->getResult(),
+        );
+    }
+
     public function upgradePassword(PasswordAuthenticatedUserInterface $user, string $newHashedPassword): void
     {
         if (!$user instanceof User) {

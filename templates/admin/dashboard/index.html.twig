@@ -8,7 +8,7 @@
 
 <div class="card">
   <div class="card__label" style="margin-bottom:0.25rem;">Opted-in members</div>
-  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
     <span style="font-size:2rem;font-weight:700;color:var(--black);">{{ totalOptedIn }}</span>
     {% set change = totalOptedIn - sixWeeksAgoCount %}
     {% if change != 0 %}
@@ -18,6 +18,16 @@
     {% else %}
       <span style="font-size:0.9rem;color:var(--muted);">No change in the last 6 weeks</span>
     {% endif %}
+    <span style="font-size:0.85rem;color:var(--muted);">out of {{ totalMembers }} total members</span>
+  </div>
+
+  <div style="display:flex;gap:1.25rem;margin-bottom:0.75rem;">
+    {% for series in chart.series %}
+      <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--muted);">
+        <span style="width:10px;height:10px;border-radius:50%;background:{{ series.color }};display:inline-block;"></span>
+        {{ series.label }}
+      </span>
+    {% endfor %}
   </div>
 
   <div class="table-scroll">
@@ -27,12 +37,16 @@
         <text x="0" y="{{ y.y - 4 }}" font-size="10" fill="var(--muted)">{{ y.label }}</text>
       {% endfor %}
 
-      <polyline points="{{ chart.polyline }}" fill="none" stroke="var(--teal)" stroke-width="2"></polyline>
+      {% for series in chart.series %}
+        <polyline points="{{ series.polyline }}" fill="none" stroke="{{ series.color }}" stroke-width="2"></polyline>
+      {% endfor %}
 
-      {% for point in chart.points %}
-        <circle cx="{{ point.x }}" cy="{{ point.y }}" r="2.5" fill="var(--teal)">
-          <title>{{ point.date|date('d M Y') }}: {{ point.count }} opted in</title>
-        </circle>
+      {% for series in chart.series %}
+        {% for point in series.points %}
+          <circle cx="{{ point.x }}" cy="{{ point.y }}" r="2.5" fill="{{ series.color }}">
+            <title>{{ point.date|date('d M Y') }}: {{ point.count }} {{ series.label }}</title>
+          </circle>
+        {% endfor %}
       {% endfor %}
 
       {% for tick in chart.xAxis %}
@@ -40,8 +54,5 @@
       {% endfor %}
     </svg>
   </div>
-  <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">
-    One dot per day, based on who's currently opted in — this shows when today's opted-in members joined, not a day-by-day history of opt-in status.
-  </p>
 </div>
 {% endblock %}

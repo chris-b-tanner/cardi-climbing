@@ -27,8 +27,30 @@ class AdminDashboardController extends AbstractController
     #[Route('', name: 'app_admin_dashboard')]
     public function index(UserRepository $userRepository): Response
     {
-        $joinDates = $userRepository->findOptedInCreatedDates();
+        $optedInDaily = $this->dailyCounts($userRepository->findOptedInCreatedDates());
+        $allDaily     = $this->dailyCounts($userRepository->findAllCreatedDates());
 
+        return $this->render('admin/dashboard/index.html.twig', [
+            'chart'            => $this->buildChart([
+                'total'    => ['daily' => $allDaily, 'color' => '#d1d5db', 'label' => 'total members'],
+                'optedIn'  => ['daily' => $optedInDaily, 'color' => 'var(--teal)', 'label' => 'opted in'],
+            ]),
+            'totalOptedIn'     => $optedInDaily[self::DAYS - 1]['count'],
+            'sixWeeksAgoCount' => $optedInDaily[0]['count'],
+            'totalMembers'     => $allDaily[self::DAYS - 1]['count'],
+        ]);
+    }
+
+    /**
+     * Cumulative count of {createdDates} still relevant as of each of the last DAYS days — i.e.
+     * "how many of these people had already joined by this point," not a historical status
+     * reconstruction (see the two callers: one already-filtered to currently opted-in, one not).
+     *
+     * @param \DateTimeImmutable[] $createdDates
+     * @return array<int, array{date: \DateTimeImmutable, count: int}>
+     */
+    private function dailyCounts(array $createdDates): array
+    {
         $today = new \DateTimeImmutable('today');
         $daily = [];
 
@@ -37,8 +59,8 @@ class AdminDashboardController extends AbstractController
             $endOfDay = $day->setTime(23, 59, 59);
 
             $count = 0;
-            foreach ($joinDates as $joinedAt) {
-                if ($joinedAt <= $endOfDay) {
+            foreach ($createdDates as $createdAt) {
+                if ($createdAt <= $endOfDay) {
                     $count++;
                 }
             }
@@ -46,57 +68,71 @@ class AdminDashboardController extends AbstractController
             $daily[] = ['date' => $day, 'count' => $count];
         }
 
-        return $this->render('admin/dashboard/index.html.twig', [
-            'chart'        => $this->buildChart($daily),
-            'totalOptedIn' => count($joinDates),
-            'sixWeeksAgoCount' => $daily[0]['count'],
-        ]);
+        return $daily;
     }
 
     /**
-     * @param array<int, array{date: \DateTimeImmutable, count: int}> $daily
-     * @return array{width: int, height: int, polyline: string, points: array, yAxis: array, xAxis: array}
+     * @param array<string, array{daily: array<int, array{date: \DateTimeImmutable, count: int}>, color: string, label: string}> $seriesInput
+     * @return array{width: int, height: int, series: array, xAxis: array, yAxis: array}
      */
-    private function buildChart(array $daily): array
+    private function buildChart(array $seriesInput): array
     {
-        $counts   = array_column($daily, 'count');
-        $minCount = min($counts);
-        $maxCount = max($counts);
-        $range    = max($maxCount - $minCount, 1); // avoid division by zero on a flat line
+        // Both series cover the same 42-day window, so any one of them gives the shared x-axis
+        // dates/point count — they don't need to be looked up per series.
+        $reference = reset($seriesInput)['daily'];
+        $lastIndex = count($reference) - 1;
+
+        // Shared y-scale across every series — the two lines need to sit on one set of axes to
+        // be visually comparable, not each normalised to its own range.
+        // array_values() first: $seriesInput's string keys ('total', 'optedIn') would otherwise
+        // be spread as named arguments into array_merge()'s variadic parameter, which fatals.
+        $allCounts = array_merge(...array_values(array_map(
+            static fn(array $s) => array_column($s['daily'], 'count'),
+            $seriesInput,
+        )));
+        $minCount = min($allCounts);
+        $maxCount = max($allCounts);
+        $range    = max($maxCount - $minCount, 1); // avoid division by zero if every series is flat
 
         $innerWidth  = self::CHART_WIDTH - self::PAD_LEFT - self::PAD_RIGHT;
         $innerHeight = self::CHART_HEIGHT - self::PAD_TOP - self::PAD_BOTTOM;
-        $lastIndex   = count($daily) - 1;
 
         $xFor = static fn(int $i) => self::PAD_LEFT + ($lastIndex > 0 ? ($i / $lastIndex) * $innerWidth : 0);
         $yFor = static fn(int $count) => self::PAD_TOP + $innerHeight - (($count - $minCount) / $range) * $innerHeight;
 
-        $points = [];
-        foreach ($daily as $i => $row) {
-            $points[] = [
-                'x'     => round($xFor($i), 1),
-                'y'     => round($yFor($row['count']), 1),
-                'date'  => $row['date'],
-                'count' => $row['count'],
+        $series = [];
+        foreach ($seriesInput as $key => $s) {
+            $points = [];
+            foreach ($s['daily'] as $i => $row) {
+                $points[] = [
+                    'x'     => round($xFor($i), 1),
+                    'y'     => round($yFor($row['count']), 1),
+                    'date'  => $row['date'],
+                    'count' => $row['count'],
+                ];
+            }
+
+            $series[$key] = [
+                'color'    => $s['color'],
+                'label'    => $s['label'],
+                'points'   => $points,
+                'polyline' => implode(' ', array_map(static fn(array $p) => "{$p['x']},{$p['y']}", $points)),
             ];
         }
-
-        $polyline = implode(' ', array_map(static fn(array $p) => "{$p['x']},{$p['y']}", $points));
 
         // One label per week (the day itself, plus every 7th going back) so 42 daily dots don't
         // turn into 42 overlapping x-axis labels.
         $xAxis = [];
         for ($i = $lastIndex; $i >= 0; $i -= 7) {
-            $xAxis[] = ['x' => $points[$i]['x'], 'label' => $daily[$i]['date']->format('d M')];
+            $xAxis[] = ['x' => round($xFor($i), 1), 'label' => $reference[$i]['date']->format('d M')];
         }
 
         return [
-            'width'    => self::CHART_WIDTH,
-            'height'   => self::CHART_HEIGHT,
-            'polyline' => $polyline,
-            'points'   => $points,
-            'xAxis'    => array_reverse($xAxis),
-            'yAxis'    => [
+            'width'  => self::CHART_WIDTH,
+            'height' => self::CHART_HEIGHT,
+            'series' => $series,
+            'xAxis'  => array_reverse($xAxis),
+            'yAxis'  => [
                 ['y' => round($yFor($minCount), 1), 'label' => (string) $minCount],
                 ['y' => round($yFor($maxCount), 1), 'label' => (string) $maxCount],
             ],
