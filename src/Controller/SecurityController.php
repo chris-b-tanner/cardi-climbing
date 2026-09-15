@@ -12,8 +12,8 @@ class SecurityController extends AbstractController
     #[Route('/login/success', name: 'app_login_success')]
     public function loginSuccess(): Response
     {
-        if ($this->isGranted('ROLE_ADMIN')) {
-            return $this->redirectToRoute('app_admin_users');
+        if ($this->isGranted('ROLE_TEAM')) {
+            return $this->redirectToRoute('app_admin_dashboard');
         }
         return $this->redirectToRoute('app_account');
     }

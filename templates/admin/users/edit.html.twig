@@ -144,7 +144,14 @@
   <div class="card">
     <div class="card__label" style="margin-bottom:0.75rem;">Tags</div>
     {% if allTags is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;">No tags exist yet — <a href="{{ path('app_admin_settings_tag_new') }}">create one</a> to start categorising members.</p>
+      <p style="color:var(--muted);font-size:0.875rem;">
+        No tags exist yet —
+        {% if is_granted('ROLE_ADMIN') %}
+          <a href="{{ path('app_admin_settings_tag_new') }}">create one</a> to start categorising members.
+        {% else %}
+          ask an admin to set one up to start categorising members.
+        {% endif %}
+      </p>
     {% else %}
       <div class="tag-grid">
         {% for tag in allTags %}

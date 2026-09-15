@@ -8,7 +8,7 @@
 
 <div class="filter-form">
   <input type="search" id="search-q" placeholder="Search member or event…"
-         value="{{ currentQuery }}" aria-label="Search bookings" autocomplete="off">
+         value="{{ currentQuery }}" aria-label="Search bookings" autocomplete="off" autofocus>
 </div>
 
 <div id="results">
@@ -21,6 +21,10 @@
   const searchInput = document.getElementById('search-q');
   const results      = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_bookings') }}';
+
+  // `autofocus` alone can leave the cursor at the start when the field is pre-filled
+  // (e.g. returning to this page with a query already applied) — put it at the end instead.
+  searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
   let debounce;
 
   function fetchResults() {

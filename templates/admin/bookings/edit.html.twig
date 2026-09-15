@@ -140,6 +140,7 @@
   {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'attendee', noteableId: attendee.id} %}
 </div>
 
+{% if is_granted('ROLE_ADMIN') %}
 <div class="card" style="margin-top:1.5rem;">
   <div class="card__label" style="margin-bottom:0.6rem;">Danger zone</div>
   {% if attendee.paidAmount != '0.00' %}
@@ -155,6 +156,7 @@
     </form>
   {% endif %}
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

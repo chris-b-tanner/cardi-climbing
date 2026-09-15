@@ -26,4 +26,14 @@ class EmailRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** Admin-flagged reusable starting content, for the "load from template" picker on the compose screens — any status (draft or sent) can be a template, it's just content. */
+    public function findTemplates(): array
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.template = true')
+            ->orderBy('e.subject', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

@@ -54,9 +54,11 @@
   </div>
 </form>
 
+{% if is_granted('ROLE_ADMIN') %}
 <form method="post" action="{{ path('app_admin_news_delete', {id: post.id}) }}"
       onsubmit="return confirm('Delete this news post? This cannot be undone.');" style="margin-top:1rem;">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_news_' ~ post.id) }}">
   <button type="submit" class="btn btn--danger btn--sm">Delete post</button>
 </form>
+{% endif %}
 {% endblock %}

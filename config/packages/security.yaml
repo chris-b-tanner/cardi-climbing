@@ -33,6 +33,6 @@ security:
         ROLE_MEMBER: [ROLE_USER]
 
     access_control:
-        - { path: ^/admin/team, roles: ROLE_ADMIN }
+        - { path: ^/admin/settings/team, roles: ROLE_ADMIN }
         - { path: ^/admin, roles: ROLE_TEAM }
     #   - { path: ^/members, roles: ROLE_MEMBER }

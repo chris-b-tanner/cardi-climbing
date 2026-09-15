@@ -56,6 +56,7 @@ class UserService
         ?\DateTimeImmutable $dateOfBirth = null,
         ?string $phone = null,
         bool $optIn = false,
+        ?string $company = null,
     ): User {
         $user = new User();
         $user->setEmail($email);
@@ -64,6 +65,7 @@ class UserService
         $user->setDateOfBirth($dateOfBirth);
         $user->setPhone($phone ?: null);
         $user->setOptIn($optIn);
+        $user->setCompany($company ?: null);
         // No login for this contact until they set a password via "forgot password" — requires an email on file.
         $user->setPassword($this->hasher->hashPassword($user, bin2hex(random_bytes(32))));
 

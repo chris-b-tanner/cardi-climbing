@@ -36,7 +36,7 @@
             · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ note.completedBy.displayName }}{% endif %}
           {% endif %}
           {% if note.email %}
-            · <a href="{{ path('app_admin_settings_email_edit', {id: note.email.id}) }}" style="color:var(--teal-dk);">View email</a>
+            · <a href="{{ path('app_admin_email_compose_edit', {id: note.email.id}) }}" style="color:var(--teal-dk);">View email</a>
           {% else %}
             · <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}" style="display:inline;">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">

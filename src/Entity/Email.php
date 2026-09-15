@@ -7,17 +7,13 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * A record of an email sent (or being drafted to send) through either admin email tool:
+ * A record of an email sent (or being drafted to send) via AdminEmailController — whatever its
+ * audience (a single member, an event's attendees, a certification's holders, a tag-filtered
+ * group, or the whole opted-in membership), it goes through the same draft → sent lifecycle: a
+ * draft can be edited freely, and only becomes a real send once "Send" is actually clicked.
  *
- * - The general/tag-filtered broadcast drafting tool (AdminEmailController): draft → sent, no
- *   approval step — a draft can be edited freely and is only ever a real send once "Send" is
- *   actually clicked.
- * - The fixed-audience sends (a single member, an event's attendees, a certification's holders —
- *   BulkEmailController::send(), compose-and-send-immediately) skip straight to STATUS_SENT the
- *   moment they're sent — there's no draft phase for those at all.
- *
- * Every send through either tool gets a row here purely as an audit record of who was emailed
- * what and when — see Note::$email for the per-recipient side of that trail.
+ * Every send gets a row here purely as an audit record of who was emailed what and when — see
+ * Note::$email for the per-recipient side of that trail.
  */
 #[ORM\Entity(repositoryClass: EmailRepository::class)]
 class Email
@@ -44,6 +40,10 @@ class Email
 
     #[ORM\Column(options: ['default' => false])]
     private bool $useBlankLayout = false;
+
+    /** Admin-flagged as reusable starting content for the compose screens — subject/body/useBlankLayout only, never the audience (see § Repository/AdminEmailController for how it's offered). */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $template = false;
 
     /** all | tags. */
     #[ORM\Column(length: 20)]
@@ -125,6 +125,17 @@ class Email
         return $this;
     }
 
+    public function isTemplate(): bool
+    {
+        return $this->template;
+    }
+
+    public function setTemplate(bool $template): static
+    {
+        $this->template = $template;
+        return $this;
+    }
+
     public function getAudienceType(): string
     {
         return $this->audienceType;
@@ -179,7 +190,7 @@ class Email
         return $this->status === self::STATUS_SENT;
     }
 
-    /** Draft → sent (AdminEmailController), or the initial/only state for a fixed-audience immediate send (BulkEmailController) — either way, the moment sending actually starts. Call setSentCount() once the send loop finishes. */
+    /** Draft → sent — the moment sending actually starts. Call setSentCount() once the send loop finishes. */
     public function markSent(User $sender): void
     {
         $this->status  = self::STATUS_SENT;

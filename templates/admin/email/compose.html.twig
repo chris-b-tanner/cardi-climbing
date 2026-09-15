@@ -1,73 +1,147 @@
 {% extends 'admin/base.html.twig' %}
-{% block title %}Compose bulk email{% endblock %}
+{% set pageTitle = email.id ? (email.draft ? 'Edit draft' : 'View email') : 'Compose email' %}
+{% if userAudience %}
+  {% set pageTitle = pageTitle ~ ' to ' ~ (userAudience.user.displayName ? userAudience.user.displayName ~ ' / ' ~ userAudience.user.email : userAudience.user.email) %}
+{% endif %}
+{% block title %}{{ pageTitle }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1>Compose email</h1>
+  <h1>{{ pageTitle }}</h1>
   {% if eventAudience %}
     <a href="{{ path('app_admin_event_show', {id: eventAudience.event.id}) }}" class="btn btn--ghost btn--sm">← {{ eventAudience.event.title }}</a>
   {% elseif certificationAudience %}
     <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost btn--sm">← {{ certificationAudience.certification.name }}</a>
   {% elseif userAudience %}
     <a href="{{ path('app_admin_user_show', {id: userAudience.user.id}) }}" class="btn btn--ghost btn--sm">← {{ userAudience.user.displayName ?: userAudience.user.email }}</a>
+  {% elseif email.id %}
+    <a href="{{ path('app_admin_settings_emails') }}" class="btn btn--ghost btn--sm">← Emails</a>
   {% else %}
     <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
   {% endif %}
 </div>
 
+{% if email.id and email.sent %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;font-size:0.85rem;">
+      <span class="status-pill status-pill--published">Sent</span>
+      <span>
+        {{ email.sentCount }} member(s) emailed on {{ email.sentAt|date('d M Y H:i') }}{% if email.sentBy %} by {{ email.sentBy.displayName }}{% endif %}
+      </span>
+    </div>
+  </div>
+{% endif %}
+
 <div class="bulk-wrap">
 
   {# ── Left: compose ───────────────────────────────────────── #}
   <div class="bulk-compose">
-    <form method="post" action="{{ path('app_admin_email_send') }}" id="send-form">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token('bulk_email') }}">
+    <form method="post" action="{{ email.id ? path('app_admin_email_save_existing', {id: email.id}) : path('app_admin_email_save') }}" id="draft-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('email_draft') }}">
+      {% if eventAudience %}
+        <input type="hidden" name="eventId" value="{{ eventAudience.event.id }}">
+        <input type="hidden" name="scope" value="{{ eventAudience.upcomingOnly ? 'series' : 'date' }}">
+        {% if eventAudience.occurrenceDate %}
+          <input type="hidden" name="occurrenceDate" value="{{ eventAudience.occurrenceDate|date('Y-m-d') }}">
+        {% endif %}
+      {% elseif certificationAudience %}
+        <input type="hidden" name="certificationId" value="{{ certificationAudience.certification.id }}">
+      {% elseif userAudience %}
+        <input type="hidden" name="userId" value="{{ userAudience.user.id }}">
+      {% endif %}
 
       <div class="card">
-        <div class="card__label" style="margin-bottom:0.75rem;">Audience</div>
-        {% if eventAudience %}
-          <input type="hidden" name="eventId" value="{{ eventAudience.event.id }}">
-          <input type="hidden" name="scope" value="{{ eventAudience.upcomingOnly ? 'series' : 'date' }}">
-          {% if eventAudience.occurrenceDate %}
-            <input type="hidden" name="occurrenceDate" value="{{ eventAudience.occurrenceDate|date('Y-m-d') }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+          {% if email.draft %}
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="template-picker">Load from template</label>
+              <select id="template-picker" class="form-control">
+                <option value="">— none —</option>
+                {% for t in templates %}
+                  <option value="{{ t.id }}">{{ t.subject }}</option>
+                {% endfor %}
+              </select>
+            </div>
           {% endif %}
-          <p style="font-size:0.9rem;">
-            Attendees of <strong>{{ eventAudience.event.title }}</strong>{% if eventAudience.upcomingOnly %} — all remaining dates in the series{% elseif eventAudience.occurrenceDate %} — {{ eventAudience.occurrenceDate|date('d M Y') }}{% endif %}
-          </p>
-          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
-            {{ eventAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about an event they're booked onto.
-          </p>
-        {% elseif certificationAudience %}
-          <input type="hidden" name="certificationId" value="{{ certificationAudience.certification.id }}">
-          <p style="font-size:0.9rem;">
-            Holders of <strong>{{ certificationAudience.certification.name }}</strong> certification.
-          </p>
-          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
-            {{ certificationAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about a certification they hold.
-          </p>
-        {% elseif userAudience %}
-          <input type="hidden" name="userId" value="{{ userAudience.user.id }}">
-          <p style="font-size:0.9rem;">
-            <strong>{{ userAudience.user.displayName ?: userAudience.user.email }}</strong>{% if userAudience.user.displayName %} ({{ userAudience.user.email }}){% endif %} only.
-          </p>
-          <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
-            Sent regardless of newsletter opt-in, since it's addressed to this member directly.
-          </p>
-        {% elseif is_granted('ROLE_ADMIN') %}
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            <label class="audience-option">
-              <input type="radio" name="audience" value="all" id="aud-all" checked>
-              <span>All opted-in members <span class="audience-count" id="count-all">({{ totalOptedIn }})</span></span>
-            </label>
-            {% if tags is not empty %}
-              <label class="audience-option">
-                <input type="radio" name="audience" value="tags" id="aud-tags">
-                <span>Filter by tag</span>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Layout</label>
+            <div style="display:flex;gap:1.25rem;margin-top:0.4rem;">
+              <label style="display:flex;align-items:center;gap:0.4rem;font-weight:400;text-transform:none;font-size:0.875rem;color:var(--black);cursor:pointer;">
+                <input type="radio" name="useBlankLayout" value="0" id="layout-branded"
+                       {% if not email.useBlankLayout %}checked{% endif %} {% if not email.draft %}disabled{% endif %}
+                       style="accent-color:var(--teal);">
+                Branded
               </label>
-              <div id="tag-panel" style="display:none;padding:0.5rem 0 0 1.6rem;">
+              <label style="display:flex;align-items:center;gap:0.4rem;font-weight:400;text-transform:none;font-size:0.875rem;color:var(--black);cursor:pointer;">
+                <input type="radio" name="useBlankLayout" value="1" id="layout-plain"
+                       {% if email.useBlankLayout %}checked{% endif %} {% if not email.draft %}disabled{% endif %}
+                       style="accent-color:var(--teal);">
+                Plain
+              </label>
+            </div>
+          </div>
+        </div>
+        {% if email.draft %}
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.6rem;margin-bottom:0;">Loading a template replaces the subject and message below with its content.</p>
+        {% endif %}
+      </div>
+
+      {% if not userAudience %}
+        <div class="card">
+          <div class="card__label" style="margin-bottom:0.75rem;">Audience</div>
+          {% if email.draft %}
+            {% if eventAudience %}
+              <p style="font-size:0.9rem;">
+                Attendees of <strong>{{ eventAudience.event.title }}</strong>{% if eventAudience.upcomingOnly %} — all remaining dates in the series{% elseif eventAudience.occurrenceDate %} — {{ eventAudience.occurrenceDate|date('d M Y') }}{% endif %}
+              </p>
+              <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
+                {{ eventAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about an event they're booked onto.
+              </p>
+            {% elseif certificationAudience %}
+              <p style="font-size:0.9rem;">
+                Holders of <strong>{{ certificationAudience.certification.name }}</strong> certification.
+              </p>
+              <p style="font-size:0.8rem;color:var(--muted);margin-top:0.35rem;">
+                {{ certificationAudience.recipients|length }} recipient(s). Sent regardless of newsletter opt-in, since it's about a certification they hold.
+              </p>
+            {% elseif is_granted('ROLE_ADMIN') %}
+              <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <label class="audience-option">
+                  <input type="radio" name="audienceType" value="all" id="aud-all"{% if email.audienceType != 'tags' %} checked{% endif %}>
+                  <span>All opted-in members <span class="audience-count" id="count-all">({{ totalOptedIn }})</span></span>
+                </label>
+                {% if tags is not empty %}
+                  <label class="audience-option">
+                    <input type="radio" name="audienceType" value="tags" id="aud-tags"{% if email.audienceType == 'tags' %} checked{% endif %}>
+                    <span>Filter by tag</span>
+                  </label>
+                  <div id="tag-panel" style="{{ email.audienceType == 'tags' ? '' : 'display:none;' }}padding:0.5rem 0 0 1.6rem;">
+                    <div class="tag-grid" style="margin-bottom:0.5rem;">
+                      {% for tag in tags %}
+                        <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
+                               value="{{ tag.id }}" class="tag-check bulk-tag"
+                               {% if tag.id in email.tagIds %}checked{% endif %}
+                               {% if email.audienceType != 'tags' %}disabled{% endif %}>
+                        <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
+                      {% endfor %}
+                    </div>
+                    <div style="font-size:0.8rem;color:var(--muted);">
+                      Recipients: <strong id="tag-count">0</strong> opted-in member(s)
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            {% elseif tags is not empty %}
+              {# Non-admin team member: no "all opted-in" option — tags are the only general-purpose audience available. #}
+              <p style="font-size:0.85rem;color:var(--muted);margin:0 0 0.6rem;">
+                Only an admin can email the whole membership — choose one or more tags to define your audience.
+              </p>
+              <div id="tag-panel">
                 <div class="tag-grid" style="margin-bottom:0.5rem;">
                   {% for tag in tags %}
                     <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
-                           value="{{ tag.id }}" class="tag-check bulk-tag">
+                           value="{{ tag.id }}" class="tag-check bulk-tag"
+                           {% if tag.id in email.tagIds %}checked{% endif %}>
                     <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
                   {% endfor %}
                 </div>
@@ -75,66 +149,79 @@
                   Recipients: <strong id="tag-count">0</strong> opted-in member(s)
                 </div>
               </div>
+            {% else %}
+              <p style="font-size:0.85rem;color:var(--muted);">
+                No tags are set up, so there's no limited audience available here. Ask an admin to send to the general membership, or send from a specific member, event, or certification page instead.
+              </p>
             {% endif %}
-          </div>
-        {% elseif tags is not empty %}
-          {# Non-admin team member: no "all opted-in" option — tags are the only general-purpose audience available. #}
-          <p style="font-size:0.85rem;color:var(--muted);margin:0 0 0.6rem;">
-            Only an admin can email the whole membership — choose one or more tags to define your audience.
-          </p>
-          <div id="tag-panel">
-            <div class="tag-grid" style="margin-bottom:0.5rem;">
-              {% for tag in tags %}
-                <input type="checkbox" id="btag_{{ tag.id }}" name="tagIds[]"
-                       value="{{ tag.id }}" class="tag-check bulk-tag">
-                <label for="btag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
-              {% endfor %}
-            </div>
-            <div style="font-size:0.8rem;color:var(--muted);">
-              Recipients: <strong id="tag-count">0</strong> opted-in member(s)
-            </div>
-          </div>
-        {% else %}
-          <p style="font-size:0.85rem;color:var(--muted);">
-            No tags are set up, so there's no limited audience available here. Ask an admin to send to the general membership, or send from a specific member, event, or certification page instead.
-          </p>
-        {% endif %}
-      </div>
+          {% else %}
+            <p style="font-size:0.9rem;margin:0;">{{ email.audienceLabel }}</p>
+          {% endif %}
+        </div>
+      {% endif %}
 
       <div class="card">
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
-            <input type="checkbox" name="useBlankLayout" id="useBlankLayout" value="1"
-                   style="width:1rem;height:1rem;accent-color:var(--teal);">
-            Use blank (personal) layout instead of the Y Wal template
-          </label>
-        </div>
         <div class="form-group">
           <label for="subject">Subject</label>
           <input type="text" id="subject" name="subject" class="form-control"
-                 placeholder="Email subject…" required autocomplete="off">
+                 value="{{ email.subject }}" placeholder="Email subject…" required autocomplete="off"
+                 {% if not email.draft %}disabled{% endif %}>
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label for="body">Message</label>
           <textarea id="body" name="body" class="form-control" rows="16"
                     placeholder="Write your message here… HTML is allowed, e.g. &lt;img src=&quot;https://…&quot;&gt; to embed an image." required
-                    style="resize:vertical;font-family:inherit;line-height:1.7;"></textarea>
-          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
-            HTML is supported — each line becomes its own paragraph. To embed an image already hosted online, put its tag on its own line, e.g. <code>&lt;img src="https://example.com/photo.jpg" style="max-width:100%"&gt;</code>.
-          </div>
+                    style="resize:vertical;font-family:inherit;line-height:1.7;"
+                    {% if not email.draft %}disabled{% endif %}>{{ email.body }}</textarea>
+          {% if email.draft %}
+            <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
+              HTML is supported — each line becomes its own paragraph. To embed an image already hosted online, put its tag on its own line, e.g. <code>&lt;img src="https://example.com/photo.jpg" style="max-width:100%"&gt;</code>.
+            </div>
+          {% endif %}
         </div>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn--teal" id="send-btn">Send email</button>
-        <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% elseif certificationAudience %}{{ certificationAudience.recipients|length }} recipient(s){% elseif userAudience %}{{ userAudience.recipients|length }} recipient(s){% endif %}</span>
-      </div>
+      {% if email.draft %}
+        <div class="form-actions">
+          <button type="submit" class="btn btn--teal" id="save-btn">Save</button>
+          <span id="send-label" style="font-size:0.8rem;color:var(--muted);">{% if eventAudience %}{{ eventAudience.recipients|length }} recipient(s){% elseif certificationAudience %}{{ certificationAudience.recipients|length }} recipient(s){% elseif userAudience %}{{ userAudience.recipients|length }} recipient(s){% endif %}</span>
+        </div>
+      {% endif %}
     </form>
+
+    {% if email.draft and email.id %}
+      <form method="post" action="{{ path('app_admin_email_send', {id: email.id}) }}" id="send-form" style="margin-top:0.75rem;"
+            onsubmit="return confirm('Send &quot;' + {{ email.subject|json_encode|raw }} + '&quot; to ' + {{ (email.audienceLabel ?: 'this audience')|json_encode|raw }} + '? This cannot be undone.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('send_email_' ~ email.id) }}">
+        <button type="submit" class="btn btn--ghost" id="send-btn">Send</button>
+      </form>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;" id="send-hint">Save any further changes before sending — sending uses whatever was last saved.</p>
+    {% elseif not email.id %}
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;">Save this as a draft first — you'll be able to send it once it's saved.</p>
+    {% endif %}
+
+    {% if email.id and is_granted('ROLE_ADMIN') %}
+      <form method="post" action="{{ path('app_admin_settings_email_toggle_template', {id: email.id}) }}" id="template-toggle-form" style="margin-top:1rem;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_template_' ~ email.id) }}">
+        <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.85rem;color:var(--black);cursor:pointer;">
+          <input type="checkbox" id="template-toggle-checkbox" style="width:1rem;height:1rem;accent-color:var(--teal);"
+                 {% if email.template %}checked{% endif %} onchange="document.getElementById('template-toggle-form').submit();">
+          Available as a template on the compose screen
+        </label>
+      </form>
+    {% endif %}
+
+    {% if email.draft and email.id and is_granted('ROLE_ADMIN') %}
+      <form method="post" action="{{ path('app_admin_settings_email_delete', {id: email.id}) }}" id="delete-form" style="margin-top:1rem;"
+            onsubmit="return window.prompt('Type DELETE to remove this draft:') === 'DELETE';">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_email_' ~ email.id) }}">
+        <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete draft</button>
+      </form>
+    {% endif %}
   </div>
 
   {# ── Right: preview ──────────────────────────────────────── #}
   <div class="bulk-preview">
-    <div class="bulk-preview__label">Preview</div>
     <iframe id="preview-frame" class="bulk-preview__frame" srcdoc="<p style='padding:2rem;color:#aaa;font-family:sans-serif;'>Start typing to see a preview…</p>"></iframe>
   </div>
 
@@ -154,10 +241,6 @@
   .bulk-compose { min-width: 0; }
 
   .bulk-preview { position: sticky; top: 4rem; }
-  .bulk-preview__label {
-    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem;
-  }
   .bulk-preview__frame {
     width: 100%; height: calc(100vh - 8rem); border: 1px solid var(--border);
     border-radius: var(--radius); background: #fff;
@@ -173,25 +256,33 @@
 <script>
   const subjectEl  = document.getElementById('subject');
   const bodyEl     = document.getElementById('body');
-  const blankLayoutEl = document.getElementById('useBlankLayout');
+  const layoutRadios = document.querySelectorAll('input[name="useBlankLayout"]');
   const frame      = document.getElementById('preview-frame');
   const audAll     = document.getElementById('aud-all');
   const audTags    = document.getElementById('aud-tags');
   const tagPanel   = document.getElementById('tag-panel');
   const tagCount   = document.getElementById('tag-count');
   const sendLabel  = document.getElementById('send-label');
+  const sendBtn    = document.getElementById('send-btn');
+  const draftForm  = document.getElementById('draft-form');
   const bulkTags   = document.querySelectorAll('.bulk-tag');
   const previewUrl = '{{ path('app_admin_email_preview') }}';
   const countUrl   = '{{ path('app_admin_email_count') }}';
+  const isDraft    = {{ email.draft ? 'true' : 'false' }};
 
   let previewDebounce, countDebounce;
+
+  function isBlankLayout() {
+    const checked = document.querySelector('input[name="useBlankLayout"]:checked');
+    return checked ? checked.value === '1' : false;
+  }
 
   // ── Preview ────────────────────────────────────────────────
   function refreshPreview() {
     const body = new FormData();
     body.append('subject', subjectEl.value || '(No subject)');
     body.append('body',    bodyEl.value    || '');
-    body.append('useBlankLayout', blankLayoutEl.checked ? '1' : '0');
+    body.append('useBlankLayout', isBlankLayout() ? '1' : '0');
     {% if userAudience %}body.append('userId', '{{ userAudience.user.id }}');{% endif %}
 
     fetch(previewUrl, { method: 'POST', body })
@@ -206,10 +297,20 @@
 
   subjectEl.addEventListener('input', schedulePreview);
   bodyEl.addEventListener('input',    schedulePreview);
-  blankLayoutEl.addEventListener('change', refreshPreview);
+  layoutRadios.forEach(r => r.addEventListener('change', refreshPreview));
+
+  // ── Only a saved draft can be sent — disable Send the instant anything changes, since
+  // sending always uses whatever was last actually saved. ─────────────────────────────
+  if (isDraft && sendBtn && draftForm) {
+    const disableSend = () => { sendBtn.disabled = true; };
+    draftForm.addEventListener('input', disableSend);
+    draftForm.addEventListener('change', disableSend);
+  }
 
   // ── Audience / recipient count ─────────────────────────────
-  {% if eventAudience or certificationAudience or userAudience %}
+  {% if not email.draft %}
+  // Read-only view — nothing to wire up.
+  {% elseif eventAudience or certificationAudience or userAudience %}
   // Fixed audience (event attendees / certification holders / single member) — recipient count is already rendered server-side.
   {% else %}
   function getSelectedTagIds() {
@@ -251,7 +352,7 @@
       refreshCount();
     });
 
-    bulkTags.forEach(c => { c.disabled = true; }); // disabled until tag mode selected
+    bulkTags.forEach(c => { c.disabled = !(audTags && audTags.checked); });
   }
 
   // Wired unconditionally: for an admin toggling into "Filter by tag" mode, and for a non-admin
@@ -264,19 +365,37 @@
   });
 
   updateSendLabel({{ is_granted('ROLE_ADMIN') ? totalOptedIn : 0 }});
+  refreshCount();
   {% endif %}
 
-  {% if not is_granted('ROLE_ADMIN') and tags is empty and not eventAudience and not certificationAudience and not userAudience %}
-  document.getElementById('send-btn').disabled = true;
-  document.getElementById('send-btn').title = 'No audience available — ask an admin, or send from a member/event/certification page.';
-  {% endif %}
+  // ── Load from template ──────────────────────────────────────
+  const templatePicker = document.getElementById('template-picker');
+  if (templatePicker) {
+    const templateContentUrlPattern = '{{ path('app_admin_email_template_content', {id: 0}) }}';
 
-  // ── Send confirmation ──────────────────────────────────────
-  document.getElementById('send-form').addEventListener('submit', function(e) {
-    const n = sendLabel.textContent;
-    if (!confirm('Send this email to ' + n + '? This cannot be undone.')) {
-      e.preventDefault();
-    }
-  });
+    templatePicker.addEventListener('change', () => {
+      const id = templatePicker.value;
+      if (!id) return;
+
+      const hasContent = subjectEl.value.trim() !== '' || bodyEl.value.trim() !== '';
+      if (hasContent && !confirm('This will overwrite the subject and message currently entered. Continue?')) {
+        templatePicker.value = '';
+        return;
+      }
+
+      fetch(templateContentUrlPattern.replace('0', id))
+        .then(r => r.json())
+        .then(data => {
+          subjectEl.value = data.subject;
+          bodyEl.value = data.body;
+          document.querySelector('input[name="useBlankLayout"][value="' + (data.useBlankLayout ? '1' : '0') + '"]').checked = true;
+          templatePicker.value = '';
+          if (sendBtn) sendBtn.disabled = true;
+          schedulePreview();
+        });
+    });
+  }
+
+  refreshPreview();
 </script>
 {% endblock %}

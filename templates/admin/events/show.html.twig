@@ -81,7 +81,11 @@
 {% if event.acceptsTicket and eventTicketProducts is empty %}
   <div class="flash flash--error">
     This event accepts "Ticket" as an access method, but no ticket product is linked to it yet —
-    <a href="{{ path('app_admin_settings_products') }}">create one</a> so members can actually buy a seat.
+    {% if is_granted('ROLE_ADMIN') %}
+      <a href="{{ path('app_admin_settings_products') }}">create one</a> so members can actually buy a seat.
+    {% else %}
+      ask an admin to set one up so members can actually buy a seat.
+    {% endif %}
   </div>
 {% endif %}
 

@@ -164,6 +164,7 @@ class AdminController extends AbstractController
                     dateOfBirth: $dob,
                     phone: trim($request->request->get('phone', '')),
                     optIn: $request->request->has('optIn'),
+                    company: trim($request->request->get('company', '')),
                 );
 
                 $this->addFlash('success', 'Member created.');
@@ -174,6 +175,28 @@ class AdminController extends AbstractController
         return $this->render('admin/users/new.html.twig', [
             'error' => $error,
         ]);
+    }
+
+    /** Live duplicate check for the "new member" form — fired on blur of each identifying field, sending the whole current form snapshot each time. */
+    #[Route('/users/check-duplicate', name: 'app_admin_user_check_duplicate', methods: ['POST'])]
+    public function checkDuplicate(Request $request, UserRepository $userRepository): JsonResponse
+    {
+        $candidates = $userRepository->findDuplicateCandidates(
+            firstName: trim($request->request->get('firstName', '')),
+            lastName: trim($request->request->get('lastName', '')),
+            email: trim($request->request->get('email', '')),
+            phone: trim($request->request->get('phone', '')),
+            company: trim($request->request->get('company', '')),
+        );
+
+        return new JsonResponse(array_map(fn(User $u) => [
+            'id'          => $u->getId(),
+            'displayName' => $u->getDisplayName() ?: '(no name)',
+            'email'       => $u->getEmail(),
+            'phone'       => $u->getPhone(),
+            'company'     => $u->getCompany(),
+            'url'         => $this->generateUrl('app_admin_user_show', ['id' => $u->getId()]),
+        ], $candidates));
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]

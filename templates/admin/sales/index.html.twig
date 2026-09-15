@@ -9,7 +9,7 @@
 
 <div class="filter-form" style="align-items:center;">
   <input type="search" id="search-q" placeholder="Search member…"
-         value="{{ currentQuery }}" aria-label="Search sales" autocomplete="off" style="flex:0 1 220px;">
+         value="{{ currentQuery }}" aria-label="Search sales" autocomplete="off" style="flex:0 1 220px;" autofocus>
   <div class="pos-tabs" id="status-filters" style="margin-bottom:0;">
     <button type="button" class="pos-tab{{ currentStatus == '' ? ' is-active' : '' }}" data-status="">All</button>
     <button type="button" class="pos-tab{{ currentStatus == 'draft' ? ' is-active' : '' }}" data-status="draft">Draft</button>
@@ -29,6 +29,10 @@
   const statusTabs   = document.querySelectorAll('#status-filters .pos-tab');
   const results      = document.getElementById('results');
   const endpoint      = '{{ path('app_admin_sales') }}';
+
+  // `autofocus` alone can leave the cursor at the start when the field is pre-filled
+  // (e.g. returning to this page with a query already applied) — put it at the end instead.
+  searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
   let currentStatus  = '{{ currentStatus }}';
   let debounce;
 

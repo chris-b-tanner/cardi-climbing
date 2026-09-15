@@ -430,6 +430,7 @@ class AdminBookingController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_admin_booking_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function delete(Request $request, Attendee $attendee, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
         $returnTo = $this->resolveReturnTo($request, $attendee);

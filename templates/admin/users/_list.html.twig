@@ -47,6 +47,9 @@
                 <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
                    title="Has dependents"><i class="bi bi-people-fill"></i></a>
               {% endif %}
+              {% if user.company %}
+                <div class="admin-table__muted" style="font-size:0.78rem;">{{ user.company }}</div>
+              {% endif %}
             </td>
             <td class="admin-table__muted">{{ user.email ?: '—' }}</td>
             <td class="admin-table__muted">{{ user.phone ? (user.phone|uk_phone) : '—' }}</td>

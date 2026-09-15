@@ -2,7 +2,6 @@
 
 namespace App\Repository;
 
-use App\Entity\Note;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -83,11 +82,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->addSelect('p');
 
         if ($query !== '') {
-            // Notes have no Doctrine association to User (polymorphic noteableType/noteableId), so
-            // matching note content is a subquery rather than a join.
-            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.memo LIKE :q OR u.id IN (SELECT n.noteableId FROM ' . Note::class . ' n WHERE n.noteableType = :noteableType AND n.content LIKE :q)')
+            // Deliberately not matching note content — too noisy, brings back too many unrelated
+            // results (a note mentioning someone in passing shouldn't surface them here).
+            $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.company LIKE :q OR u.memo LIKE :q')
                ->setParameter('q', '%' . $query . '%')
-               ->setParameter('noteableType', Note::TYPE_MEMBER)
                ->distinct();
         }
 
@@ -245,6 +243,55 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->setParameter('fn', $firstName)
             ->setParameter('ln', $lastName)
             ->setParameter('id', $excludeId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Live duplicate check for the "new member" form — as each field is filled in, the whole
+     * current snapshot is sent back here so matches stay accurate (e.g. a first-name-only match
+     * is far noisier than a first+last combination once both are filled in). Only fields actually
+     * filled in contribute a condition; an empty set of conditions means nothing to check yet.
+     */
+    public function findDuplicateCandidates(string $firstName, string $lastName, string $email, string $phone, string $company, int $limit = 8): array
+    {
+        $qb         = $this->createQueryBuilder('u');
+        $conditions = [];
+
+        if ($firstName !== '' && $lastName !== '') {
+            $conditions[] = "LOWER(CONCAT(u.firstName, ' ', u.lastName)) = LOWER(:fullName)";
+            $qb->setParameter('fullName', $firstName . ' ' . $lastName);
+        } elseif ($firstName !== '') {
+            $conditions[] = 'LOWER(u.firstName) = LOWER(:firstName)';
+            $qb->setParameter('firstName', $firstName);
+        } elseif ($lastName !== '') {
+            $conditions[] = 'LOWER(u.lastName) = LOWER(:lastName)';
+            $qb->setParameter('lastName', $lastName);
+        }
+
+        if ($email !== '') {
+            $conditions[] = '(LOWER(u.email) = LOWER(:email) OR LOWER(u.email2) = LOWER(:email) OR LOWER(u.email3) = LOWER(:email))';
+            $qb->setParameter('email', $email);
+        }
+
+        if ($phone !== '') {
+            $conditions[] = 'u.phone = :phone';
+            $qb->setParameter('phone', $phone);
+        }
+
+        if ($company !== '') {
+            $conditions[] = 'u.company LIKE :company';
+            $qb->setParameter('company', '%' . $company . '%');
+        }
+
+        if (!$conditions) {
+            return [];
+        }
+
+        return $qb->andWhere(implode(' OR ', $conditions))
+            ->orderBy('u.lastName', 'ASC')
+            ->addOrderBy('u.firstName', 'ASC')
+            ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
     }

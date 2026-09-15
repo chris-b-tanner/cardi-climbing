@@ -16,7 +16,7 @@
 
 <div class="filter-form">
   <input type="search" id="search-q" placeholder="Search name or email…"
-         value="{{ currentQuery }}" aria-label="Search members" autocomplete="off">
+         value="{{ currentQuery }}" aria-label="Search members" autocomplete="off" autofocus>
   <select id="search-tag" aria-label="Filter by tag">
     <option value="">All tags</option>
     {% for tag in tags %}
@@ -68,6 +68,11 @@
   const endpoint    = '{{ path('app_admin_users') }}';
   const mergeUrl    = '{{ path('app_admin_user_merge') }}';
   const printLink   = document.getElementById('print-link');
+
+  // `autofocus` alone can leave the cursor at the start when the field is pre-filled
+  // (e.g. returning to this page with a query already applied) — put it at the end instead.
+  const searchLen = searchInput.value.length;
+  searchInput.setSelectionRange(searchLen, searchLen);
   const csvLink     = document.getElementById('csv-link');
   const printBaseUrl = {{ context != 'new_sale' ? path('app_admin_users_print')|json_encode|raw : 'null' }};
   const csvBaseUrl    = {{ context != 'new_sale' ? path('app_admin_users_export')|json_encode|raw : 'null' }};

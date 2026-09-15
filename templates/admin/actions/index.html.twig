@@ -7,11 +7,11 @@
 </div>
 
 {% set types = [
-  {key: 'member', label: 'Members', icon: 'bi-person-badge'},
-  {key: 'attendee', label: 'Bookings', icon: 'bi-calendar-check'},
-  {key: 'event', label: 'Events', icon: 'bi-calendar3'},
-  {key: 'product', label: 'Products', icon: 'bi-tag'},
-  {key: 'order', label: 'Sales', icon: 'bi-receipt'},
+  {key: 'member', label: 'Members', singular: 'member', icon: 'bi-person-badge'},
+  {key: 'attendee', label: 'Bookings', singular: 'booking', icon: 'bi-calendar-check'},
+  {key: 'event', label: 'Events', singular: 'event', icon: 'bi-calendar3'},
+  {key: 'product', label: 'Products', singular: 'product', icon: 'bi-tag'},
+  {key: 'order', label: 'Sales', singular: 'sale', icon: 'bi-receipt'},
 ] %}
 
 {% if items is empty %}
@@ -50,16 +50,11 @@
               <p class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
                 Pinned: {{ note.pinnedAt|date('d M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}
               </p>
-              <div class="btn-row">
-                <form method="post" action="{{ path('app_admin_note_complete', {id: note.id}) }}">
-                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_complete_' ~ note.id) }}">
-                  <button type="submit" class="btn btn--teal btn--sm">Complete</button>
-                </form>
-                <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}">
-                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">
-                  <button type="submit" class="btn btn--ghost btn--sm">Unpin</button>
-                </form>
-              </div>
+              {% if item.target.url %}
+                <div class="btn-row">
+                  <a href="{{ item.target.url }}" class="btn btn--teal btn--sm">View {{ type.singular }}</a>
+                </div>
+              {% endif %}
             </div>
           {% endfor %}
         </div>

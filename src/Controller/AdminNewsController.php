@@ -124,6 +124,7 @@ class AdminNewsController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_admin_news_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function delete(Request $request, NewsPost $post, EntityManagerInterface $em): Response
     {
         if (!$this->isCsrfTokenValid('delete_news_' . $post->getId(), $request->request->get('_csrf_token'))) {

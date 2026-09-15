@@ -11,53 +11,142 @@
   <div class="flash flash--error">{{ error }}</div>
 {% endif %}
 
-<form method="post" action="{{ path('app_admin_user_new') }}" novalidate>
-  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user_new') }}">
+<div class="new-member-wrap">
+  <div>
+    <form method="post" action="{{ path('app_admin_user_new') }}" novalidate id="new-member-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user_new') }}">
 
-  <div class="card">
-    <div class="detail-grid">
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="firstName">First name</label>
-        <input type="text" id="firstName" name="firstName" class="form-control"
-               autocomplete="off">
+      <div class="card">
+        <div class="form-group">
+          <label for="firstName">First name</label>
+          <input type="text" id="firstName" name="firstName" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last name</label>
+          <input type="text" id="lastName" name="lastName" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="company">Company</label>
+          <input type="text" id="company" name="company" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="dateOfBirth">Date of birth</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" autocomplete="off">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
+            <input type="checkbox" name="optIn" value="1" checked
+                   style="width:1rem;height:1rem;accent-color:var(--teal);">
+            Opted in to mailing list
+          </label>
+        </div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="lastName">Last name</label>
-        <input type="text" id="lastName" name="lastName" class="form-control"
-               autocomplete="off">
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn--teal">Create member</button>
+        <a href="{{ path('app_admin_users') }}" class="btn btn--ghost">Cancel</a>
       </div>
-    </div>
-    <div class="detail-grid" style="margin-top:1rem;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" class="form-control"
-               autocomplete="off">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);margin-top:1.6rem;">
-          <input type="checkbox" name="optIn" value="1" checked
-                 style="width:1rem;height:1rem;accent-color:var(--teal);">
-          Opted in to mailing list
-        </label>
-      </div>
-    </div>
-    <div class="detail-grid" style="margin-top:1rem;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="phone">Phone</label>
-        <input type="tel" id="phone" name="phone" class="form-control"
-               autocomplete="off">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label for="dateOfBirth">Date of birth</label>
-        <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control"
-               autocomplete="off">
-      </div>
-    </div>
+    </form>
   </div>
 
-  <div class="form-actions">
-    <button type="submit" class="btn btn--teal">Create member</button>
-    <a href="{{ path('app_admin_users') }}" class="btn btn--ghost">Cancel</a>
+  <div class="new-member-duplicates">
+    <div class="card">
+      <div class="card__label" style="margin-bottom:0.75rem;">Potential duplicates</div>
+      <p id="dup-empty" style="font-size:0.85rem;color:var(--muted);margin:0;">Fill in a name, email, phone, or company above to check for existing members.</p>
+      <div id="dup-list" style="display:none;flex-direction:column;gap:0.6rem;"></div>
+    </div>
   </div>
-</form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .new-member-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 720px) { .new-member-wrap { grid-template-columns: 1fr; } }
+
+  .new-member-duplicates { position: sticky; top: 4rem; }
+
+  .dup-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.65rem 0.85rem; }
+  .dup-card__name { font-weight: 600; font-size: 0.9rem; }
+  .dup-card__meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+  .dup-card__link { font-size: 0.8rem; display: inline-block; margin-top: 0.35rem; }
+</style>
+<script>
+  const form       = document.getElementById('new-member-form');
+  const dupFields  = form.querySelectorAll('.dup-check');
+  const dupList    = document.getElementById('dup-list');
+  const dupEmpty   = document.getElementById('dup-empty');
+  const checkUrl   = '{{ path('app_admin_user_check_duplicate') }}';
+
+  function currentSnapshot() {
+    return {
+      firstName: document.getElementById('firstName').value.trim(),
+      lastName:  document.getElementById('lastName').value.trim(),
+      email:     document.getElementById('email').value.trim(),
+      phone:     document.getElementById('phone').value.trim(),
+      company:   document.getElementById('company').value.trim(),
+    };
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  function showEmptyState(message) {
+    dupList.style.display = 'none';
+    dupList.innerHTML = '';
+    dupEmpty.style.display = 'block';
+    dupEmpty.textContent = message;
+  }
+
+  function renderDuplicates(candidates) {
+    if (!candidates.length) {
+      showEmptyState('No matching members found.');
+      return;
+    }
+
+    dupEmpty.style.display = 'none';
+    dupList.style.display = 'flex';
+    dupList.innerHTML = candidates.map(c => `
+      <div class="dup-card">
+        <div class="dup-card__name">${escapeHtml(c.displayName)}</div>
+        <div class="dup-card__meta">${[c.email, c.phone, c.company].filter(Boolean).map(escapeHtml).join(' · ') || '—'}</div>
+        <a class="dup-card__link" href="${c.url}" target="_blank" rel="noopener">View member →</a>
+      </div>
+    `).join('');
+  }
+
+  function checkForDuplicates() {
+    const snapshot = currentSnapshot();
+    if (!Object.values(snapshot).some(v => v !== '')) {
+      showEmptyState('Fill in a name, email, phone, or company above to check for existing members.');
+      return;
+    }
+
+    const body = new FormData();
+    Object.entries(snapshot).forEach(([key, value]) => body.append(key, value));
+
+    fetch(checkUrl, { method: 'POST', body })
+      .then(r => r.json())
+      .then(renderDuplicates)
+      .catch(() => {});
+  }
+
+  dupFields.forEach(field => field.addEventListener('blur', checkForDuplicates));
+</script>
 {% endblock %}

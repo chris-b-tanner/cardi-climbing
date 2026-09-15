@@ -22,6 +22,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Last access</th>
             <th></th>
           </tr>
         </thead>
@@ -40,6 +41,9 @@
                 <span class="role-pill{{ memberIsAdmin ? ' role-pill--admin' : ' role-pill--team' }}">
                   {{ memberIsAdmin ? 'Admin' : 'Team' }}
                 </span>
+              </td>
+              <td class="admin-table__muted">
+                {{ member.lastLoginAt ? member.lastLoginAt|date('d M Y H:i') : 'Never' }}
               </td>
               <td>
                 {% if not memberIsAdmin %}
