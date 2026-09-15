@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\Email;
 use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\UserRepository;
@@ -79,13 +80,17 @@ class UserService
     }
 
     /** Records a Note against {$user}. Only call this once $user is guaranteed to already have an id (already flushed, or an existing record). */
-    public function addNote(User $user, string $content, ?User $addedBy = null): void
+    /** @param ?Email $email Set when this note records a bulk email actually sent to {user} — links the note back to the full Email record (subject, body, audience, approval history). */
+    public function addNote(User $user, string $content, ?User $addedBy = null, ?Email $email = null): void
     {
         $note = new Note();
         $note->setNoteable($user);
         $note->setContent($content);
         if ($addedBy !== null) {
             $note->setAddedBy($addedBy);
+        }
+        if ($email !== null) {
+            $note->setEmail($email);
         }
 
         $this->em->persist($note);

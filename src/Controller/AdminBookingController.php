@@ -250,11 +250,12 @@ class AdminBookingController extends AbstractController
             }
 
             if (!$error) {
+                /** @var User $admin */
+                $admin = $this->getUser();
+
                 if ($status === Attendee::STATUS_CANCELLED) {
-                    $bookingService->cancelBooking($attendee);
+                    $bookingService->cancelBooking($attendee, $admin);
                 } else {
-                    /** @var User $admin */
-                    $admin = $this->getUser();
                     $error = $bookingService->reinstateBooking($attendee, $status, $admin);
                 }
 
@@ -324,7 +325,7 @@ class AdminBookingController extends AbstractController
      * attendee back to pending either way, exactly like a brand-new invite from the event page.
      */
     #[Route('/{id}/staffing/restart-invite', name: 'app_admin_booking_staffing_restart_invite', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function restartStaffingInvite(Request $request, Attendee $attendee, EntityManagerInterface $em, BookingMailer $bookingMailer): Response
+    public function restartStaffingInvite(Request $request, Attendee $attendee, EntityManagerInterface $em, BookingMailer $bookingMailer, BookingService $bookingService): Response
     {
         $returnTo = $this->resolveReturnTo($request, $attendee);
 
@@ -338,9 +339,15 @@ class AdminBookingController extends AbstractController
             return $this->redirect($returnTo);
         }
 
+        /** @var User $admin */
+        $admin = $this->getUser();
+        $previousStatus = $attendee->getStatus();
+
         $attendee->setStaffingStatus(Attendee::STAFFING_PENDING);
         $attendee->setStatus(Attendee::STATUS_PENDING);
         $em->flush();
+
+        $bookingService->recordStatusChangeIfNeeded($attendee, $previousStatus, $admin);
 
         $bookingMailer->sendStaffingInvite($attendee);
 
@@ -366,17 +373,18 @@ class AdminBookingController extends AbstractController
             return $this->redirectToEventShow($attendee);
         }
 
+        /** @var User $admin */
+        $admin = $this->getUser();
+
         $attendee->setStaffingStatus($status);
         if ($status === Attendee::STAFFING_APPROVED) {
-            /** @var User $admin */
-            $admin = $this->getUser();
             $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED, $admin);
             if ($error) {
                 $this->addFlash('error', $error);
                 return $this->redirectToEventShow($attendee);
             }
         } elseif ($status === Attendee::STAFFING_DECLINED) {
-            $bookingService->cancelBooking($attendee);
+            $bookingService->cancelBooking($attendee, $admin);
         } else {
             $em->flush();
         }

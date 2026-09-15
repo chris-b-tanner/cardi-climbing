@@ -436,7 +436,7 @@ class EventController extends AbstractController
             return $this->redirect($this->generateUrl('app_account') . '#bookings');
         }
 
-        $bookingService->cancelBooking($attendee);
+        $bookingService->cancelBooking($attendee, $user);
 
         $this->addFlash('success', 'Your booking has been cancelled.');
         return $this->redirect($this->generateUrl('app_account') . '#bookings');

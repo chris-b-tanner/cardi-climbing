@@ -1,0 +1,68 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Emails — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Emails</h1>
+  <a href="{{ path('app_admin_settings_email_new') }}" class="btn btn--teal btn--sm">+ New draft</a>
+</div>
+
+{% if emails is empty %}
+  <div class="empty">
+    <strong>No drafts yet</strong>
+    Start a new draft to compose a broadcast email, then send it when you're ready.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Status</th>
+          <th>Audience</th>
+          <th>Created</th>
+          <th>Sent</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for email in emails %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_email_edit', {id: email.id}) }}" class="admin-table__link">{{ email.subject }}</a>
+            </td>
+            <td>
+              {% if email.sent %}
+                <span class="status-pill status-pill--published">Sent</span>
+              {% else %}
+                <span class="status-pill status-pill--pending">Draft</span>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ email.audienceLabel }}</td>
+            <td class="admin-table__muted">
+              {{ email.createdAt|date('d M Y H:i') }}{% if email.createdBy %} — {{ email.createdBy.displayName }}{% endif %}
+            </td>
+            <td class="admin-table__muted">
+              {% if email.sentAt %}
+                {{ email.sentAt|date('d M Y H:i') }}{% if email.sentBy %} — {{ email.sentBy.displayName }}{% endif %}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if email.draft %}
+                <a href="{{ path('app_admin_settings_email_edit', {id: email.id}) }}" class="admin-table__link">Edit</a>
+                <form method="post" action="{{ path('app_admin_settings_email_send', {id: email.id}) }}" style="display:inline;"
+                      onsubmit="return confirm('Send &quot;' + {{ email.subject|json_encode|raw }} + '&quot; to ' + {{ email.audienceLabel|json_encode|raw }} + '? This cannot be undone.');">
+                  <input type="hidden" name="_csrf_token" value="{{ csrf_token('send_email_' ~ email.id) }}">
+                  <button type="submit" class="admin-table__link" style="background:none;border:none;padding:0;cursor:pointer;margin-left:0.6rem;">Send</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

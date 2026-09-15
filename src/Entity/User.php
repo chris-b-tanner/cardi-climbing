@@ -321,6 +321,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getDateOfBirth(): ?\DateTimeImmutable { return $this->dateOfBirth; }
     public function setDateOfBirth(?\DateTimeImmutable $dateOfBirth): static { $this->dateOfBirth = $dateOfBirth; return $this; }
 
+    public function getAge(): ?int
+    {
+        return $this->dateOfBirth?->diff(new \DateTimeImmutable('today'))->y;
+    }
+
+    public function isAdult(): bool
+    {
+        return $this->getAge() !== null && $this->getAge() >= 18;
+    }
+
     public function getEmergencyContactName(): ?string { return $this->emergencyContactName; }
     public function setEmergencyContactName(?string $emergencyContactName): static { $this->emergencyContactName = $emergencyContactName; return $this; }
 

@@ -35,17 +35,21 @@
           {% if note.completed %}
             · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ note.completedBy.displayName }}{% endif %}
           {% endif %}
-          · <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}" style="display:inline;">
-              <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">
-              <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">{{ note.pinned ? 'Unpin' : 'Pin' }}</button>
-            </form>
+          {% if note.email %}
+            · <a href="{{ path('app_admin_settings_email_edit', {id: note.email.id}) }}" style="color:var(--teal-dk);">View email</a>
+          {% else %}
+            · <form method="post" action="{{ path('app_admin_note_pin', {id: note.id}) }}" style="display:inline;">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_pin_' ~ note.id) }}">
+                <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">{{ note.pinned ? 'Unpin' : 'Pin' }}</button>
+              </form>
+          {% endif %}
           {% if note.pinned %}
             · <form method="post" action="{{ path('app_admin_note_complete', {id: note.id}) }}" style="display:inline;">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_complete_' ~ note.id) }}">
                 <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:#16a34a;text-decoration:underline;cursor:pointer;">Complete</button>
               </form>
           {% endif %}
-          {% if note.addedBy and note.addedBy == app.user %}
+          {% if note.addedBy and note.addedBy == app.user and not note.email %}
             · <form method="post" action="{{ path('app_admin_note_delete', {id: note.id}) }}"
                     style="display:inline;"
                     onsubmit="return window.prompt('Type DELETE to remove this note:') === 'DELETE';">

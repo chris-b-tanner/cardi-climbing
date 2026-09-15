@@ -23,6 +23,7 @@ class BookingService
         private readonly AttendeeRepository $attendeeRepository,
         private readonly EventBookingCreditService $eventBookingCreditService,
         private readonly DoorAccessService $doorAccessService,
+        private readonly UserService $userService,
     ) {}
 
     /**
@@ -124,12 +125,16 @@ class BookingService
         return $attendee;
     }
 
-    /** Cancels {attendee} and revokes any door PIN it holds. */
-    public function cancelBooking(Attendee $attendee): void
+    /** Cancels {attendee} and revokes any door PIN it holds. @param ?User $actor Set when a staff member (or the member themselves, self-service) is making this change — attributed on the status-change note. */
+    public function cancelBooking(Attendee $attendee, ?User $actor = null): void
     {
+        $previousStatus = $attendee->getStatus();
+
         $attendee->setStatus(Attendee::STATUS_CANCELLED);
         $this->doorAccessService->revokePin($attendee);
         $this->em->flush();
+
+        $this->recordStatusChangeIfNeeded($attendee, $previousStatus, $actor);
     }
 
     /**
@@ -155,10 +160,42 @@ class BookingService
             return 'Sorry, this event is fully booked — there is no spare place to reinstate this booking into.';
         }
 
+        $previousStatus = $attendee->getStatus();
+
         $attendee->setStatus($status);
         $this->doorAccessService->generatePinIfNeeded($attendee);
         $this->em->flush();
 
+        $this->recordStatusChangeIfNeeded($attendee, $previousStatus, $actor);
+
         return null;
+    }
+
+    /**
+     * Booking-status paper trail: records a Note on {attendee}'s member if its status actually
+     * changed from {previousStatus} to whatever is currently set — call this after setStatus() (so
+     * it logs the real new value) and only for a change on an *existing* attendee, not the initial
+     * status set at booking creation (createBooking() deliberately doesn't call this).
+     */
+    public function recordStatusChangeIfNeeded(Attendee $attendee, string $previousStatus, ?User $actor = null): void
+    {
+        if ($attendee->getStatus() === $previousStatus) {
+            return;
+        }
+
+        $event = $attendee->getEvent();
+        $when  = $attendee->getOccurrenceDate() ? ' (' . $attendee->getOccurrenceDate()->format('d M Y') . ')' : '';
+
+        $this->userService->addNote(
+            $attendee->getUser(),
+            sprintf(
+                'Booking status changed from %s to %s for %s%s.',
+                ucfirst($previousStatus),
+                ucfirst($attendee->getStatus()),
+                $event->getTitle(),
+                $when,
+            ),
+            $actor,
+        );
     }
 }

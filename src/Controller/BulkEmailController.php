@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Certification;
+use App\Entity\Email;
 use App\Entity\Event;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
@@ -11,6 +12,8 @@ use App\Repository\EventRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
+use App\Service\UserService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -111,7 +114,10 @@ class BulkEmailController extends AbstractController
         AttendeeRepository $attendeeRepository,
         CertificationRepository $certificationRepository,
         UserCertificationRepository $userCertificationRepository,
+        TagRepository $tagRepository,
         MailerInterface $mailer,
+        UserService $userService,
+        EntityManagerInterface $em,
     ): Response {
         $eventId           = (int) $request->request->get('eventId', 0);
         $scope             = (string) $request->request->get('scope', 'date');
@@ -146,6 +152,8 @@ class BulkEmailController extends AbstractController
         $certificationAudience = $eventAudience ? null : $this->resolveCertificationAudience($certificationId, $certificationRepository, $userCertificationRepository);
         $userAudience = ($eventAudience || $certificationAudience) ? null : $this->resolveUserAudience($userId, $userRepository);
 
+        $tagIds = [];
+
         if ($eventAudience) {
             $recipients = $eventAudience['recipients'];
         } elseif ($certificationAudience) {
@@ -178,6 +186,53 @@ class BulkEmailController extends AbstractController
         $htmlTemplate   = $useBlankLayout ? 'email/bulk_blank.html.twig' : 'email/bulk.html.twig';
         $textTemplate   = $useBlankLayout ? 'email/bulk_blank.txt.twig' : 'email/bulk.txt.twig';
 
+        // Audit record — every send through this tool gets one, regardless of audience type. No
+        // draft/approve step needed here (unlike AdminEmailController's broadcast workflow): this
+        // goes straight to "sent" the moment sending actually starts, since that's already true.
+        [$audienceType, $audienceParams, $audienceLabel] = match (true) {
+            (bool) $eventAudience => [
+                Email::AUDIENCE_EVENT,
+                ['eventId' => $eventId, 'scope' => $scope, 'occurrenceDate' => $occurrenceDateRaw ?: null],
+                'Event: ' . $eventAudience['event']->getTitle()
+                    . ($eventAudience['upcomingOnly'] ? ' — remaining series dates' : ($eventAudience['occurrenceDate'] ? ' — ' . $eventAudience['occurrenceDate']->format('d M Y') : '')),
+            ],
+            (bool) $certificationAudience => [
+                Email::AUDIENCE_CERTIFICATION,
+                ['certificationId' => $certificationId],
+                'Certification: ' . $certificationAudience['certification']->getName(),
+            ],
+            (bool) $userAudience => [
+                Email::AUDIENCE_USER,
+                ['userId' => $userId],
+                'Member: ' . ($userAudience['user']->getDisplayName() ?: $userAudience['user']->getEmail()),
+            ],
+            $tagIds !== [] => [
+                Email::AUDIENCE_TAGS,
+                ['tagIds' => $tagIds],
+                'Tags: ' . implode(', ', array_filter(array_map(
+                    static fn(int $id) => $tagRepository->find($id)?->getName(),
+                    $tagIds,
+                ))),
+            ],
+            default => [Email::AUDIENCE_ALL, null, 'All opted-in members'],
+        };
+
+        /** @var User $sender */
+        $sender = $this->getUser();
+
+        $emailRecord = new Email();
+        $emailRecord->setSubject($subject);
+        $emailRecord->setBody($body);
+        $emailRecord->setUseBlankLayout($useBlankLayout);
+        $emailRecord->setAudienceType($audienceType);
+        $emailRecord->setAudienceParams($audienceParams);
+        $emailRecord->setAudienceLabel($audienceLabel . ' (' . count($recipients) . ')');
+        $emailRecord->setCreatedBy($sender);
+        // Straight to sent — see the comment above.
+        $emailRecord->markSent($sender);
+        $em->persist($emailRecord);
+        $em->flush(); // needed before any Note below can reference it by id.
+
         $sent    = 0;
         $skipped = [];
 
@@ -202,7 +257,7 @@ class BulkEmailController extends AbstractController
                 $context['recipientEmail'] = $user->getEmail();
             }
 
-            $email = (new TemplatedEmail())
+            $message = (new TemplatedEmail())
                 ->from(new Address($this->mailerFrom, $this->mailerFromName))
                 ->to($user->getEmail())
                 ->subject($subject)
@@ -211,8 +266,11 @@ class BulkEmailController extends AbstractController
                 ->context($context);
 
             try {
-                $mailer->send($email);
+                $mailer->send($message);
                 $sent++;
+                // Per-recipient audit trail — "who was sent what" — linked back to the full
+                // Email record (subject, body, audience) via Note::$email.
+                $userService->addNote($user, 'Emailed: ' . $subject, $sender, $emailRecord);
             } catch (\Throwable $e) {
                 // One bad address (or a transient mailer error) shouldn't halt the whole batch and
                 // leave everyone after it in the list never emailed.
@@ -220,6 +278,9 @@ class BulkEmailController extends AbstractController
                 error_log('Bulk email failed for user ' . $user->getId() . ': ' . $e->getMessage());
             }
         }
+
+        $emailRecord->setSentCount($sent);
+        $em->flush();
 
         $this->addFlash('success', sprintf('Email sent to %d member%s.', $sent, $sent === 1 ? '' : 's'));
         if ($skipped) {

@@ -103,7 +103,12 @@
     </div>
     <div>
       <div class="card__label">Date of birth</div>
-      <div class="card__value">{{ user.dateOfBirth ? user.dateOfBirth|date('j M Y') : '—' }}</div>
+      <div class="card__value">
+        {{ user.dateOfBirth ? user.dateOfBirth|date('j M Y') : '—' }}
+        {% if user.dateOfBirth %}
+          <span style="color:var(--muted);font-size:0.85em;">({{ user.adult ? '18+' : user.age }})</span>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>

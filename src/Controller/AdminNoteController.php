@@ -84,6 +84,11 @@ class AdminNoteController extends AbstractController
             return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
         }
 
+        if ($note->getEmail() !== null) {
+            $this->addFlash('error', 'This note records a sent email and can\'t be deleted — it\'s part of the audit trail.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+        }
+
         $type = $note->getNoteableType();
         $id   = $note->getNoteableId();
 
@@ -100,6 +105,11 @@ class AdminNoteController extends AbstractController
         if (!$this->isCsrfTokenValid('note_pin_' . $note->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
             return $this->redirectToRoute('app_home');
+        }
+
+        if ($note->getEmail() !== null) {
+            $this->addFlash('error', 'This note records a sent email and can\'t be pinned.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
         }
 
         /** @var User $admin */

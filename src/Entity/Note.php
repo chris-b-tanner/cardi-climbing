@@ -34,6 +34,11 @@ class Note
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $addedBy = null;
 
+    /** Set when this note records a bulk email actually being sent to this recipient — traces back to the full Email (subject, body, audience, approval history). Null for every other kind of note. */
+    #[ORM\ManyToOne(targetEntity: Email::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Email $email = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -108,6 +113,17 @@ class Note
     public function setAddedBy(?User $addedBy): static
     {
         $this->addedBy = $addedBy;
+        return $this;
+    }
+
+    public function getEmail(): ?Email
+    {
+        return $this->email;
+    }
+
+    public function setEmail(?Email $email): static
+    {
+        $this->email = $email;
         return $this;
     }
 

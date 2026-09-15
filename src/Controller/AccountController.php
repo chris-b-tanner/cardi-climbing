@@ -254,7 +254,7 @@ class AccountController extends AbstractController
             $action = $request->request->get('action');
             if ($action === 'confirm') {
                 $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
-                $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED);
+                $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED, $user);
                 if ($error) {
                     $this->addFlash('error', $error);
                 } else {
@@ -262,7 +262,7 @@ class AccountController extends AbstractController
                 }
             } elseif ($action === 'decline') {
                 $attendee->setStaffingStatus(Attendee::STAFFING_DECLINED);
-                $bookingService->cancelBooking($attendee);
+                $bookingService->cancelBooking($attendee, $user);
                 $this->addFlash('success', "Thanks for letting us know — you've been marked as unavailable for this session.");
             }
 
