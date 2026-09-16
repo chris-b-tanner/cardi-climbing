@@ -1,15 +1,15 @@
 {% extends 'admin/base.html.twig' %}
-{% block title %}Members{% endblock %}
+{% block title %}People{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ context == 'new_sale' ? 'Choose a member' : 'Members' }}</h1>
+  <h1>{{ context == 'new_sale' ? 'Choose a person' : 'People' }}</h1>
   {% if context == 'new_sale' %}
     <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Cancel</a>
   {% else %}
     <div class="btn-row">
-      <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Email members</a>
-      <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New member</a>
+      <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Send bulk email</a>
+      <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New person</a>
     </div>
   {% endif %}
 </div>

@@ -10,7 +10,7 @@
 <div class="page-header">
   <h1>
     <span class="member-id">#{{ user.id }}</span>
-    <a href="{{ path('app_admin_users') }}" class="page-header__crumb">Members</a> &raquo;
+    <a href="{{ path('app_admin_users') }}" class="page-header__crumb">People</a> &raquo;
     {{ displayName ?: user.email }}
     {% if activeMembership %}
       <span class="status-pill status-pill--published" style="margin-left:0.5rem;font-size:0.7rem;vertical-align:middle;">{{ activeMembership.membershipType.name }}</span>
