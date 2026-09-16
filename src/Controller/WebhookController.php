@@ -2,14 +2,29 @@
 
 namespace App\Controller;
 
+use App\Repository\UserRepository;
 use App\Service\UserService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Also the landing point for the "ywal-u-{id}" reply-tracking scheme: every email sent from the
+ * compose window carries a "Ref: ywal-u-{recipient's user id}" line in its footer (see
+ * templates/email/bulk*.twig). A Gmail filter on that address auto-forwards any reply quoting it
+ * to this same Postmark inbound endpoint — see inbound() below, which checks for that ref before
+ * falling back to the generic from-email matching used for everything else forwarded here.
+ */
 class WebhookController extends AbstractController
 {
+    private const FORWARD_MARKERS = [
+        '---------- Forwarded message',
+        'Begin forwarded message',
+        '-----Original Message-----',
+        'Forwarded message',
+    ];
+
     public function __construct(
         private readonly string $webhookSecret,
     ) {}
@@ -19,6 +34,7 @@ class WebhookController extends AbstractController
         Request $request,
         string $secret,
         UserService $userService,
+        UserRepository $userRepository,
     ): JsonResponse {
         if (!hash_equals($this->webhookSecret, $secret)) {
             return new JsonResponse(['error' => 'Unauthorized'], 401);
@@ -28,6 +44,21 @@ class WebhookController extends AbstractController
 
         if (!is_array($payload)) {
             return new JsonResponse(['error' => 'Invalid payload'], 400);
+        }
+
+        $textBody = trim($payload['TextBody'] ?? '');
+
+        $trackedUserId = $this->extractTrackedUserId($textBody);
+        if ($trackedUserId !== null) {
+            $trackedUser = $userRepository->find($trackedUserId);
+            if ($trackedUser !== null) {
+                $replyText = $this->stripForwardHeader($textBody);
+                if ($replyText !== '') {
+                    $userService->addNote($trackedUser, 'Email reply: ' . $replyText);
+                }
+                return new JsonResponse(['status' => 'noted', 'id' => $trackedUser->getId()]);
+            }
+            // Tracked user no longer exists — fall through to the generic from-email handling below.
         }
 
         $original = $this->parseForwardedSender($payload['TextBody'] ?? '');
@@ -44,8 +75,7 @@ class WebhookController extends AbstractController
             return new JsonResponse(['error' => 'No valid sender email in payload'], 422);
         }
 
-        $user     = $userService->findExistingByEmail($fromEmail);
-        $textBody = trim($payload['TextBody'] ?? '');
+        $user = $userService->findExistingByEmail($fromEmail);
 
         if ($user !== null) {
             if ($textBody !== '') {
@@ -79,23 +109,7 @@ class WebhookController extends AbstractController
 
     private function parseForwardedSender(string $text): ?array
     {
-        // Only parse if the body contains a recognised forward marker
-        $markers = [
-            '---------- Forwarded message',
-            'Begin forwarded message',
-            '-----Original Message-----',
-            'Forwarded message',
-        ];
-
-        $isForward = false;
-        foreach ($markers as $marker) {
-            if (stripos($text, $marker) !== false) {
-                $isForward = true;
-                break;
-            }
-        }
-
-        if (!$isForward) {
+        if (!$this->hasForwardMarker($text)) {
             return null;
         }
 
@@ -110,5 +124,68 @@ class WebhookController extends AbstractController
         }
 
         return null;
+    }
+
+    private function hasForwardMarker(string $text): bool
+    {
+        foreach (self::FORWARD_MARKERS as $marker) {
+            if (stripos($text, $marker) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Looks for the "ywal-u-{id}" ref line this app's own outbound compose emails carry — see the class docblock. */
+    private function extractTrackedUserId(string $text): ?int
+    {
+        if (preg_match('/ywal-u-(\d+)/i', $text, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Drops Gmail/Outlook's own "---------- Forwarded message ---------" header block (the
+     * marker line plus the From/Date/Subject/To lines under it) so the note left behind is the
+     * member's actual reply text, not the mechanics of how it got to us. Deliberately doesn't try
+     * to strip the deeper "On ... wrote:" quoted-original tail below that — that's a much fuzzier
+     * boundary to detect reliably, and it's still useful context to see what they were replying to.
+     */
+    private function stripForwardHeader(string $text): string
+    {
+        if (!$this->hasForwardMarker($text)) {
+            return trim($text);
+        }
+
+        $lines      = explode("\n", $text);
+        $bodyStart  = null;
+        $sawMarker  = false;
+
+        foreach ($lines as $i => $line) {
+            if (!$sawMarker) {
+                foreach (self::FORWARD_MARKERS as $marker) {
+                    if (stripos($line, $marker) !== false) {
+                        $sawMarker = true;
+                        continue 2;
+                    }
+                }
+                continue;
+            }
+
+            // First blank line after the marker ends the From/Date/Subject/To header block.
+            if (trim($line) === '') {
+                $bodyStart = $i + 1;
+                break;
+            }
+        }
+
+        if ($bodyStart === null) {
+            return trim($text);
+        }
+
+        return trim(implode("\n", array_slice($lines, $bodyStart)));
     }
 }

@@ -36,6 +36,10 @@
         </p>
       {% endif %}
 
+      {% if user is defined %}
+        <p style="margin:8px 0 0;font-size:11px;color:#c4c2bc;">Ref: ywal-u-{{ user.id }}</p>
+      {% endif %}
+
     </td>
   </tr>
 </table>

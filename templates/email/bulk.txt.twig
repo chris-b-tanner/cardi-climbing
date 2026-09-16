@@ -9,3 +9,6 @@ cardiganclimbing@gmail.com | https://www.cardiganclimbing.org
 {% if recipientEmail is defined and recipientEmail %}
 Unsubscribe: {{ unsubscribe_url(recipientEmail) }}
 {% endif %}
+{% if user is defined %}
+Ref: ywal-u-{{ user.id }}
+{% endif %}
