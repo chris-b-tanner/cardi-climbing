@@ -46,6 +46,9 @@
                   {{ item.target.label }}
                 {% endif %}
               </div>
+              {% if item.target.company is defined and item.target.company %}
+                <div class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.4rem;">{{ item.target.company }}</div>
+              {% endif %}
               <p style="font-size:0.9rem;white-space:pre-wrap;margin-bottom:0.6rem;">{{ note.content }}</p>
               <p class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
                 Pinned: {{ note.pinnedAt|date('d M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}

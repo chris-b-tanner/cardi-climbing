@@ -63,6 +63,10 @@ class AdminNoteController extends AbstractController
             $note->setContent($content);
             $note->setAddedBy($admin);
 
+            if ($request->request->getBoolean('pinned')) {
+                $note->pin($admin);
+            }
+
             $em->persist($note);
             $em->flush();
         }

@@ -22,7 +22,7 @@ class NoteableResolver
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {}
 
-    /** @return array{label: string, url: ?string} */
+    /** @return array{label: string, url: ?string, company?: ?string} */
     public function resolve(Note $note): array
     {
         $id = $note->getNoteableId();
@@ -45,8 +45,9 @@ class NoteableResolver
         }
 
         return [
-            'label' => $user->getDisplayName(),
-            'url'   => $this->urlGenerator->generate('app_admin_user_show', ['id' => $id]),
+            'label'   => $user->getDisplayName(),
+            'url'     => $this->urlGenerator->generate('app_admin_user_show', ['id' => $id]),
+            'company' => $user->getCompany(),
         ];
     }
 
