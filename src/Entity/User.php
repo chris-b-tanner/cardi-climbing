@@ -55,6 +55,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $phone = null;
 
+    /** Admin-only field (a contact/organisation detail, not something a member sets on their own account) — shown on the admin contact view when present. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $website = null;
+
     /** 6-digit door-disarm PIN for a keyholder (someone who can already open a self-access door with a physical key) — see door-access-spec.md § Keyholder disarm PIN. Never triggers the relay; only suppresses the unexpected-open alarm briefly. Null for everyone else. */
     #[ORM\Column(length: 6, nullable: true, unique: true)]
     private ?string $keyholderPin = null;
@@ -313,6 +317,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getPhone(): ?string { return $this->phone; }
     public function setPhone(?string $phone): static { $this->phone = $phone; return $this; }
+
+    public function getWebsite(): ?string { return $this->website; }
+    public function setWebsite(?string $website): static { $this->website = $website; return $this; }
 
     public function getKeyholderPin(): ?string { return $this->keyholderPin; }
     public function setKeyholderPin(?string $keyholderPin): static { $this->keyholderPin = $keyholderPin; return $this; }

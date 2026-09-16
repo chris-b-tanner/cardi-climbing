@@ -59,6 +59,11 @@ class Note
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $completedBy = null;
 
+    /** Who's picked this up — the team's shared task list (see AdminActionsController) lets anyone assign a pinned note to anyone else on staff, or to themselves. Independent of pinned/completed status. */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $assignedTo = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -187,6 +192,17 @@ class Note
         $this->pinned = false;
         $this->completedAt = new \DateTimeImmutable();
         $this->completedBy = $by;
+        return $this;
+    }
+
+    public function getAssignedTo(): ?User
+    {
+        return $this->assignedTo;
+    }
+
+    public function setAssignedTo(?User $assignedTo): static
+    {
+        $this->assignedTo = $assignedTo;
         return $this;
     }
 }

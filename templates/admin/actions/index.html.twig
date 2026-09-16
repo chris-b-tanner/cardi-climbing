@@ -6,6 +6,47 @@
   <h1>Actions</h1>
 </div>
 
+{% macro action_card(item, singular) %}
+  {% set note = item.note %}
+  <div class="card actions-card" data-assigned-to-id="{{ note.assignedTo ? note.assignedTo.id : '0' }}">
+    <div class="card__label" style="margin-bottom:0.4rem;">
+      {% if item.target.url %}
+        <a href="{{ item.target.url }}" class="admin-table__link">{{ item.target.label }}</a>
+      {% else %}
+        {{ item.target.label }}
+      {% endif %}
+    </div>
+    {% if item.target.company is defined and item.target.company %}
+      <div class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.4rem;">{{ item.target.company }}</div>
+    {% endif %}
+    {% if item.target.tags is defined and item.target.tags is not empty %}
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.6rem;">
+        {% for tagName in item.target.tags %}
+          <span class="tag-badge">{{ tagName }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p style="font-size:0.9rem;white-space:pre-wrap;margin-bottom:0.6rem;">{{ note.content }}</p>
+    <p class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
+      Pinned: {{ note.pinnedAt|date('d M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}
+    </p>
+    {% if note.assignedTo %}
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+        <span style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;background:#ede9fe;color:#5b21b6;display:flex;align-items:center;justify-content:center;font-size:0.85rem;" title="Assigned">
+          <i class="bi bi-person-fill"></i>
+        </span>
+        <span style="font-size:0.85rem;">Assigned to <strong>{{ note.assignedTo.displayName }}</strong></span>
+      </div>
+    {% endif %}
+    {% if item.target.url %}
+      <div class="btn-row">
+        <a href="{{ item.target.url }}" class="btn btn--teal btn--sm">View {{ singular }}</a>
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+{% import _self as cards %}
+
 {% set types = [
   {key: 'member', label: 'Members', singular: 'member', icon: 'bi-person-badge'},
   {key: 'attendee', label: 'Bookings', singular: 'booking', icon: 'bi-calendar-check'},
@@ -13,6 +54,10 @@
   {key: 'product', label: 'Products', singular: 'product', icon: 'bi-tag'},
   {key: 'order', label: 'Sales', singular: 'sale', icon: 'bi-receipt'},
 ] %}
+{% set typesByKey = {} %}
+{% for t in types %}
+  {% set typesByKey = typesByKey|merge({(t.key): t}) %}
+{% endfor %}
 
 {% if items is empty %}
   <div class="empty">
@@ -20,13 +65,38 @@
     Pin a note on a member, booking, event, product, or order to add it here.
   </div>
 {% else %}
-  <div class="pos-tabs" id="actions-tabs">
-    {% for type in types %}
-      {% set typeItems = items|filter(i => i.note.noteableType == type.key) %}
-      <button type="button" class="pos-tab" data-tab="{{ type.key }}" data-has-content="{{ typeItems is not empty ? '1' : '0' }}">
-        <i class="bi {{ type.icon }}"></i> {{ type.label }} ({{ typeItems|length }})
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+    <div class="pos-tabs" id="actions-tabs" style="margin-bottom:0;">
+      <button type="button" class="pos-tab" data-tab="all">
+        <i class="bi bi-list-check"></i> All (<span class="tab-count" data-tab-count="all">{{ items|length }}</span>)
       </button>
-    {% endfor %}
+      {% for type in types %}
+        {% set typeItems = items|filter(i => i.note.noteableType == type.key) %}
+        <button type="button" class="pos-tab" data-tab="{{ type.key }}">
+          <i class="bi {{ type.icon }}"></i> {{ type.label }} (<span class="tab-count" data-tab-count="{{ type.key }}">{{ typeItems|length }}</span>)
+        </button>
+      {% endfor %}
+    </div>
+
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <label for="assigned-to-filter" style="font-size:0.8rem;color:var(--muted);text-transform:none;margin-bottom:0;">Assigned to</label>
+      <select id="assigned-to-filter" class="form-control" style="width:auto;">
+        <option value="">Anyone</option>
+        <option value="0">Unassigned</option>
+        {% for person in staff %}
+          <option value="{{ person.id }}">{{ person.displayName ?: person.email }}</option>
+        {% endfor %}
+      </select>
+      <a href="#" id="assigned-to-me" style="font-size:0.8rem;font-weight:600;color:var(--teal-dk);">Me</a>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-tab-panel="all" style="display:none;">
+    <div class="actions-card-grid">
+      {% for item in items %}
+        {{ cards.action_card(item, typesByKey[item.note.noteableType].singular) }}
+      {% endfor %}
+    </div>
   </div>
 
   {% for type in types %}
@@ -37,28 +107,7 @@
       {% else %}
         <div class="actions-card-grid">
           {% for item in typeItems %}
-            {% set note = item.note %}
-            <div class="card actions-card">
-              <div class="card__label" style="margin-bottom:0.4rem;">
-                {% if item.target.url %}
-                  <a href="{{ item.target.url }}" class="admin-table__link">{{ item.target.label }}</a>
-                {% else %}
-                  {{ item.target.label }}
-                {% endif %}
-              </div>
-              {% if item.target.company is defined and item.target.company %}
-                <div class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.4rem;">{{ item.target.company }}</div>
-              {% endif %}
-              <p style="font-size:0.9rem;white-space:pre-wrap;margin-bottom:0.6rem;">{{ note.content }}</p>
-              <p class="admin-table__muted" style="font-size:0.78rem;margin-bottom:0.75rem;">
-                Pinned: {{ note.pinnedAt|date('d M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}
-              </p>
-              {% if item.target.url %}
-                <div class="btn-row">
-                  <a href="{{ item.target.url }}" class="btn btn--teal btn--sm">View {{ type.singular }}</a>
-                </div>
-              {% endif %}
-            </div>
+            {{ cards.action_card(item, type.singular) }}
           {% endfor %}
         </div>
       {% endif %}
@@ -78,25 +127,41 @@
 </style>
 <script>
   (function () {
-    const tabs   = document.querySelectorAll('#actions-tabs .pos-tab');
-    const panels = document.querySelectorAll('.tab-panel[data-tab-panel]');
+    const tabs           = document.querySelectorAll('#actions-tabs .pos-tab');
+    const panels         = document.querySelectorAll('.tab-panel[data-tab-panel]');
+    const assignedFilter = document.getElementById('assigned-to-filter');
+    const assignedToMe   = document.getElementById('assigned-to-me');
+    const currentUserId  = {{ app.user.id }};
+    let currentTab = null;
 
-    function selectTab(tab) {
-      tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tab));
-      panels.forEach(p => p.style.display = p.dataset.tabPanel === tab ? '' : 'none');
+    function applyFilters() {
+      const assignedToId = assignedFilter.value;
+
+      tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === currentTab));
+      panels.forEach(p => {
+        p.style.display = p.dataset.tabPanel === currentTab ? '' : 'none';
+        let visibleCount = 0;
+        p.querySelectorAll('.actions-card').forEach(card => {
+          const matches = assignedToId === '' || card.dataset.assignedToId === assignedToId;
+          card.style.display = matches ? '' : 'none';
+          if (matches) visibleCount++;
+        });
+        const countEl = document.querySelector('.tab-count[data-tab-count="' + p.dataset.tabPanel + '"]');
+        if (countEl) countEl.textContent = visibleCount;
+      });
     }
 
-    tabs.forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+    tabs.forEach(t => t.addEventListener('click', () => { currentTab = t.dataset.tab; applyFilters(); }));
+    assignedFilter.addEventListener('change', applyFilters);
+    assignedToMe.addEventListener('click', (e) => {
+      e.preventDefault();
+      assignedFilter.value = String(currentUserId);
+      applyFilters();
+    });
 
-    // Default to the first tab that actually has a pinned note in it.
-    let defaultTab = tabs[0] ? tabs[0].dataset.tab : null;
-    for (const tab of tabs) {
-      if (tab.dataset.hasContent === '1') {
-        defaultTab = tab.dataset.tab;
-        break;
-      }
-    }
-    if (defaultTab) selectTab(defaultTab);
+    // Default to the unfiltered "All" view rather than any one type.
+    currentTab = 'all';
+    applyFilters();
   })();
 </script>
 {% endblock %}

@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Note;
+use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\ProductRepository;
@@ -22,7 +23,7 @@ class NoteableResolver
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {}
 
-    /** @return array{label: string, url: ?string, company?: ?string} */
+    /** @return array{label: string, url: ?string, company?: ?string, tags?: string[]} */
     public function resolve(Note $note): array
     {
         $id = $note->getNoteableId();
@@ -48,6 +49,7 @@ class NoteableResolver
             'label'   => $user->getDisplayName(),
             'url'     => $this->urlGenerator->generate('app_admin_user_show', ['id' => $id]),
             'company' => $user->getCompany(),
+            'tags'    => $this->tagNames($user),
         ];
     }
 
@@ -61,6 +63,7 @@ class NoteableResolver
         return [
             'label' => $attendee->getUser()->getDisplayName() . ' — ' . $attendee->getEvent()->getTitle(),
             'url'   => $this->urlGenerator->generate('app_admin_booking_edit', ['id' => $id]),
+            'tags'  => $this->tagNames($attendee->getUser()),
         ];
     }
 
@@ -100,6 +103,13 @@ class NoteableResolver
         return [
             'label' => 'Sale #' . $id,
             'url'   => $this->urlGenerator->generate('app_admin_sale_show', ['id' => $id]),
+            'tags'  => $this->tagNames($order->getUser()),
         ];
+    }
+
+    /** @return string[] */
+    private function tagNames(User $user): array
+    {
+        return array_map(static fn ($tag) => $tag->getName(), $user->getTags()->toArray());
     }
 }

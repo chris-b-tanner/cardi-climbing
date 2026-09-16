@@ -12,6 +12,7 @@ use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -149,6 +150,49 @@ class AdminNoteController extends AbstractController
 
         $this->addFlash('success', 'Note completed.');
         return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+    }
+
+    /** Assigns (or, with an empty userId, unassigns) a pinned note to someone on staff — anyone on the team can hand a note to anyone else, or to themselves. */
+    #[Route('/{id}/assign', name: 'app_admin_note_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function assign(Request $request, Note $note, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('note_assign_' . $note->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $userId = (int) $request->request->get('userId', 0);
+
+        if (!$userId) {
+            $note->setAssignedTo(null);
+            $em->flush();
+            $this->addFlash('success', 'Note unassigned.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+        }
+
+        $assignee = $this->userRepository->find($userId);
+        $isStaff  = $assignee && (in_array(User::ROLE_ADMIN, $assignee->getRoles(), true) || in_array(User::ROLE_TEAM, $assignee->getRoles(), true));
+
+        if (!$isStaff) {
+            $this->addFlash('error', 'Notes can only be assigned to a team member.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+        }
+
+        $note->setAssignedTo($assignee);
+        $em->flush();
+
+        $this->addFlash('success', 'Assigned to ' . $assignee->getDisplayName() . '.');
+        return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+    }
+
+    /** Staff list for the assign-note modal — team and admin only, same set as Settings > Team. */
+    #[Route('/staff', name: 'app_admin_note_staff_list', methods: ['GET'])]
+    public function staffList(): JsonResponse
+    {
+        return new JsonResponse(array_map(
+            static fn(User $u) => ['id' => $u->getId(), 'name' => $u->getDisplayName() ?: $u->getEmail()],
+            $this->userRepository->findTeam(),
+        ));
     }
 
     private function findNoteable(string $type, int $id): ?object

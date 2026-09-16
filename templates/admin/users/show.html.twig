@@ -93,6 +93,14 @@
         {% else %}—{% endif %}
       </div>
     </div>
+    {% if user.website %}
+      <div>
+        <div class="card__label">Website</div>
+        <div class="card__value">
+          <a href="{{ user.website }}" target="_blank" rel="noopener" style="color:var(--teal);">{{ user.website }}</a>
+        </div>
+      </div>
+    {% endif %}
     <div>
       <div class="card__label">Mailing list</div>
       <div class="card__value">{{ user.optIn ? 'Opted in' : 'Opted out' }}</div>
