@@ -10,6 +10,8 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
+use App\Service\NoteableResolver;
+use App\Service\NoteAssignmentMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,6 +36,8 @@ class AdminNoteController extends AbstractController
         private readonly EventRepository $eventRepository,
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
+        private readonly NoteableResolver $noteableResolver,
+        private readonly NoteAssignmentMailer $noteAssignmentMailer,
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
@@ -180,6 +184,11 @@ class AdminNoteController extends AbstractController
 
         $note->setAssignedTo($assignee);
         $em->flush();
+
+        /** @var User $assignedBy */
+        $assignedBy = $this->getUser();
+        $target     = $this->noteableResolver->resolve($note, absolute: true);
+        $this->noteAssignmentMailer->sendAssigned($note, $target, $assignedBy);
 
         $this->addFlash('success', 'Assigned to ' . $assignee->getDisplayName() . '.');
         return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());

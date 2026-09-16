@@ -1,0 +1,57 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}{{ entityName }} action assigned to you{% endblock %}
+
+{% block emailBody %}
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 8px;">
+    {{ entityName }} action assigned to you
+  </p>
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 12px;">
+    {{ target.label }}
+  </h1>
+
+  {% if target.company is defined and target.company %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#9a9895;margin:0 0 8px;">
+      {{ target.company }}
+    </p>
+  {% endif %}
+
+  {% if target.tags is defined and target.tags is not empty %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#5a5857;margin:0 0 20px;">
+      {% for tagName in target.tags %}
+        <span style="display:inline-block;background:#f0f0eb;border-radius:999px;padding:3px 10px;margin:0 6px 6px 0;">{{ tagName }}</span>
+      {% endfor %}
+    </p>
+  {% endif %}
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#141414;line-height:1.7;white-space:pre-wrap;margin:0 0 24px;background:#f6f6f3;border-radius:8px;padding:16px 18px;">{{ note.content }}</p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#5a5857;">
+    <tr>
+      <td style="padding:6px 0;color:#9a9895;">Pinned</td>
+      <td style="padding:6px 0;text-align:right;">{{ note.pinnedAt|date('j M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#9a9895;">Assigned by</td>
+      <td style="padding:6px 0;text-align:right;">{{ assignedBy.displayName }}</td>
+    </tr>
+  </table>
+
+  {% if target.url %}
+    <table role="presentation" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="border-radius:8px;background-color:#1e4f41;">
+          <a href="{{ target.url }}" style="display:inline-block;padding:12px 26px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+            View {{ typeLabel }}
+          </a>
+        </td>
+      </tr>
+    </table>
+  {% endif %}
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;margin:0;">
+    You can also see everything assigned to you on the <a href="{{ url('app_admin_actions') }}" style="color:#9a9895;">Actions</a> page.
+  </p>
+{% endblock %}

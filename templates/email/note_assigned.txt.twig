@@ -1,0 +1,19 @@
+Y WAL — {{ entityName|upper }} ACTION ASSIGNED TO YOU
+====================================================
+
+{{ target.label }}
+{% if target.company is defined and target.company %}{{ target.company }}
+{% endif %}{% if target.tags is defined and target.tags is not empty %}Tags: {{ target.tags|join(', ') }}
+{% endif %}
+{{ note.content }}
+
+Pinned:       {{ note.pinnedAt|date('j M Y') }}{% if note.pinnedBy %} by {{ note.pinnedBy.displayName }}{% endif %}
+Assigned by:  {{ assignedBy.displayName }}
+{% if target.url %}
+View {{ typeLabel }}: {{ target.url }}
+{% endif %}
+See everything assigned to you: {{ url('app_admin_actions') }}
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+cardiganclimbing@gmail.com | https://www.cardiganclimbing.org
