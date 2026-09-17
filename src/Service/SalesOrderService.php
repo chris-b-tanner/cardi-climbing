@@ -9,6 +9,7 @@ use App\Entity\SalesOrderRow;
 use App\Entity\User;
 use App\Service\Fulfilment\FulfilmentHandlerInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Stripe\StripeClient;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /** Owns a SalesOrder's path from draft to complete — payment collection, then dispatching each row to its product-type fulfilment handler. */
@@ -17,6 +18,8 @@ class SalesOrderService
     /** @param iterable<FulfilmentHandlerInterface> $fulfilmentHandlers */
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly StripeClient $stripe,
+        private readonly string $stripeTerminalReaderId,
         #[AutowireIterator('app.fulfilment_handler')]
         private readonly iterable $fulfilmentHandlers,
     ) {}
@@ -52,13 +55,20 @@ class SalesOrderService
     }
 
     /**
-     * Starts a card payment for an order — records a pending Payment against it and returns it so
-     * the caller can send it to the card machine. The order stays draft until that's confirmed;
-     * completeFromPayment() finishes the job once it is.
+     * Starts a card payment for an order — records a pending Payment against it, creates the
+     * matching Stripe PaymentIntent, and sends it straight to the club's S700 for the member to
+     * tap/insert. The order stays draft until that's confirmed; completeFromPayment() (called from
+     * the Stripe webhook, and as a fallback by the status-poll endpoint) finishes the job once it is.
+     *
+     * @throws \LogicException if no card reader is configured (STRIPE_TERMINAL_READER_ID unset)
      */
     public function startCardPayment(SalesOrder $order, User $takenBy): Payment
     {
         $this->assertDraft($order);
+
+        if (!$this->stripeTerminalReaderId) {
+            throw new \LogicException('No card reader is configured.');
+        }
 
         $payment = new Payment();
         $payment->setUser($order->getUser());
@@ -67,10 +77,69 @@ class SalesOrderService
         $payment->setMethod(Payment::METHOD_TERMINAL);
         $payment->setTakenBy($takenBy);
 
+        $intent = $this->stripe->paymentIntents->create([
+            'amount'               => $this->toMinorUnits($order->getTotal()),
+            'currency'             => $payment->getCurrency(),
+            'payment_method_types' => ['card_present'],
+            'capture_method'       => 'automatic',
+            'description'          => 'Y Wal order #' . $order->getId(),
+            'metadata'             => ['order_id' => (string) $order->getId()],
+        ]);
+
+        $payment->setStripePaymentIntentId($intent->id);
+
         $this->em->persist($payment);
         $this->em->flush();
 
+        try {
+            $this->stripe->terminal->readers->processPaymentIntent($this->stripeTerminalReaderId, [
+                'payment_intent' => $intent->id,
+            ]);
+        } catch (\Throwable $e) {
+            // Never reached the reader (offline, busy, wrong id) — fail it immediately rather than
+            // leaving a "pending" payment behind that would block the Cash/Card choice from
+            // reappearing until someone notices and cancels it by hand.
+            $payment->setFailedAt(new \DateTimeImmutable());
+            $payment->setFailureReason('Could not reach the card reader: ' . $e->getMessage());
+            $this->em->flush();
+
+            throw $e;
+        }
+
         return $payment;
+    }
+
+    /**
+     * Backs out of a card payment that's stuck waiting on the reader (customer walked off, wrong
+     * amount, reader unreachable, etc.) — releases the reader's in-progress prompt and cancels the
+     * PaymentIntent so it can't be confirmed later, then marks the Payment failed so the order's
+     * "Cash / Card" choice reappears.
+     *
+     * @throws \LogicException if this isn't actually a pending terminal payment
+     */
+    public function cancelCardPayment(Payment $payment): void
+    {
+        if ($payment->getMethod() !== Payment::METHOD_TERMINAL || $payment->getSucceededAt() !== null || $payment->getFailedAt() !== null) {
+            throw new \LogicException('This payment is not a pending card payment.');
+        }
+
+        try {
+            $this->stripe->terminal->readers->cancelAction($this->stripeTerminalReaderId);
+        } catch (\Throwable) {
+            // The reader may already be idle (e.g. it never received the prompt) — not fatal, we're cancelling regardless.
+        }
+
+        if ($payment->getStripePaymentIntentId()) {
+            try {
+                $this->stripe->paymentIntents->cancel($payment->getStripePaymentIntentId());
+            } catch (\Throwable) {
+                // May already be succeeded/canceled on Stripe's side by the time we get here — not fatal.
+            }
+        }
+
+        $payment->setFailedAt(new \DateTimeImmutable());
+        $payment->setFailureReason('Cancelled by staff.');
+        $this->em->flush();
     }
 
     /** Completes the order a succeeded card/terminal Payment belongs to. Safe to call more than once (e.g. webhook retries) or with a payment that isn't order-linked (a no-op). */
@@ -83,6 +152,11 @@ class SalesOrderService
 
         $this->markComplete($order);
         $this->em->flush();
+    }
+
+    private function toMinorUnits(string $amount): int
+    {
+        return (int) round((float) $amount * 100);
     }
 
     /**

@@ -140,4 +140,16 @@ class SalesOrder
     {
         return $this->payments;
     }
+
+    /** The card payment currently awaiting confirmation from the terminal (or Stripe), if any — an order only ever has one of these at a time. */
+    public function getPendingCardPayment(): ?Payment
+    {
+        foreach ($this->payments as $payment) {
+            if ($payment->getMethod() === Payment::METHOD_TERMINAL && $payment->getSucceededAt() === null && $payment->getFailedAt() === null) {
+                return $payment;
+            }
+        }
+
+        return null;
+    }
 }

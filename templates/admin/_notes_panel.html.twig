@@ -14,14 +14,26 @@
       {% else %}
         <div style="border-left:3px solid var(--border);padding:0.5rem 0.75rem;">
       {% endif %}
+        {% set contentLines = note.content|split('\n') %}
+        {% set isLongNote = contentLines|length > 5 %}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
-          <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">{{ note.content }}</p>
+          <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">
+            {%- if isLongNote -%}
+              {{ contentLines|slice(0, 5)|join('\n') }}<span class="note-more-content" id="note-more-{{ note.id }}" style="display:none;">{{ "\n" ~ contentLines|slice(5)|join('\n') }}</span>
+            {%- else -%}
+              {{ note.content }}
+            {%- endif -%}
+          </p>
           {% if note.pinned %}
             <span class="status-pill status-pill--pinned" style="flex-shrink:0;">Pinned</span>
           {% elseif note.completed %}
             <span class="status-pill status-pill--published" style="flex-shrink:0;">Completed</span>
           {% endif %}
         </div>
+        {% if isLongNote %}
+          <button type="button" class="note-toggle-more" data-target="note-more-{{ note.id }}"
+                  style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;margin-bottom:0.3rem;">Show more</button>
+        {% endif %}
         <p style="font-size:0.75rem;color:var(--muted);">
           {{ note.createdAt|date('j M Y, H:i') }}
           {% if note.addedBy %}
@@ -161,6 +173,16 @@
     document.addEventListener('click', (e) => {
       const trigger = e.target.closest('.note-assign-trigger');
       if (trigger) openModal(trigger.dataset.noteId, trigger.dataset.csrf);
+
+      const toggle = e.target.closest('.note-toggle-more');
+      if (toggle) {
+        const target = document.getElementById(toggle.dataset.target);
+        if (target) {
+          const isHidden = target.style.display === 'none';
+          target.style.display = isHidden ? 'inline' : 'none';
+          toggle.textContent = isHidden ? 'Show less' : 'Show more';
+        }
+      }
     });
 
     closeBtn.addEventListener('click', closeModal);

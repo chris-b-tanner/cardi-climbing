@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Event;
 use App\Entity\Note;
+use App\Entity\Payment;
 use App\Entity\Product;
 use App\Entity\SalesOrder;
 use App\Entity\SalesOrderRow;
@@ -13,9 +14,12 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
+use App\Service\PaymentMailer;
 use App\Service\SalesOrderService;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
+use Stripe\Exception\ApiErrorException;
+use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -641,7 +645,7 @@ class AdminSalesController extends AbstractController
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
-    /** Records a pending card payment against the order. Sending it to the card machine itself isn't wired up yet — completeFromPayment() (via the Stripe webhook) finishes the job once that's confirmed. */
+    /** Records a pending card payment against the order and sends it straight to the club's S700 for the member to tap/insert. completeFromPayment() (via the Stripe webhook, or the status-poll fallback below) finishes the job once that's confirmed. */
     #[Route('/{id}/pay-card', name: 'app_admin_sale_pay_card', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function payCard(Request $request, SalesOrder $order, SalesOrderService $salesOrderService): Response
     {
@@ -652,10 +656,75 @@ class AdminSalesController extends AbstractController
         /** @var User $admin */
         $admin = $this->getUser();
 
-        $salesOrderService->startCardPayment($order, $admin);
-        $this->addFlash('success', 'Card payment started — waiting for confirmation.');
+        try {
+            $salesOrderService->startCardPayment($order, $admin);
+        } catch (\LogicException $e) {
+            $this->addFlash('error', $e->getMessage());
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        } catch (ApiErrorException $e) {
+            $this->addFlash('error', 'Could not reach the card reader: ' . $e->getMessage());
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $this->addFlash('success', 'Sent to the card reader — waiting for the customer to tap or insert their card.');
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /** Backs out of a card payment that's stuck waiting on the reader (customer walked off, wrong amount, reader unreachable) so the Cash/Card choice reappears. */
+    #[Route('/{id}/cancel-card', name: 'app_admin_sale_cancel_card', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function cancelCard(Request $request, SalesOrder $order, SalesOrderService $salesOrderService): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $pending = $order->getPendingCardPayment();
+        if (!$pending) {
+            $this->addFlash('error', 'There is no pending card payment to cancel.');
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $salesOrderService->cancelCardPayment($pending);
+        $this->addFlash('success', 'Card payment cancelled.');
+
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    /** Polled by the sale page while waiting for a terminal payment to settle — same fallback pattern as PaymentController::status() for donations, in case the webhook is delayed or (locally) not configured at all. */
+    #[Route('/payments/{id}/status', name: 'app_admin_sale_payment_status', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function paymentStatus(
+        Payment $payment,
+        StripeClient $stripe,
+        EntityManagerInterface $em,
+        SalesOrderService $salesOrderService,
+        PaymentMailer $paymentMailer,
+    ): JsonResponse {
+        if ($payment->getSucceededAt() === null && $payment->getFailedAt() === null && $payment->getStripePaymentIntentId()) {
+            $intent = $stripe->paymentIntents->retrieve($payment->getStripePaymentIntentId());
+
+            if ($intent->status === 'succeeded') {
+                $payment->setSucceededAt(new \DateTimeImmutable());
+                $em->flush();
+
+                $salesOrderService->completeFromPayment($payment);
+
+                try {
+                    $paymentMailer->sendReceipt($payment);
+                } catch (\Throwable $e) {
+                    error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
+                }
+            } elseif ($intent->status === 'canceled' || $intent->last_payment_error) {
+                $payment->setFailedAt(new \DateTimeImmutable());
+                $payment->setFailureReason($intent->last_payment_error->message ?? null);
+                $em->flush();
+            }
+        }
+
+        return new JsonResponse([
+            'status'      => $payment->getStatus(),
+            'orderStatus' => $payment->getOrder()?->getStatus(),
+        ]);
     }
 
     private function assertOpenAndValid(Request $request, SalesOrder $order): bool

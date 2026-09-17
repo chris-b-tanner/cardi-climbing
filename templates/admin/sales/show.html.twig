@@ -1,12 +1,7 @@
 {% extends 'admin/base.html.twig' %}
 {% set memberName = order.user.displayName %}
 {% set pillClass = order.status == 'complete' ? 'status-pill--published' : (order.status == 'cancelled' ? 'status-pill--cancelled' : 'status-pill--pending') %}
-{% set pendingCardPayment = null %}
-{% for payment in order.payments %}
-  {% if payment.method == 'terminal' and payment.succeededAt is null and payment.failedAt is null %}
-    {% set pendingCardPayment = payment %}
-  {% endif %}
-{% endfor %}
+{% set pendingCardPayment = order.pendingCardPayment %}
 {% block title %}Sale #{{ order.id }}{% endblock %}
 
 {% block content %}
@@ -199,8 +194,13 @@
 
     {% if order.status == 'draft' %}
       {% if pendingCardPayment %}
-        <div class="empty" style="padding:1.25rem 1rem;">
-          Waiting for card payment confirmation (£{{ pendingCardPayment.amount }})… the card machine isn't connected yet, so this needs the Stripe integration to finish before it can confirm automatically.
+        <div class="empty" style="padding:1.25rem 1rem;" id="card-payment-waiting">
+          <p style="margin-bottom:0.75rem;">Waiting for the customer to tap or insert their card (£{{ pendingCardPayment.amount }})…</p>
+          <form method="post" action="{{ path('app_admin_sale_cancel_card', {id: order.id}) }}"
+                onsubmit="return confirm('Cancel this card payment?');">
+            <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+            <button type="submit" class="btn btn--ghost btn--sm">Cancel</button>
+          </form>
         </div>
       {% elseif order.rows is empty %}
         {# Nothing to complete yet #}
@@ -619,6 +619,44 @@
     document.getElementById('complete-order-btn').style.display = 'none';
     document.getElementById('payment-method-choice').style.display = 'block';
   });
+</script>
+{% endif %}
+{% if pendingCardPayment %}
+<script>
+  (function () {
+    const statusUrl = '{{ path('app_admin_sale_payment_status', {id: pendingCardPayment.id}) }}';
+    let attempts = 0;
+    const maxAttempts = 60; // ~2 minutes at 2s intervals — plenty for a tap/insert, and the Cancel button covers anything longer.
+
+    const timer = setInterval(async () => {
+      attempts++;
+
+      let data;
+      try {
+        const response = await fetch(statusUrl);
+        data = await response.json();
+      } catch (e) {
+        return; // transient network error — keep polling
+      }
+
+      if (data.status === 'succeeded') {
+        clearInterval(timer);
+        window.location.reload();
+        return;
+      }
+
+      if (data.status === 'failed') {
+        clearInterval(timer);
+        alert('The card payment did not go through — you can try again.');
+        window.location.reload();
+        return;
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(timer);
+      }
+    }, 2000);
+  })();
 </script>
 {% endif %}
 {% if order.status == 'draft' %}
