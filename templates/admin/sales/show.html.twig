@@ -27,8 +27,8 @@
         {key: 'membership', label: 'Memberships'},
         {key: 'event_ticket', label: 'Events / classes'},
         {key: 'credit', label: 'Credit'},
-        {key: 'stock', label: 'Stock'},
-        {key: 'service', label: 'Non-stock / services'},
+        {key: 'stock', label: 'Products'},
+        {key: 'service', label: 'Services / other'},
       ] %}
       <input type="search" id="product-search" class="form-control" style="margin-bottom:0.75rem;"
              placeholder="Search products or SKU…" autocomplete="off">
@@ -214,14 +214,14 @@
           <button type="button" id="complete-order-btn" class="btn btn--teal">Complete order</button>
           <div id="payment-method-choice" class="card" style="display:none;margin-top:0.75rem;">
             <p style="margin-bottom:0.75rem;font-size:0.875rem;color:var(--muted);">Choose a payment method:</p>
-            <div class="btn-row">
-              <form method="post" action="{{ path('app_admin_sale_complete_cash', {id: order.id}) }}">
+            <div class="btn-row" style="flex-wrap:nowrap;">
+              <form method="post" action="{{ path('app_admin_sale_pay_card', {id: order.id}) }}" style="flex:1;">
                 <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
-                <button type="submit" class="btn btn--teal">Cash</button>
+                <button type="submit" class="btn btn--ghost" style="width:100%;"><i class="bi bi-credit-card"></i> Card</button>
               </form>
-              <form method="post" action="{{ path('app_admin_sale_pay_card', {id: order.id}) }}">
+              <form method="post" action="{{ path('app_admin_sale_complete_cash', {id: order.id}) }}" style="flex:1;">
                 <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
-                <button type="submit" class="btn btn--ghost">Card</button>
+                <button type="submit" class="btn btn--ghost" style="width:100%;"><i class="bi bi-cash"></i> Cash</button>
               </form>
             </div>
           </div>
