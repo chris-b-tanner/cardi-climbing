@@ -820,7 +820,7 @@
     priceModalTitle.textContent = 'Change price — ' + trigger.dataset.productName;
     priceModalStandard.textContent = 'Standard price: £' + priceStandardValue.toFixed(2);
     priceModalPrice.value = trigger.dataset.currentPrice;
-    priceModalNote.value  = trigger.dataset.currentNote || '';
+    priceModalNote.value  = trigger.dataset.currentNote || 'Donation';
     priceModalError.style.display = 'none';
 
     priceModal.style.display = 'flex';
