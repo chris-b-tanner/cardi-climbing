@@ -96,7 +96,7 @@
     </div>
 
     <div class="table-scroll">
-      <table class="admin-table">
+      <table class="admin-table order-lines-table">
         <thead>
           <tr>
             <th>Product</th>
@@ -109,7 +109,7 @@
         <tbody>
           {% for row in order.rows %}
             <tr>
-              <td>
+              <td data-label="Product">
                 {% set rowEventTicketProduct = row.product.eventTicketProduct %}
                 {% if rowEventTicketProduct %}
                   <i class="bi bi-calendar3"></i>
@@ -132,7 +132,7 @@
                   </small>
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Qty">
                 {% if order.status == 'draft' and not row.product.requiresBeneficiary %}
                   <div class="btn-row" style="flex-wrap:nowrap;align-items:center;">
                     <form method="post" action="{{ path('app_admin_sale_row_decrease', {id: order.id, rowId: row.id}) }}">
@@ -149,7 +149,7 @@
                   {{ row.qty }}
                 {% endif %}
               </td>
-              <td class="admin-table__muted" style="text-align:right;">
+              <td class="admin-table__muted" style="text-align:right;" data-label="Price">
                 {% if order.status == 'draft' %}
                   <button type="button" class="price-edit-trigger"
                           data-row-id="{{ row.id }}"
@@ -165,9 +165,9 @@
                 {% endif %}
                 {% if row.note %}<br><small class="admin-table__muted" style="font-style:italic;">{{ row.note }}</small>{% endif %}
               </td>
-              <td class="admin-table__muted" style="text-align:right;">£{{ row.lineTotal }}</td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Total">£{{ row.lineTotal }}</td>
               {% if order.status == 'draft' %}
-                <td>
+                <td data-label="Remove">
                   {% set seriesCount = order.rows|filter(r => r.product == row.product and r.effectiveBeneficiary == row.effectiveBeneficiary)|length %}
                   <form method="post" action="{{ path('app_admin_sale_row_remove', {id: order.id, rowId: row.id}) }}"
                         {% if seriesCount > 1 %}
@@ -411,6 +411,37 @@
   .pos-calendar-day:hover { border-color: var(--teal); background: #f0fdfa; }
   .pos-calendar-day__num { font-size: 0.95rem; font-weight: 600; color: var(--black); }
   .pos-calendar-day__dow { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+
+  /* Order line items: below this width the table becomes a stack of cards (one per row)
+     instead of scrolling horizontally — there's little room to spare on a phone. */
+  @media (max-width: 640px) {
+    /* .admin-table sets min-width: 640px for its normal (non-card) layout — override it here or
+       the table stays pinned at 640px wide regardless of the display:block changes below. */
+    .order-lines-table { min-width: 0; }
+    .order-lines-table thead { display: none; }
+    .order-lines-table, .order-lines-table tbody, .order-lines-table tr, .order-lines-table td {
+      display: block; width: 100%;
+    }
+    .order-lines-table tr {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.65rem 0.85rem; margin-bottom: 0.6rem;
+    }
+    .order-lines-table td {
+      padding: 0.3rem 0; text-align: left !important; border: none !important;
+    }
+    .order-lines-table td:first-child {
+      font-weight: 600; margin-bottom: 0.3rem; padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    .order-lines-table td:not(:first-child) {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    }
+    .order-lines-table td:not(:first-child)::before {
+      content: attr(data-label); flex-shrink: 0;
+      font-weight: 600; font-size: 0.78rem; text-transform: uppercase;
+      letter-spacing: 0.02em; color: var(--muted);
+    }
+  }
 </style>
 {% if products is not empty and order.status == 'draft' %}
 <script>

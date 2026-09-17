@@ -126,6 +126,9 @@
         white-space: nowrap;
       }
       .admin-nav__link.is-active { border-left-color: transparent; border-bottom-color: var(--teal); }
+      /* Dashboard is the first, most-clicked item — shrink it to just its icon on mobile to leave
+         more room for the rest of the (horizontally-scrolling) nav; every other item keeps its text. */
+      .admin-nav__link--dashboard .admin-nav__label { display: none; }
     }
 
     .flash { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.875rem; }
@@ -175,6 +178,10 @@
     .member-columns--halves { grid-template-columns: 1fr 1fr; }
     .member-columns--single { grid-template-columns: 1fr; }
     @media (max-width: 900px) { .member-columns { grid-template-columns: 1fr; } }
+    /* Grid items default to min-width:auto, which takes on their content's min-content size —
+       a wide table or a minmax()-tracked grid nested inside would otherwise force this column
+       (and the whole page) wider than the viewport instead of wrapping/scrolling internally. */
+    .member-columns > * { min-width: 0; }
 
     .pos-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
     .pos-tab {
@@ -400,8 +407,9 @@
     <ul class="admin-nav">
       <li>
         <a href="{{ path('app_admin_dashboard') }}"
-           class="admin-nav__link{{ currentRoute starts with 'app_admin_dashboard' ? ' is-active' : '' }}">
-          <i class="bi bi-speedometer2"></i> Dashboard
+           class="admin-nav__link admin-nav__link--dashboard{{ currentRoute starts with 'app_admin_dashboard' ? ' is-active' : '' }}"
+           aria-label="Dashboard">
+          <i class="bi bi-speedometer2"></i> <span class="admin-nav__label">Dashboard</span>
         </a>
       </li>
       <li>
