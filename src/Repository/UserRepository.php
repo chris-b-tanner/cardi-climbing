@@ -81,7 +81,13 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->addSelect('t')
             ->addSelect('p');
 
-        if ($query !== '') {
+        if ($query !== '' && ctype_digit($query)) {
+            // A purely numeric search is almost always someone looking up a specific contact by
+            // ID (eg. from a URL or another record) — matching it against text fields too would
+            // just bury the one result they want under unrelated LIKE '%123%' noise.
+            $qb->andWhere('u.id = :id')
+               ->setParameter('id', (int) $query);
+        } elseif ($query !== '') {
             // Deliberately not matching note content — too noisy, brings back too many unrelated
             // results (a note mentioning someone in passing shouldn't surface them here).
             $qb->andWhere('u.email LIKE :q OR u.email2 LIKE :q OR u.email3 LIKE :q OR u.firstName LIKE :q OR u.lastName LIKE :q OR CONCAT(u.firstName, \' \', u.lastName) LIKE :q OR u.company LIKE :q OR u.memo LIKE :q')

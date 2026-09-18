@@ -94,10 +94,12 @@
       </div>
     </div>
     {% if user.website %}
+      {# "https://www.facebook.com/" (25 chars) is the longest URL we display in full before truncating. #}
+      {% set websiteDisplay = user.website|length > 25 ? user.website|slice(0, 25) ~ '…' : user.website %}
       <div>
         <div class="card__label">Website</div>
         <div class="card__value">
-          <a href="{{ user.website }}" target="_blank" rel="noopener" style="color:var(--teal);">{{ user.website }}</a>
+          <a href="{{ user.website }}" target="_blank" rel="noopener" style="color:var(--teal);">{{ websiteDisplay }}</a>
         </div>
       </div>
     {% endif %}

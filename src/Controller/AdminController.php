@@ -311,7 +311,12 @@ class AdminController extends AbstractController
             $user->setMemo(trim($request->request->get('memo', '')) ?: null);
             $user->setOptIn($request->request->has('optIn'));
             $user->setPhone(trim($request->request->get('phone', '')) ?: null);
-            $user->setWebsite(trim($request->request->get('website', '')) ?: null);
+
+            $website = trim($request->request->get('website', ''));
+            if ($website !== '' && !preg_match('#^https?://#i', $website)) {
+                $website = 'https://' . $website;
+            }
+            $user->setWebsite($website ?: null);
 
             $dob = trim($request->request->get('dateOfBirth', ''));
             $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
