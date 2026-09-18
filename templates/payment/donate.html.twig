@@ -25,6 +25,15 @@
     text-transform: uppercase; letter-spacing: 0.04em;
     color: #6b7280; margin-bottom: 0.35rem;
   }
+  .field input[type="text"], .field input[type="email"] {
+    width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e5e7eb;
+    border-radius: 6px; font-size: 0.9375rem; font-family: inherit; color: #1a1a1a;
+  }
+  .field input:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
+  .optin-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: #1a1a1a; cursor: pointer; }
+  .optin-label input { width: 1rem; height: 1rem; accent-color: #2a9d8f; }
 
   .alert--success {
     background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
@@ -51,11 +60,43 @@
 {% block content %}
 <div class="donate-page">
   <div class="donate-wrap">
-    <a href="{{ path('app_account') }}" class="donate-back-link">← Back to my account</a>
+    {% if app.user %}
+      <a href="{{ path('app_account') }}" class="donate-back-link">← Back to my account</a>
+    {% endif %}
     <h1>Make a donation</h1>
 
+    <p>
+      Just donations towards food on the launch night at the moment - please hold any
+      other donations until we launch our Crowdfunder campaign in a couple of weeks.
+    </p>
+    <p>
+      Thank you!
+    </p>
+    <p>
+      Mark, Chris &amp; Duncan
+    </p>
+    <br>
     <div class="account-card">
       <div id="donate-step-amount" class="donate-step">
+        {% if not app.user %}
+          <div class="field-row">
+            <div class="field">
+              <label for="donateFirstName">First name</label>
+              <input type="text" id="donateFirstName" autocomplete="given-name">
+            </div>
+            <div class="field">
+              <label for="donateLastName">Last name</label>
+              <input type="text" id="donateLastName" autocomplete="family-name">
+            </div>
+          </div>
+          <div class="field">
+            <label for="donateEmail">Email</label>
+            <input type="email" id="donateEmail" autocomplete="email">
+          </div>
+          <div class="field">
+            <label class="optin-label"><input type="checkbox" id="donateOptIn"> Keep me updated about Y Wal news</label>
+          </div>
+        {% endif %}
         <div class="field">
           <label for="donateAmount">Amount</label>
           <div class="donate-amount-field">
@@ -97,6 +138,11 @@
         <div class="alert--success">Thank you for your donation!</div>
       </div>
     </div>
+
+    <p>
+      Until we get our own bank account, payments will show on your statement to LEND-ENGINE.COM which is the other
+      non-profit named in our articles of association.
+    </p>
   </div>
 </div>
 {% endblock %}
@@ -107,12 +153,30 @@
 <script>
 (function () {
   const csrfToken = {{ csrf_token('donate')|json_encode|raw }};
+  const isLoggedIn = {{ app.user ? 'true' : 'false' }};
   const stripe = Stripe({{ stripePublishableKey|json_encode|raw }});
   const statusUrlTemplate = {{ path('app_donate_status', {id: 999999999})|json_encode|raw }};
 
   const amountInput    = document.getElementById('donateAmount');
   const amountError    = document.getElementById('donate-amount-error');
   const amountDisplays = document.querySelectorAll('.donate-amount-display');
+
+  const firstNameInput = document.getElementById('donateFirstName');
+  const lastNameInput  = document.getElementById('donateLastName');
+  const emailInput     = document.getElementById('donateEmail');
+  const optInInput     = document.getElementById('donateOptIn');
+
+  function donorFields() {
+    if (isLoggedIn) {
+      return {};
+    }
+    return {
+      firstName: firstNameInput.value.trim(),
+      lastName:  lastNameInput.value.trim(),
+      email:     emailInput.value.trim(),
+      optIn:     optInInput.checked ? '1' : '',
+    };
+  }
 
   const steps = {
     amount:     document.getElementById('donate-step-amount'),
@@ -149,6 +213,15 @@
       return;
     }
 
+    if (!isLoggedIn) {
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+      if (!firstNameInput.value.trim() || !lastNameInput.value.trim() || !emailValid) {
+        amountError.textContent = 'Please enter your name and a valid email address.';
+        amountError.style.display = 'block';
+        return;
+      }
+    }
+
     currentAmount = value.toFixed(2);
     amountDisplays.forEach(el => { el.textContent = currentAmount; });
     showStep('choose');
@@ -157,7 +230,7 @@
   document.getElementById('donate-pay-card-btn').addEventListener('click', async () => {
     showStep('card');
 
-    const body = new URLSearchParams({ amount: currentAmount, _csrf_token: csrfToken });
+    const body = new URLSearchParams({ amount: currentAmount, _csrf_token: csrfToken, ...donorFields() });
     const response = await fetch('{{ path('app_donate_intent') }}', { method: 'POST', body });
     const data = await response.json();
 
@@ -198,7 +271,7 @@
   document.getElementById('donate-pay-terminal-btn').addEventListener('click', async () => {
     showStep('terminal');
 
-    const body = new URLSearchParams({ amount: currentAmount, _csrf_token: csrfToken });
+    const body = new URLSearchParams({ amount: currentAmount, _csrf_token: csrfToken, ...donorFields() });
     const response = await fetch('{{ path('app_donate_terminal') }}', { method: 'POST', body });
     const data = await response.json();
 

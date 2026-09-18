@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Payment;
 use App\Entity\User;
 use App\Service\PaymentMailer;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -12,9 +13,14 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted('ROLE_USER')]
+/**
+ * Open to anyone, logged in or not — donating shouldn't require an account. An anonymous donor's
+ * name/email (collected on the page) resolves to a User via resolveDonor() below: reused as-is if
+ * that email already belongs to someone (never touching their existing details), or created fresh
+ * (opted out by default unless they ticked the box) so every Payment still links to a User exactly
+ * like the rest of the app expects.
+ */
 class PaymentController extends AbstractController
 {
     public function __construct(
@@ -35,7 +41,7 @@ class PaymentController extends AbstractController
 
     /** Creates a Payment + Stripe PaymentIntent for an online card donation, returns the client secret for Stripe.js. */
     #[Route('/donate/intent', name: 'app_donate_intent', methods: ['POST'])]
-    public function createIntent(Request $request, EntityManagerInterface $em): JsonResponse
+    public function createIntent(Request $request, EntityManagerInterface $em, UserService $userService): JsonResponse
     {
         if (!$this->isCsrfTokenValid('donate', $request->request->get('_csrf_token'))) {
             return new JsonResponse(['error' => 'Access denied.'], 403);
@@ -46,8 +52,10 @@ class PaymentController extends AbstractController
             return new JsonResponse(['error' => 'Please enter a valid donation amount.'], 422);
         }
 
-        /** @var User $user */
-        $user = $this->getUser();
+        $user = $this->resolveDonor($request, $userService);
+        if ($user === null) {
+            return new JsonResponse(['error' => 'Please enter your name and a valid email address.'], 422);
+        }
 
         $payment = new Payment();
         $payment->setUser($user);
@@ -68,6 +76,8 @@ class PaymentController extends AbstractController
         $em->persist($payment);
         $em->flush();
 
+        $request->getSession()->set('donate_payment_id', $payment->getId());
+
         return new JsonResponse([
             'paymentId'    => $payment->getId(),
             'clientSecret' => $intent->client_secret,
@@ -76,7 +86,7 @@ class PaymentController extends AbstractController
 
     /** Creates a Payment + Stripe PaymentIntent and sends it to the club's S700 for the member to tap. */
     #[Route('/donate/terminal', name: 'app_donate_terminal', methods: ['POST'])]
-    public function sendToTerminal(Request $request, EntityManagerInterface $em): JsonResponse
+    public function sendToTerminal(Request $request, EntityManagerInterface $em, UserService $userService): JsonResponse
     {
         if (!$this->isCsrfTokenValid('donate', $request->request->get('_csrf_token'))) {
             return new JsonResponse(['error' => 'Access denied.'], 403);
@@ -91,8 +101,10 @@ class PaymentController extends AbstractController
             return new JsonResponse(['error' => 'Please enter a valid donation amount.'], 422);
         }
 
-        /** @var User $user */
-        $user = $this->getUser();
+        $user = $this->resolveDonor($request, $userService);
+        if ($user === null) {
+            return new JsonResponse(['error' => 'Please enter your name and a valid email address.'], 422);
+        }
 
         $payment = new Payment();
         $payment->setUser($user);
@@ -118,14 +130,22 @@ class PaymentController extends AbstractController
             'payment_intent' => $intent->id,
         ]);
 
+        $request->getSession()->set('donate_payment_id', $payment->getId());
+
         return new JsonResponse(['paymentId' => $payment->getId()]);
     }
 
     /** Polled by the donate page while waiting for a terminal (or card) payment to settle. */
     #[Route('/donate/{id}/status', name: 'app_donate_status', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function status(Payment $payment, EntityManagerInterface $em, PaymentMailer $paymentMailer): JsonResponse
+    public function status(Payment $payment, Request $request, EntityManagerInterface $em, PaymentMailer $paymentMailer): JsonResponse
     {
-        if ($payment->getUser() !== $this->getUser()) {
+        // Logged-in donors are matched by account; anonymous donors have no account to match
+        // against, so fall back to the id of the payment they themselves just created this session.
+        $owner = $this->getUser() !== null
+            ? $payment->getUser() === $this->getUser()
+            : $payment->getId() === $request->getSession()->get('donate_payment_id');
+
+        if (!$owner) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
@@ -153,6 +173,35 @@ class PaymentController extends AbstractController
         }
 
         return new JsonResponse(['status' => $payment->getStatus()]);
+    }
+
+    /**
+     * Logged-in donors use their own account. Anonymous donors submit their name/email alongside
+     * the payment; that email reuses an existing account untouched if one already matches (never
+     * overwriting their name or opt-in preference), or creates a fresh one — opted out by default
+     * unless they ticked the box — so every Payment still ends up linked to a real User.
+     */
+    private function resolveDonor(Request $request, UserService $userService): ?User
+    {
+        if ($this->getUser() instanceof User) {
+            return $this->getUser();
+        }
+
+        $firstName = trim($request->request->get('firstName', ''));
+        $lastName  = trim($request->request->get('lastName', ''));
+        $email     = trim($request->request->get('email', ''));
+
+        if ($firstName === '' || $lastName === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        return $userService->findExistingByEmail($email) ?? $userService->createContact(
+            email: $email,
+            firstName: $firstName,
+            lastName: $lastName,
+            noteContent: 'Contact created via a donation made while not logged in.',
+            optIn: $request->request->getBoolean('optIn'),
+        );
     }
 
     /** Validates and normalises a submitted amount into a decimal(8,2) string, or null if invalid. */

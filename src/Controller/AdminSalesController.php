@@ -146,7 +146,17 @@ class AdminSalesController extends AbstractController
         ]);
     }
 
-    /** Only a still-open draft can be deleted — a completed or cancelled order is kept as a financial record even if it has no payments (e.g. a free order). */
+    /**
+     * Only a still-open draft can be deleted, and only if every payment against it is still
+     * pending or failed (a completed/succeeded/refunded payment means this is a real financial
+     * record, kept even if the order itself never got marked complete). A pending/failed payment
+     * never went anywhere — Stripe never took money against it, or the attempt was cancelled/
+     * declined — so it's deleted along with the order rather than left as a dangling record:
+     * Payment.order is nullable with onDelete: SET NULL specifically so deleting an order never
+     * fails outright, but leaving one of these behind would silently orphan it, and an orphaned
+     * payment (no order, no attendee) reads as a donation in the UI — exactly the confusing state
+     * this guard exists to prevent.
+     */
     #[Route('/{id}/delete', name: 'app_admin_sale_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(Request $request, SalesOrder $order, EntityManagerInterface $em, NoteRepository $noteRepository): Response
     {
@@ -154,10 +164,21 @@ class AdminSalesController extends AbstractController
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
         }
 
+        foreach ($order->getPayments() as $payment) {
+            if (!in_array($payment->getStatus(), [Payment::STATUS_PENDING, Payment::STATUS_FAILED], true)) {
+                $this->addFlash('error', 'This order has payment history and can\'t be deleted — it\'s kept as a record.');
+                return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+            }
+        }
+
         $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_ORDER, $order->getId());
         if ($pinnedCount > 0) {
             $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
             return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        foreach ($order->getPayments() as $payment) {
+            $em->remove($payment);
         }
 
         foreach ($noteRepository->findForNoteable(Note::TYPE_ORDER, $order->getId()) as $note) {
