@@ -17,6 +17,7 @@
           <th>Amount</th>
           <th>Status</th>
           <th>Transaction ID</th>
+          {% if is_granted('ROLE_ADMIN') %}<th></th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -43,6 +44,19 @@
             <td class="admin-table__muted">£{{ payment.amount }}</td>
             <td><span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span></td>
             <td class="admin-table__muted" style="font-size:0.78rem;">{{ payment.stripePaymentIntentId ?: '—' }}</td>
+            {% if is_granted('ROLE_ADMIN') %}
+              <td>
+                {% if payment.status != 'succeeded' %}
+                  <form method="post" action="{{ path('app_admin_payment_delete', {id: payment.id}) }}"
+                        onsubmit="return confirm('Delete this payment record? This can\'t be undone.');">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_payment_delete_' ~ payment.id) }}">
+                    <button type="submit" class="btn btn--ghost btn--sm" title="Delete payment" aria-label="Delete payment" style="color:var(--red);border-color:var(--red);padding:0.35rem 0.5rem;line-height:1;">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
+            {% endif %}
           </tr>
         {% endfor %}
       </tbody>

@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\Payment;
 use App\Repository\PaymentRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -73,6 +75,29 @@ class AdminPaymentController extends AbstractController
         $response->headers->set('Content-Disposition', 'attachment; filename="payments-' . (new \DateTimeImmutable())->format('Y-m-d') . '.csv"');
 
         return $response;
+    }
+
+    /** Removes a payment record outright — restricted to admins, and only while it never succeeded (or has since been fully/partially refunded away), since a still-succeeded payment is real financial history worth keeping. */
+    #[Route('/{id}/delete', name: 'app_admin_payment_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(Request $request, Payment $payment, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_payment_delete_' . $payment->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Invalid request — please try again.');
+            return $this->redirectToRoute('app_admin_payments');
+        }
+
+        if ($payment->getStatus() === Payment::STATUS_SUCCEEDED) {
+            $this->addFlash('error', 'A succeeded payment can\'t be deleted — it\'s kept as a record.');
+            return $this->redirectToRoute('app_admin_payments');
+        }
+
+        $em->remove($payment);
+        $em->flush();
+
+        $this->addFlash('success', 'Payment deleted.');
+
+        return $this->redirectToRoute('app_admin_payments');
     }
 
     /** @return array{0: ?\DateTimeImmutable, 1: ?\DateTimeImmutable} */

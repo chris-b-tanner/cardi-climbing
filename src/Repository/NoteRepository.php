@@ -64,18 +64,4 @@ class NoteRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
-
-    /** @return int[] IDs of pinned notes whose content matches {query} — backs the Actions page's content search. */
-    public function searchPinnedIds(string $query): array
-    {
-        $rows = $this->createQueryBuilder('n')
-            ->select('n.id')
-            ->where('n.pinned = true')
-            ->andWhere('n.content LIKE :q')
-            ->setParameter('q', '%' . $query . '%')
-            ->getQuery()
-            ->getScalarResult();
-
-        return array_map(static fn (array $row) => (int) $row['id'], $rows);
-    }
 }

@@ -31,9 +31,14 @@ class AdminActionsController extends AbstractController
         ]);
     }
 
-    /** Backs the Actions page's content search box — every pinned note is already in the page, so this just returns which ones (by id) match, for the client to filter by. */
+    /**
+     * Backs the Actions page's search box — every pinned note is already in the page, so this just
+     * returns which ones (by id) match, for the client to filter by. Matches on the note's own
+     * content as well as its resolved target's label (which, for a member or booking note, is the
+     * person's name) — the same label already shown on the card, so search and what's visible agree.
+     */
     #[Route('/search', name: 'app_admin_actions_search')]
-    public function search(Request $request, NoteRepository $noteRepository): JsonResponse
+    public function search(Request $request, NoteRepository $noteRepository, NoteableResolver $resolver): JsonResponse
     {
         $query = trim($request->query->get('q', ''));
 
@@ -41,6 +46,18 @@ class AdminActionsController extends AbstractController
             return $this->json(['ids' => null]);
         }
 
-        return $this->json(['ids' => $noteRepository->searchPinnedIds($query)]);
+        $needle = mb_strtolower($query);
+        $ids = [];
+
+        foreach ($noteRepository->findAllPinned() as $note) {
+            $label = $resolver->resolve($note)['label'] ?? '';
+            $haystack = mb_strtolower($note->getContent() . ' ' . $label);
+
+            if (str_contains($haystack, $needle)) {
+                $ids[] = $note->getId();
+            }
+        }
+
+        return $this->json(['ids' => $ids]);
     }
 }
