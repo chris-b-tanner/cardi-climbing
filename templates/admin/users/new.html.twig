@@ -17,13 +17,15 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user_new') }}">
 
       <div class="card">
-        <div class="form-group">
-          <label for="firstName">First name</label>
-          <input type="text" id="firstName" name="firstName" class="form-control dup-check" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label for="lastName">Last name</label>
-          <input type="text" id="lastName" name="lastName" class="form-control dup-check" autocomplete="off">
+        <div class="detail-grid" style="margin-bottom:1rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="firstName">First name</label>
+            <input type="text" id="firstName" name="firstName" class="form-control dup-check" autocomplete="off">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="lastName">Last name</label>
+            <input type="text" id="lastName" name="lastName" class="form-control dup-check" autocomplete="off">
+          </div>
         </div>
         <div class="form-group">
           <label for="company">Company</label>
@@ -51,13 +53,22 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn--teal">Create member</button>
+        <button type="submit" class="btn btn--teal">Create</button>
         <a href="{{ path('app_admin_users') }}" class="btn btn--ghost">Cancel</a>
       </div>
     </form>
   </div>
 
   <div class="new-member-duplicates">
+    <div class="card">
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="memo">Memo</label>
+        <textarea id="memo" name="memo" form="new-member-form" class="form-control" rows="5"
+                  placeholder="Skills, experience, background…" style="resize:vertical;"></textarea>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">This content is searchable from the People list.</p>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card__label" style="margin-bottom:0.75rem;">Potential duplicates</div>
       <p id="dup-empty" style="font-size:0.85rem;color:var(--muted);margin:0;">Fill in a name, email, phone, or company above to check for existing members.</p>

@@ -142,6 +142,7 @@ class AdminController extends AbstractController
     public function newUser(
         Request $request,
         UserService $userService,
+        EntityManagerInterface $em,
     ): Response {
         $error = null;
 
@@ -172,6 +173,12 @@ class AdminController extends AbstractController
                     optIn: $request->request->has('optIn'),
                     company: trim($request->request->get('company', '')),
                 );
+
+                $memo = trim($request->request->get('memo', ''));
+                if ($memo !== '') {
+                    $user->setMemo($memo);
+                    $em->flush();
+                }
 
                 $this->addFlash('success', 'Member created.');
                 return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
