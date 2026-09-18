@@ -18,6 +18,10 @@ class Tag
     #[ORM\Column(length: 100, unique: true)]
     private string $name;
 
+    /** Shown to staff filtering the members list by this tag, so they know what it's for. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $description = null;
+
     #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'tags')]
     private Collection $users;
 
@@ -39,6 +43,17 @@ class Tag
     public function setName(string $name): static
     {
         $this->name = $name;
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): static
+    {
+        $this->description = $description;
         return $this;
     }
 

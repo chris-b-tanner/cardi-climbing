@@ -41,15 +41,18 @@ class AdminSalesController extends AbstractController
             $status = '';
         }
         $orders = $salesOrderRepository->search($query, $status);
+        $total  = number_format(array_sum(array_map(static fn (SalesOrder $o) => (float) $o->getTotal(), $orders)), 2, '.', '');
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/sales/_list.html.twig', [
                 'orders' => $orders,
+                'total'  => $total,
             ]);
         }
 
         return $this->render('admin/sales/index.html.twig', [
             'orders'        => $orders,
+            'total'         => $total,
             'currentQuery'  => $query,
             'currentStatus' => $status,
         ]);

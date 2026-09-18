@@ -18,6 +18,7 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Description</th>
           <th>Used by</th>
           <th></th>
         </tr>
@@ -30,6 +31,7 @@
                 {{ tag.name }}
               </a>
             </td>
+            <td class="admin-table__muted">{{ tag.description ?: '—' }}</td>
             <td class="admin-table__muted">{{ tag.users|length }}</td>
             <td>
               <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">Edit</a>

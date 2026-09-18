@@ -31,6 +31,8 @@
   {% endif %}
 </div>
 
+<div id="tag-description" style="display:none;font-size:0.85rem;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.85rem;margin-top:-0.5rem;margin-bottom:1rem;"></div>
+
 {% if context != 'new_sale' %}
 <div id="merge-toolbar" style="display:none;" class="merge-toolbar">
   <span id="merge-count" class="merge-count"></span>
@@ -58,8 +60,10 @@
   .merge-count { font-size: 0.875rem; font-weight: 500; color: #0369a1; }
 </style>
 <script>
-  const searchInput = document.getElementById('search-q');
-  const tagSelect   = document.getElementById('search-tag');
+  const searchInput   = document.getElementById('search-q');
+  const tagSelect     = document.getElementById('search-tag');
+  const tagDescBox    = document.getElementById('tag-description');
+  const tagDescriptions = {{ tagDescriptions|json_encode|raw }};
   const results     = document.getElementById('results');
   const toolbar     = document.getElementById('merge-toolbar');
   const mergeBtn    = document.getElementById('merge-btn');
@@ -123,6 +127,16 @@
     });
   }
 
+  function updateTagDescription() {
+    const description = tagDescriptions[tagSelect.value];
+    if (tagSelect.value && description) {
+      tagDescBox.textContent = description;
+      tagDescBox.style.display = '';
+    } else {
+      tagDescBox.style.display = 'none';
+    }
+  }
+
   function fetchResults() {
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
@@ -166,7 +180,11 @@
     debounce = setTimeout(fetchResults, 300);
   });
 
-  tagSelect.addEventListener('change', fetchResults);
+  tagSelect.addEventListener('change', () => {
+    updateTagDescription();
+    fetchResults();
+  });
+  updateTagDescription();
 
   // Sortable column headers — delegated since the table is replaced on every fetch.
   results.addEventListener('click', (e) => {

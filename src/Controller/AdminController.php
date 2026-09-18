@@ -58,10 +58,16 @@ class AdminController extends AbstractController
             ]);
         }
 
+        $tags = $tagRepository->findBy([], ['name' => 'ASC']);
+
         return $this->render('admin/users/index.html.twig', [
-            'users'          => $users,
-            'parentIds'      => $parentIds,
-            'tags'           => $tagRepository->findBy([], ['name' => 'ASC']),
+            'users'           => $users,
+            'parentIds'       => $parentIds,
+            'tags'            => $tags,
+            'tagDescriptions' => array_combine(
+                array_map(static fn ($t) => $t->getId(), $tags),
+                array_map(static fn ($t) => $t->getDescription() ?: '', $tags),
+            ),
             'currentQuery'   => $query,
             'currentTagId'   => $tagId,
             'currentSort'    => $sort,

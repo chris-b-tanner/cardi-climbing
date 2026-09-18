@@ -36,6 +36,13 @@
           </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:right;font-weight:600;border-top:2px solid var(--border);border-bottom:none;">Total</td>
+          <td style="text-align:right;font-weight:600;border-top:2px solid var(--border);border-bottom:none;">£{{ total }}</td>
+          <td colspan="2" style="border-top:2px solid var(--border);border-bottom:none;"></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 {% endif %}

@@ -14,7 +14,7 @@
           <th>Member</th>
           <th>Type</th>
           <th>Method</th>
-          <th>Amount</th>
+          <th style="text-align:right;">Amount</th>
           <th>Status</th>
           <th>Transaction ID</th>
           {% if is_granted('ROLE_ADMIN') %}<th></th>{% endif %}
@@ -41,7 +41,7 @@
               {% endif %}
             </td>
             <td class="admin-table__muted">{{ payment.method|capitalize }}</td>
-            <td class="admin-table__muted">£{{ payment.amount }}</td>
+            <td class="admin-table__muted" style="text-align:right;">£{{ payment.amount }}</td>
             <td><span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span></td>
             <td class="admin-table__muted" style="font-size:0.78rem;">{{ payment.stripePaymentIntentId ?: '—' }}</td>
             {% if is_granted('ROLE_ADMIN') %}
@@ -63,7 +63,7 @@
       <tfoot>
         <tr>
           <td colspan="4" style="text-align:right;font-weight:600;border-top:2px solid var(--border);border-bottom:none;">Total</td>
-          <td style="font-weight:600;border-top:2px solid var(--border);border-bottom:none;">£{{ total }}</td>
+          <td style="text-align:right;font-weight:600;border-top:2px solid var(--border);border-bottom:none;">£{{ total }}</td>
           <td colspan="{{ is_granted('ROLE_ADMIN') ? 3 : 2 }}" style="border-top:2px solid var(--border);border-bottom:none;"></td>
         </tr>
       </tfoot>

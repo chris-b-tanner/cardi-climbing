@@ -19,10 +19,12 @@ class AdminPaymentController extends AbstractController
     #[Route('', name: 'app_admin_payments')]
     public function index(Request $request, PaymentRepository $paymentRepository): Response
     {
-        $query = trim($request->query->get('q', ''));
+        $query  = trim($request->query->get('q', ''));
+        $status = $this->parseStatus($request);
+        $method = $this->parseMethod($request);
         [$from, $to] = $this->parseDateRange($request);
 
-        $payments = $paymentRepository->search($query, $from, $to);
+        $payments = $this->filterByStatus($paymentRepository->search($query, $from, $to, $method), $status);
         $total    = number_format(array_sum(array_map(static fn (Payment $p) => (float) $p->getAmount(), $payments)), 2, '.', '');
 
         if ($request->isXmlHttpRequest()) {
@@ -33,21 +35,25 @@ class AdminPaymentController extends AbstractController
         }
 
         return $this->render('admin/payments/index.html.twig', [
-            'payments'     => $payments,
-            'total'        => $total,
-            'currentQuery' => $query,
-            'currentFrom'  => $request->query->get('from', ''),
-            'currentTo'    => $request->query->get('to', ''),
+            'payments'      => $payments,
+            'total'         => $total,
+            'currentQuery'  => $query,
+            'currentFrom'   => $request->query->get('from', ''),
+            'currentTo'     => $request->query->get('to', ''),
+            'currentStatus' => $status,
+            'currentMethod' => $method,
         ]);
     }
 
     #[Route('/export', name: 'app_admin_payments_export')]
     public function export(Request $request, PaymentRepository $paymentRepository): StreamedResponse
     {
-        $query = trim($request->query->get('q', ''));
+        $query  = trim($request->query->get('q', ''));
+        $status = $this->parseStatus($request);
+        $method = $this->parseMethod($request);
         [$from, $to] = $this->parseDateRange($request);
 
-        $payments = $paymentRepository->search($query, $from, $to);
+        $payments = $this->filterByStatus($paymentRepository->search($query, $from, $to, $method), $status);
 
         $response = new StreamedResponse(function () use ($payments) {
             $handle = fopen('php://output', 'w');
@@ -101,6 +107,38 @@ class AdminPaymentController extends AbstractController
         $this->addFlash('success', 'Payment deleted.');
 
         return $this->redirectToRoute('app_admin_payments');
+    }
+
+    private function parseStatus(Request $request): string
+    {
+        $status = $request->query->get('status', '');
+        $valid  = [Payment::STATUS_PENDING, Payment::STATUS_SUCCEEDED, Payment::STATUS_FAILED, Payment::STATUS_PARTIALLY_REFUNDED, Payment::STATUS_REFUNDED];
+
+        return in_array($status, $valid, true) ? $status : '';
+    }
+
+    private function parseMethod(Request $request): string
+    {
+        $method = $request->query->get('method', '');
+        $valid  = [Payment::METHOD_ONLINE, Payment::METHOD_TERMINAL, Payment::METHOD_CASH];
+
+        return in_array($method, $valid, true) ? $method : '';
+    }
+
+    /**
+     * Payment::getStatus() is derived (from succeededAt/failedAt/refunds), not a persisted column,
+     * so it can't be filtered in the repository's DQL — done here in PHP instead.
+     *
+     * @param Payment[] $payments
+     * @return Payment[]
+     */
+    private function filterByStatus(array $payments, string $status): array
+    {
+        if ($status === '') {
+            return $payments;
+        }
+
+        return array_values(array_filter($payments, static fn (Payment $p) => $p->getStatus() === $status));
     }
 
     /** @return array{0: ?\DateTimeImmutable, 1: ?\DateTimeImmutable} */

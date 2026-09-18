@@ -44,6 +44,7 @@ class AdminTagController extends AbstractController
             } else {
                 $tag = new Tag();
                 $tag->setName($name);
+                $tag->setDescription(trim($request->request->get('description', '')) ?: null);
 
                 $em->persist($tag);
                 $em->flush();
@@ -78,6 +79,7 @@ class AdminTagController extends AbstractController
                 $error = 'A tag with that name already exists.';
             } else {
                 $tag->setName($name);
+                $tag->setDescription(trim($request->request->get('description', '')) ?: null);
 
                 $em->flush();
 

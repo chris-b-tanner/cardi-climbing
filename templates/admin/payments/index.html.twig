@@ -8,8 +8,22 @@
 </div>
 
 <div class="filter-form">
-  <input type="search" id="search-q" placeholder="Search name, email or transaction ID…"
+  <input type="search" id="search-q" placeholder="Search…" style="flex:0 0 11rem;"
          value="{{ currentQuery }}" aria-label="Search payments" autocomplete="off">
+  <select id="search-status" aria-label="Filter by status">
+    <option value="">All statuses</option>
+    <option value="pending"{{ currentStatus == 'pending' ? ' selected' : '' }}>Pending</option>
+    <option value="succeeded"{{ currentStatus == 'succeeded' ? ' selected' : '' }}>Succeeded</option>
+    <option value="failed"{{ currentStatus == 'failed' ? ' selected' : '' }}>Failed</option>
+    <option value="partially_refunded"{{ currentStatus == 'partially_refunded' ? ' selected' : '' }}>Partially refunded</option>
+    <option value="refunded"{{ currentStatus == 'refunded' ? ' selected' : '' }}>Refunded</option>
+  </select>
+  <select id="search-method" aria-label="Filter by method">
+    <option value="">All methods</option>
+    <option value="online"{{ currentMethod == 'online' ? ' selected' : '' }}>Online</option>
+    <option value="terminal"{{ currentMethod == 'terminal' ? ' selected' : '' }}>Terminal</option>
+    <option value="cash"{{ currentMethod == 'cash' ? ' selected' : '' }}>Cash</option>
+  </select>
   <input type="date" id="search-from" value="{{ currentFrom }}" aria-label="From date">
   <input type="date" id="search-to" value="{{ currentTo }}" aria-label="To date">
 </div>
@@ -22,6 +36,8 @@
 {% block scripts %}
 <script>
   const searchInput = document.getElementById('search-q');
+  const statusInput = document.getElementById('search-status');
+  const methodInput = document.getElementById('search-method');
   const fromInput   = document.getElementById('search-from');
   const toInput     = document.getElementById('search-to');
   const results     = document.getElementById('results');
@@ -33,6 +49,8 @@
   function currentParams() {
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
+    if (statusInput.value) params.set('status', statusInput.value);
+    if (methodInput.value) params.set('method', methodInput.value);
     if (fromInput.value)   params.set('from', fromInput.value);
     if (toInput.value)     params.set('to', toInput.value);
     return params;
@@ -59,6 +77,8 @@
     clearTimeout(debounce);
     debounce = setTimeout(fetchResults, 300);
   });
+  statusInput.addEventListener('change', fetchResults);
+  methodInput.addEventListener('change', fetchResults);
   fromInput.addEventListener('change', fetchResults);
   toInput.addEventListener('change', fetchResults);
 

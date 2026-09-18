@@ -18,11 +18,13 @@ class PaymentRepository extends ServiceEntityRepository
 
     /**
      * Admin payments list — searchable by member name/email or Stripe payment intent ID, with an
-     * optional createdAt date range. $from/$to are inclusive.
+     * optional createdAt date range and method filter. $from/$to are inclusive. There's no status
+     * filter here: Payment::getStatus() is derived (from succeededAt/failedAt/refunds), not a
+     * persisted column, so the controller filters by status in PHP after fetching.
      *
      * @return Payment[]
      */
-    public function search(string $query = '', ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): array
+    public function search(string $query = '', ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null, string $method = ''): array
     {
         $qb = $this->createQueryBuilder('p')
             ->innerJoin('p.user', 'u')->addSelect('u')
@@ -39,6 +41,10 @@ class PaymentRepository extends ServiceEntityRepository
 
         if ($to !== null) {
             $qb->andWhere('p.createdAt <= :to')->setParameter('to', $to);
+        }
+
+        if ($method !== '') {
+            $qb->andWhere('p.method = :method')->setParameter('method', $method);
         }
 
         return $qb->getQuery()->getResult();
