@@ -60,6 +60,13 @@
           </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" style="text-align:right;font-weight:600;border-top:2px solid var(--border);border-bottom:none;">Total</td>
+          <td style="font-weight:600;border-top:2px solid var(--border);border-bottom:none;">£{{ total }}</td>
+          <td colspan="{{ is_granted('ROLE_ADMIN') ? 3 : 2 }}" style="border-top:2px solid var(--border);border-bottom:none;"></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 {% endif %}

@@ -23,15 +23,18 @@ class AdminPaymentController extends AbstractController
         [$from, $to] = $this->parseDateRange($request);
 
         $payments = $paymentRepository->search($query, $from, $to);
+        $total    = number_format(array_sum(array_map(static fn (Payment $p) => (float) $p->getAmount(), $payments)), 2, '.', '');
 
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/payments/_list.html.twig', [
                 'payments' => $payments,
+                'total'    => $total,
             ]);
         }
 
         return $this->render('admin/payments/index.html.twig', [
             'payments'     => $payments,
+            'total'        => $total,
             'currentQuery' => $query,
             'currentFrom'  => $request->query->get('from', ''),
             'currentTo'    => $request->query->get('to', ''),
