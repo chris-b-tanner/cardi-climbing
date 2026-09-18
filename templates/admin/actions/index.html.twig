@@ -4,11 +4,16 @@
 {% block content %}
 <div class="page-header">
   <h1>Actions</h1>
+  {% if items is not empty %}
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <input type="search" id="actions-search" class="form-control" style="width:14rem;" placeholder="Search notes…" aria-label="Search notes by content">
+    </div>
+  {% endif %}
 </div>
 
 {% macro action_card(item, singular) %}
   {% set note = item.note %}
-  <div class="card actions-card" data-assigned-to-id="{{ note.assignedTo ? note.assignedTo.id : '0' }}">
+  <div class="card actions-card" data-note-id="{{ note.id }}" data-assigned-to-id="{{ note.assignedTo ? note.assignedTo.id : '0' }}">
     <div class="card__label" style="margin-bottom:0.4rem;">
       {% if item.target.url %}
         <a href="{{ item.target.url }}" class="admin-table__link">{{ item.target.label }}</a>
@@ -131,8 +136,11 @@
     const panels         = document.querySelectorAll('.tab-panel[data-tab-panel]');
     const assignedFilter = document.getElementById('assigned-to-filter');
     const assignedToMe   = document.getElementById('assigned-to-me');
+    const searchInput    = document.getElementById('actions-search');
+    const searchUrl      = {{ path('app_admin_actions_search')|json_encode|raw }};
     const currentUserId  = {{ app.user.id }};
     let currentTab = null;
+    let matchingNoteIds = null; // null = search inactive; Set<string> once a query has returned results
 
     function applyFilters() {
       const assignedToId = assignedFilter.value;
@@ -142,7 +150,9 @@
         p.style.display = p.dataset.tabPanel === currentTab ? '' : 'none';
         let visibleCount = 0;
         p.querySelectorAll('.actions-card').forEach(card => {
-          const matches = assignedToId === '' || card.dataset.assignedToId === assignedToId;
+          const matchesAssigned = assignedToId === '' || card.dataset.assignedToId === assignedToId;
+          const matchesSearch   = matchingNoteIds === null || matchingNoteIds.has(card.dataset.noteId);
+          const matches = matchesAssigned && matchesSearch;
           card.style.display = matches ? '' : 'none';
           if (matches) visibleCount++;
         });
@@ -158,6 +168,37 @@
       assignedFilter.value = String(currentUserId);
       applyFilters();
     });
+
+    if (searchInput) {
+      let debounceTimer = null;
+      let requestToken   = 0;
+
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim();
+        clearTimeout(debounceTimer);
+
+        if (query === '') {
+          matchingNoteIds = null;
+          applyFilters();
+          return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+          const thisToken = ++requestToken;
+          let data;
+          try {
+            const response = await fetch(searchUrl + '?q=' + encodeURIComponent(query));
+            data = await response.json();
+          } catch (e) {
+            return; // transient network error — leave the previous results showing
+          }
+          if (thisToken !== requestToken) return; // a newer keystroke's request has already landed
+
+          matchingNoteIds = new Set((data.ids || []).map(String));
+          applyFilters();
+        }, 250);
+      });
+    }
 
     // Default to the unfiltered "All" view rather than any one type.
     currentTab = 'all';

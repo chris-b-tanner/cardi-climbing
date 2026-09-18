@@ -6,6 +6,8 @@ use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\NoteableResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -27,5 +29,18 @@ class AdminActionsController extends AbstractController
             'items' => $items,
             'staff' => $userRepository->findTeam(),
         ]);
+    }
+
+    /** Backs the Actions page's content search box — every pinned note is already in the page, so this just returns which ones (by id) match, for the client to filter by. */
+    #[Route('/search', name: 'app_admin_actions_search')]
+    public function search(Request $request, NoteRepository $noteRepository): JsonResponse
+    {
+        $query = trim($request->query->get('q', ''));
+
+        if ($query === '') {
+            return $this->json(['ids' => null]);
+        }
+
+        return $this->json(['ids' => $noteRepository->searchPinnedIds($query)]);
     }
 }

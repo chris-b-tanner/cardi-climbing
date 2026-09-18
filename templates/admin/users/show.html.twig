@@ -50,6 +50,40 @@
   </div>
 {% endif %}
 
+<div class="tags-row">
+  <span class="card__label" style="margin-bottom:0;">Tags</span>
+  <div id="tag-list" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.3rem;">
+    <span class="tag-badge--none" id="tag-list-empty"{% if user.tags is not empty %} style="display:none;"{% endif %}>No tags assigned</span>
+    {% for tag in user.tags %}
+      <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}">
+        {{ tag.name }}
+        <button type="button" class="tag-badge__remove" data-tag-id="{{ tag.id }}" aria-label="Remove tag {{ tag.name }}">&times;</button>
+      </span>
+    {% endfor %}
+    {% if allTags is empty %}
+      {% if is_granted('ROLE_ADMIN') %}
+        <a href="{{ path('app_admin_settings_tag_new') }}" style="font-size:0.8rem;font-weight:600;color:var(--teal-dk);">+ Add tag</a>
+      {% else %}
+        <span style="font-size:0.8rem;color:var(--muted);">No tags exist yet — ask an admin to set one up.</span>
+      {% endif %}
+    {% else %}
+      <div class="tag-picker" id="tag-picker">
+        <button type="button" class="tag-picker__trigger" id="tag-picker-trigger" aria-haspopup="listbox" aria-expanded="false">+ Add tag</button>
+        <div class="tag-picker__menu" id="tag-picker-menu" style="display:none;" role="listbox" aria-label="Choose a tag to add">
+          <input type="text" id="tag-picker-search" class="tag-picker__search" placeholder="Search tags…" autocomplete="off">
+          <div id="tag-picker-list" class="tag-picker__list">
+            {% for tag in allTags %}
+              <button type="button" class="tag-picker__item{% if user.hasTag(tag) %} is-added is-hidden{% endif %}" data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name|lower }}" role="option">{{ tag.name }}</button>
+            {% endfor %}
+          </div>
+          <p class="tag-picker__empty" id="tag-picker-empty" style="display:none;">No matching tags.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <p id="tag-error" class="flash flash--error" style="display:none;margin-top:0.6rem;margin-bottom:0;width:100%;"></p>
+</div>
+
 <div class="member-columns member-columns--thirds">
 <div class="member-col-left">
 
@@ -195,40 +229,6 @@
   </div>
 </div>
 {% endif %}
-
-<div class="card">
-  <div class="card__label" style="margin-bottom:0.6rem;">Tags</div>
-  <div id="tag-list" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.3rem;">
-    <span class="tag-badge--none" id="tag-list-empty"{% if user.tags is not empty %} style="display:none;"{% endif %}>No tags assigned</span>
-    {% for tag in user.tags %}
-      <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}">
-        {{ tag.name }}
-        <button type="button" class="tag-badge__remove" data-tag-id="{{ tag.id }}" aria-label="Remove tag {{ tag.name }}">&times;</button>
-      </span>
-    {% endfor %}
-    {% if allTags is empty %}
-      {% if is_granted('ROLE_ADMIN') %}
-        <a href="{{ path('app_admin_settings_tag_new') }}" style="font-size:0.8rem;font-weight:600;color:var(--teal-dk);">+ Add tag</a>
-      {% else %}
-        <span style="font-size:0.8rem;color:var(--muted);">No tags exist yet — ask an admin to set one up.</span>
-      {% endif %}
-    {% else %}
-      <div class="tag-picker" id="tag-picker">
-        <button type="button" class="tag-picker__trigger" id="tag-picker-trigger" aria-haspopup="listbox" aria-expanded="false">+ Add tag</button>
-        <div class="tag-picker__menu" id="tag-picker-menu" style="display:none;" role="listbox" aria-label="Choose a tag to add">
-          <input type="text" id="tag-picker-search" class="tag-picker__search" placeholder="Search tags…" autocomplete="off">
-          <div id="tag-picker-list" class="tag-picker__list">
-            {% for tag in allTags %}
-              <button type="button" class="tag-picker__item{% if user.hasTag(tag) %} is-added is-hidden{% endif %}" data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name|lower }}" role="option">{{ tag.name }}</button>
-            {% endfor %}
-          </div>
-          <p class="tag-picker__empty" id="tag-picker-empty" style="display:none;">No matching tags.</p>
-        </div>
-      </div>
-    {% endif %}
-  </div>
-  <p id="tag-error" class="flash flash--error" style="display:none;margin-top:0.6rem;margin-bottom:0;"></p>
-</div>
 
 {% if user.memo %}
 <div class="card">
