@@ -38,19 +38,31 @@
             {% endif %}
             <td class="admin-table__muted">#{{ user.id }}</td>
             <td>
-              <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">
-                {{ displayName ?: '—' }}
-              </a>
-              {% if user.parent %}
-                <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}#family" class="family-icon"
-                   title="Dependent of {{ user.parent.displayName }}"><i class="bi bi-people-fill"></i></a>
-              {% elseif user.id in parentIds %}
-                <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
-                   title="Has dependents"><i class="bi bi-people-fill"></i></a>
-              {% endif %}
-              {% if user.company %}
-                <div class="admin-table__muted" style="font-size:0.78rem;">{{ user.company }}</div>
-              {% endif %}
+              {% set avatarUrl = avatar_url(user) %}
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                {% if avatarUrl %}
+                  <img src="{{ avatarUrl }}" alt="" style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;object-fit:cover;">
+                {% else %}
+                  <span style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;background:#eef2f1;color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">
+                    {{ (displayName ?: user.email)|slice(0, 1)|upper }}
+                  </span>
+                {% endif %}
+                <div>
+                  <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">
+                    {{ displayName ?: '—' }}
+                  </a>
+                  {% if user.parent %}
+                    <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}#family" class="family-icon"
+                       title="Dependent of {{ user.parent.displayName }}"><i class="bi bi-people-fill"></i></a>
+                  {% elseif user.id in parentIds %}
+                    <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
+                       title="Has dependents"><i class="bi bi-people-fill"></i></a>
+                  {% endif %}
+                  {% if user.company %}
+                    <div class="admin-table__muted" style="font-size:0.78rem;">{{ user.company }}</div>
+                  {% endif %}
+                </div>
+              </div>
             </td>
             <td class="admin-table__muted">{{ user.email ?: '—' }}</td>
             <td class="admin-table__muted">{{ user.phone ? (user.phone|uk_phone) : '—' }}</td>
