@@ -49,8 +49,12 @@ class AccountController extends AbstractController
             }
 
             // Captured before any setters run below — see AdminController::editUser() for why.
-            $previousEmail = $user->getEmail();
-            $previousOptIn = $user->isOptIn();
+            $previousEmail   = $user->getEmail();
+            $previousOptIn   = $user->isOptIn();
+            $previousTagIds  = array_map(
+                static fn (Tag $t) => $t->getId(),
+                array_filter($publicTags, static fn (Tag $t) => $user->hasTag($t)),
+            );
 
             $newEmail = strtolower(trim($request->request->get('email', '')));
 
@@ -105,6 +109,7 @@ class AccountController extends AbstractController
 
                 $userService->recordEmailChangeIfNeeded($user, $previousEmail, $user);
                 $userService->recordOptInChangeIfNeeded($user, $previousOptIn, $user);
+                $userService->recordPublicTagChangesIfNeeded($user, $previousTagIds, $publicTags, $user);
 
                 $this->addFlash('success', 'Your details have been updated.');
                 return $this->redirect($this->resolveReturnTo($request));

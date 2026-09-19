@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Email;
 use App\Entity\Note;
+use App\Entity\Tag;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -124,5 +125,30 @@ class UserService
         }
 
         $this->addNote($user, $user->isOptIn() ? 'Opted in to the mailing list.' : 'Opted out of the mailing list.', $actor);
+    }
+
+    /**
+     * GDPR paper trail: records a Note for each public tag ("interest group") {user} added or
+     * removed, comparing {previousTagIds} (captured before the addTag/removeTag loop ran) against
+     * the tags they carry now. Only ever called from the member's own account page — staff-side
+     * tag changes elsewhere aren't self-administered and don't need this trail.
+     *
+     * @param Tag[] $publicTags
+     * @param int[] $previousTagIds
+     */
+    public function recordPublicTagChangesIfNeeded(User $user, array $previousTagIds, array $publicTags, ?User $actor = null): void
+    {
+        foreach ($publicTags as $tag) {
+            $wasSelected = in_array($tag->getId(), $previousTagIds, true);
+            $isSelected  = $user->hasTag($tag);
+
+            if ($wasSelected === $isSelected) {
+                continue;
+            }
+
+            $this->addNote($user, $isSelected
+                ? sprintf('Opted in to "%s".', $tag->getName())
+                : sprintf('Opted out of "%s".', $tag->getName()), $actor);
+        }
     }
 }
