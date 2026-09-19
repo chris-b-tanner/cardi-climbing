@@ -55,6 +55,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $phone = null;
 
+    /** S3 object key (not a full URL) for the member's uploaded profile photo — see AvatarUploader. Null until they upload one. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $avatarPath = null;
+
     /** Admin-only field (a contact/organisation detail, not something a member sets on their own account) — shown on the admin contact view when present. */
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $website = null;
@@ -317,6 +321,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getPhone(): ?string { return $this->phone; }
     public function setPhone(?string $phone): static { $this->phone = $phone; return $this; }
+
+    public function getAvatarPath(): ?string { return $this->avatarPath; }
+    public function setAvatarPath(?string $avatarPath): static { $this->avatarPath = $avatarPath; return $this; }
 
     public function getWebsite(): ?string { return $this->website; }
     public function setWebsite(?string $website): static { $this->website = $website; return $this; }

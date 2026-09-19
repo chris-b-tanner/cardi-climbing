@@ -2,6 +2,7 @@
 
 namespace App\Twig;
 
+use App\Service\AvatarUploader;
 use App\Service\UkPhoneFormatter;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -15,12 +16,14 @@ class AppExtension extends AbstractExtension
         private readonly UrlGeneratorInterface $router,
         #[Autowire('%kernel.secret%')] private readonly string $appSecret,
         private readonly UkPhoneFormatter $ukPhoneFormatter,
+        private readonly AvatarUploader $avatarUploader,
     ) {}
 
     public function getFunctions(): array
     {
         return [
             new TwigFunction('unsubscribe_url', $this->unsubscribeUrl(...)),
+            new TwigFunction('avatar_url', $this->avatarUploader->getUrl(...)),
         ];
     }
 

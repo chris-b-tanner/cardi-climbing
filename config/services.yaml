@@ -16,6 +16,7 @@ services:
             string $doorApiKey: '%env(DOOR_API_KEY)%'
             string $doorSimSecret: '%env(DOOR_SIM_SECRET)%'
             int $doorMinFirmwareVersion: '%env(int:DOOR_MIN_FIRMWARE_VERSION)%'
+            string $s3Bucket: '%env(AWS_S3_BUCKET)%'
 
     _instanceof:
         App\Service\Fulfilment\FulfilmentHandlerInterface:
@@ -30,3 +31,12 @@ services:
 
     Stripe\StripeClient:
         arguments: ['%env(STRIPE_SECRET_KEY)%']
+
+    Aws\S3\S3Client:
+        arguments:
+            -
+                version: 'latest'
+                region: '%env(AWS_S3_REGION)%'
+                credentials:
+                    key: '%env(AWS_ACCESS_KEY_ID)%'
+                    secret: '%env(AWS_SECRET_ACCESS_KEY)%'

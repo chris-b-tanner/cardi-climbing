@@ -9,6 +9,7 @@ use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
+use App\Service\AvatarUploader;
 use App\Service\BookingService;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ class AccountController extends AbstractController
         AttendeeRepository $attendeeRepository,
         TagRepository $tagRepository,
         UserService $userService,
+        AvatarUploader $avatarUploader,
     ): Response {
         /** @var User $user */
         $user  = $this->getUser();
@@ -114,8 +116,58 @@ class AccountController extends AbstractController
             'error'      => $error,
             'attendees'  => $attendeeRepository->findAllForUser($user),
             'publicTags' => $publicTags,
+            'avatarUrl'  => $avatarUploader->getUrl($user),
             'today'      => new \DateTimeImmutable('today'),
         ]);
+    }
+
+    /** A dedicated, separate form from the main profile one — a file upload needs its own multipart encoding, and a photo change doesn't belong in the same submit/validation cycle as the rest of the profile fields. */
+    #[Route('/avatar', name: 'app_account_avatar_upload', methods: ['POST'])]
+    public function uploadAvatar(Request $request, EntityManagerInterface $em, AvatarUploader $avatarUploader): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('account_avatar', $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $file = $request->files->get('avatar');
+
+        if (!$file) {
+            $this->addFlash('error', 'Please choose a photo to upload.');
+            return $this->redirect($this->resolveReturnTo($request));
+        }
+
+        $error = $avatarUploader->upload($user, $file);
+
+        if ($error) {
+            $this->addFlash('error', $error);
+        } else {
+            $em->flush();
+            $this->addFlash('success', 'Your photo has been updated.');
+        }
+
+        return $this->redirect($this->resolveReturnTo($request));
+    }
+
+    #[Route('/avatar/remove', name: 'app_account_avatar_remove', methods: ['POST'])]
+    public function removeAvatar(Request $request, EntityManagerInterface $em, AvatarUploader $avatarUploader): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('account_avatar', $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $avatarUploader->remove($user);
+        $em->flush();
+
+        $this->addFlash('success', 'Your photo has been removed.');
+        return $this->redirect($this->resolveReturnTo($request));
     }
 
     /** A member's own (or one of their dependents') certification record — full detail, including agreed declarations and signature once complete. */
