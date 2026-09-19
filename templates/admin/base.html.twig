@@ -487,6 +487,7 @@
       {% if app.user %}
         <span class="admin-topbar__user">{{ app.user.firstName ?? app.user.email }}</span>
       {% endif %}
+      <a href="{{ path('app_account') }}" class="admin-topbar__link">My account</a>
       <a href="{{ path('app_logout') }}" class="admin-topbar__link">Sign out</a>
     </div>
 

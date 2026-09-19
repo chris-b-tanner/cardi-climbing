@@ -147,6 +147,35 @@
 
     editor.addEventListener('input', syncToTextarea);
 
+    // Pasting from Word/Google Docs/etc. brings along a wall of inline `style="..."` spans that
+    // the "Clear formatting" button can't fully undo after the fact (browsers vary in how
+    // thoroughly removeFormat unwraps deeply-nested pasted spans). Simplest robust fix: never
+    // accept the clipboard's HTML at all — take plain text only and rebuild it as bare
+    // paragraphs/line breaks, so pasted content always picks up the site's own typography instead
+    // of carrying its source formatting in with it.
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+      function escapeAndBreak(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML.replace(/\r?\n/g, '<br>');
+      }
+
+      const paragraphs = text.split(/\r?\n\s*\r?\n/);
+      // A single-paragraph paste (a phrase, a URL, a quick correction) is inserted as plain inline
+      // text — wrapping it in a <p> would split whatever paragraph it's being pasted into. Only a
+      // paste that actually contains multiple blank-line-separated paragraphs (e.g. a whole
+      // announcement pasted in from Google Docs) gets rebuilt as separate <p> blocks.
+      const html = paragraphs.length > 1
+        ? paragraphs.map((paragraph) => '<p>' + escapeAndBreak(paragraph) + '</p>').join('')
+        : escapeAndBreak(text);
+
+      document.execCommand('insertHTML', false, html);
+      syncToTextarea();
+    });
+
     form.addEventListener('submit', () => {
       // In HTML mode the textarea IS the edited content already — only the WYSIWYG side needs
       // syncing before submit, and re-syncing an already-current textarea would be a no-op anyway.
