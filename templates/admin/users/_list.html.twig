@@ -21,6 +21,7 @@
           {% endfor %}
           <th>Phone</th>
           <th>Tags</th>
+          <th class="admin-table__memo-col">Memo</th>
           {% if context == 'new_sale' %}<th></th>{% endif %}
         </tr>
       </thead>
@@ -60,6 +61,7 @@
                 <span class="admin-table__muted">—</span>
               {% endfor %}
             </td>
+            <td class="admin-table__memo-col admin-table__muted" style="font-size:0.78rem;max-width:240px;">{{ user.memo ?: '—' }}</td>
             {% if context == 'new_sale' %}
               {% set saleNewParams = {userId: user.id} %}
               {% if eventId %}{% set saleNewParams = saleNewParams|merge({eventId: eventId}) %}{% endif %}

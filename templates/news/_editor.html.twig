@@ -28,6 +28,21 @@
   .wysiwyg__editor { padding: 1.5rem; min-height: 320px; outline: none; }
   .wysiwyg__editor.news-post__body p:first-child { margin-top: 0; }
 
+  .wysiwyg__html-textarea {
+    display: block; width: 100%; min-height: 320px; padding: 1.5rem;
+    border: 1px solid var(--border); margin-bottom: 1.5rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.85rem; line-height: 1.6; color: var(--black);
+    resize: vertical;
+  }
+  .news-editor__html-toggle-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-top: -1rem; margin-bottom: 1.5rem;
+  }
+  .news-editor__html-toggle-row .wysiwyg__btn { border-color: var(--border); }
+  .news-editor__html-hint { font-size: 0.8rem; color: var(--muted); }
+  #html-toggle-btn.is-active { background: var(--black); color: var(--white); border-color: var(--black); }
+
   .news-editor__actions {
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem;
@@ -82,7 +97,14 @@
         </div>
         <div class="wysiwyg__editor news-post__body" id="body-editor" contenteditable="true"></div>
       </div>
-      <textarea id="body" name="body" style="display:none;" required>{{ post ? post.body : '' }}</textarea>
+      <textarea id="body" name="body" class="wysiwyg__html-textarea" style="display:none;" required>{{ post ? post.body : '' }}</textarea>
+
+      <p class="news-editor__html-toggle-row">
+        <button type="button" class="wysiwyg__btn" id="html-toggle-btn" title="Edit the raw HTML directly — useful if the visual editor gets confused, or to add a specific CSS class">View HTML</button>
+        <span class="news-editor__html-hint" id="html-hint" style="display:none;">
+          Editing raw HTML — switch back to the visual editor to continue formatting normally.
+        </span>
+      </p>
 
       <div class="news-editor__actions">
         <label class="news-editor__publish-label">
@@ -103,19 +125,56 @@
 {{ parent() }}
 <script>
   (function () {
-    const textarea = document.getElementById('body');
-    const editor   = document.getElementById('body-editor');
-    const toolbar  = document.querySelector('#body-wysiwyg .wysiwyg__toolbar');
-    const form     = document.getElementById('news-editor-form');
+    const textarea    = document.getElementById('body');
+    const editor      = document.getElementById('body-editor');
+    const wysiwygBox  = document.getElementById('body-wysiwyg');
+    const toolbar     = document.querySelector('#body-wysiwyg .wysiwyg__toolbar');
+    const toggleBtn   = document.getElementById('html-toggle-btn');
+    const htmlHint    = document.getElementById('html-hint');
+    const form        = document.getElementById('news-editor-form');
 
     editor.innerHTML = textarea.value;
+    let mode = 'wysiwyg'; // or 'html' — which one currently holds the authoritative content
 
     function syncToTextarea() {
       textarea.value = editor.innerHTML;
     }
 
+    function syncToEditor() {
+      editor.innerHTML = textarea.value;
+    }
+
     editor.addEventListener('input', syncToTextarea);
-    form.addEventListener('submit', syncToTextarea);
+
+    form.addEventListener('submit', () => {
+      // In HTML mode the textarea IS the edited content already — only the WYSIWYG side needs
+      // syncing before submit, and re-syncing an already-current textarea would be a no-op anyway.
+      if (mode === 'wysiwyg') syncToTextarea();
+    });
+
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      if (mode === 'wysiwyg') {
+        syncToTextarea();
+        wysiwygBox.style.display = 'none';
+        textarea.style.display = '';
+        htmlHint.style.display = '';
+        toggleBtn.classList.add('is-active');
+        toggleBtn.textContent = 'Visual editor';
+        textarea.focus();
+        mode = 'html';
+      } else {
+        syncToEditor();
+        textarea.style.display = 'none';
+        htmlHint.style.display = 'none';
+        wysiwygBox.style.display = '';
+        toggleBtn.classList.remove('is-active');
+        toggleBtn.textContent = 'View HTML';
+        editor.focus();
+        mode = 'wysiwyg';
+      }
+    });
 
     toolbar.addEventListener('click', (e) => {
       const btn = e.target.closest('.wysiwyg__btn');

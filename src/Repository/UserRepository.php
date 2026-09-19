@@ -73,13 +73,17 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /** @param 'id'|'name'|'email' $sort */
-    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc'): array
+    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc', bool $hasMemo = false): array
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
             ->leftJoin('u.parent', 'p')
             ->addSelect('t')
             ->addSelect('p');
+
+        if ($hasMemo) {
+            $qb->andWhere("u.memo IS NOT NULL AND u.memo != ''");
+        }
 
         if ($query !== '' && ctype_digit($query)) {
             // A purely numeric search is almost always someone looking up a specific contact by

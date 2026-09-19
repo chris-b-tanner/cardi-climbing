@@ -36,14 +36,14 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
         $context        = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
         // Carried through from the event view's "Add attendee" button so the sale created from
         // the "Choose" form below already knows which event/occurrence to add as a line item.
         $eventId        = $context === 'new_sale' ? (int) $request->query->get('eventId', 0) : 0;
         $occurrenceDate = $context === 'new_sale' ? trim($request->query->get('occurrenceDate', '')) : '';
 
-        $users     = $userRepository->search($query, $tagId, null, $sort, $dir);
+        $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo);
         $parentIds = $userRepository->findParentIds();
 
         if ($request->isXmlHttpRequest()) {
@@ -72,6 +72,7 @@ class AdminController extends AbstractController
             'currentTagId'   => $tagId,
             'currentSort'    => $sort,
             'currentDir'     => $dir,
+            'currentHasMemo' => $hasMemo,
             'context'        => $context,
             'eventId'        => $eventId,
             'occurrenceDate' => $occurrenceDate,
@@ -86,11 +87,11 @@ class AdminController extends AbstractController
     #[Route('/users/print', name: 'app_admin_users_print')]
     public function printUsers(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
         $tag = $tagId !== null ? $tagRepository->find($tagId) : null;
 
         return $this->render('admin/users/print.html.twig', [
-            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir),
+            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo),
             'currentQuery' => $query,
             'tag'          => $tag,
         ]);
@@ -100,8 +101,8 @@ class AdminController extends AbstractController
     #[Route('/users/export.csv', name: 'app_admin_users_export')]
     public function exportUsers(Request $request, UserRepository $userRepository, UkPhoneFormatter $ukPhoneFormatter): Response
     {
-        [$query, $tagId, $sort, $dir] = $this->resolveUserFilters($request);
-        $users = $userRepository->search($query, $tagId, null, $sort, $dir);
+        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
+        $users = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo);
 
         $handle = fopen('php://temp', 'r+');
         fputcsv($handle, ['ID', 'Name', 'Email', 'Phone', 'Tags']);
@@ -125,7 +126,7 @@ class AdminController extends AbstractController
         return $response;
     }
 
-    /** @return array{0: string, 1: ?int, 2: string, 3: string} [query, tagId, sort, dir] — the filter set shared by the members list, its print view, and its CSV export. */
+    /** @return array{0: string, 1: ?int, 2: string, 3: string, 4: bool} [query, tagId, sort, dir, hasMemo] — the filter set shared by the members list, its print view, and its CSV export. */
     private function resolveUserFilters(Request $request): array
     {
         $query = trim($request->query->get('q', ''));
@@ -134,8 +135,9 @@ class AdminController extends AbstractController
             : null;
         $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
         $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
+        $hasMemo = $request->query->getBoolean('hasMemo');
 
-        return [$query, $tagId, $sort, $dir];
+        return [$query, $tagId, $sort, $dir, $hasMemo];
     }
 
     #[Route('/users/new', name: 'app_admin_user_new', methods: ['GET', 'POST'])]
