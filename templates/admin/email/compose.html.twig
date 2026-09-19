@@ -26,8 +26,13 @@
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;font-size:0.85rem;">
       <span class="status-pill status-pill--published">Sent</span>
       <span>
-        {{ email.sentCount }} member(s) emailed on {{ email.sentAt|date('d M Y H:i') }}{% if email.sentBy %} by {{ email.sentBy.displayName }}{% endif %}
+        Queued for {{ email.sentCount }} member(s) on {{ email.sentAt|date('d M Y H:i') }}{% if email.sentBy %} by {{ email.sentBy.displayName }}{% endif %}
       </span>
+      {% if deliveredCount < email.sentCount %}
+        <span class="admin-table__muted">— {{ deliveredCount }} delivered so far</span>
+      {% else %}
+        <span class="admin-table__muted">— all delivered</span>
+      {% endif %}
     </div>
   </div>
 {% endif %}

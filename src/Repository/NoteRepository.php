@@ -42,6 +42,17 @@ class NoteRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /** How many recipients of a bulk Email have a confirmed "Emailed:" audit note so far — used to show delivery progress while the bulk_email queue is still draining (see AdminEmailController::compose()). */
+    public function countForEmail(int $emailId): int
+    {
+        return (int) $this->createQueryBuilder('n')
+            ->select('COUNT(n.id)')
+            ->where('n.email = :emailId')
+            ->setParameter('emailId', $emailId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function countPinnedFor(string $type, int $id): int
     {
         return (int) $this->createQueryBuilder('n')

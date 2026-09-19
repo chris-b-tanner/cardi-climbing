@@ -1,0 +1,23 @@
+framework:
+    messenger:
+        # Uncomment this (and the failed transport below) to send failed messages to this transport for later handling.
+        # failure_transport: failed
+
+        transports:
+            # Bulk admin-composed emails (compose/send screen) queue here instead of sending
+            # inline, so a large audience can't blow Heroku's request timeout. Consumed by
+            # `messenger:consume bulk_email` on a Heroku Scheduler job, not a worker dyno —
+            # see README/deploy notes. Everything else (password resets, receipts, confirmations)
+            # stays a direct, synchronous MailerInterface::send() call and never touches this.
+            bulk_email: '%env(MESSENGER_TRANSPORT_DSN)%'
+
+        routing:
+            'App\Message\SendBulkEmailMessage': bulk_email
+
+# when@test:
+#    framework:
+#        messenger:
+#            transports:
+#                # replace with your transport name here (e.g., my_transport: 'in-memory://')
+#                # For more Messenger testing tools, see https://github.com/zenstruck/messenger-test
+#                async: 'in-memory://'

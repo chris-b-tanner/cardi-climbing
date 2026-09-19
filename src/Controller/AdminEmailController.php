@@ -14,16 +14,13 @@ use App\Repository\NoteRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
-use App\Service\UserService;
+use App\Message\SendBulkEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Address;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Twig\Environment;
@@ -44,11 +41,6 @@ use Twig\Environment;
 #[IsGranted('ROLE_TEAM')]
 class AdminEmailController extends AbstractController
 {
-    public function __construct(
-        #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
-        #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
-    ) {}
-
     /**
      * Starts (no {id}) or resumes/views (with {id}) an email. A fixed audience for a brand-new
      * one is read from the query string (eventId/certificationId/userId — the "Email" buttons on
@@ -66,6 +58,7 @@ class AdminEmailController extends AbstractController
         AttendeeRepository $attendeeRepository,
         CertificationRepository $certificationRepository,
         UserCertificationRepository $userCertificationRepository,
+        NoteRepository $noteRepository,
     ): Response {
         $email = $id ? $emailRepository->find($id) : new Email();
         if (!$email) {
@@ -84,6 +77,9 @@ class AdminEmailController extends AbstractController
             'eventAudience'          => $eventAudience,
             'certificationAudience'  => $certificationAudience,
             'userAudience'           => $userAudience,
+            // Sending is queued (see send()/SendBulkEmailMessageHandler), so sentCount is how many
+            // were queued, not how many have actually gone out yet — this is the confirmed count.
+            'deliveredCount'         => $email->getId() ? $noteRepository->countForEmail($email->getId()) : 0,
         ]);
     }
 
@@ -271,8 +267,7 @@ class AdminEmailController extends AbstractController
         AttendeeRepository $attendeeRepository,
         CertificationRepository $certificationRepository,
         UserCertificationRepository $userCertificationRepository,
-        MailerInterface $mailer,
-        UserService $userService,
+        MessageBusInterface $bus,
         EntityManagerInterface $em,
     ): Response {
         if (!$this->isCsrfTokenValid('send_email_' . $email->getId(), $request->request->get('_csrf_token'))) {
@@ -286,7 +281,6 @@ class AdminEmailController extends AbstractController
         }
 
         $params = $email->getAudienceParams() ?? [];
-        $isFixedAudience = in_array($email->getAudienceType(), [Email::AUDIENCE_EVENT, Email::AUDIENCE_CERTIFICATION, Email::AUDIENCE_USER], true);
 
         $recipients = match ($email->getAudienceType()) {
             Email::AUDIENCE_EVENT => $this->resolveEventAudience(
@@ -311,13 +305,10 @@ class AdminEmailController extends AbstractController
             return $this->redirectToRoute('app_admin_email_compose_edit', ['id' => $email->getId()]);
         }
 
-        $htmlTemplate = $email->isUseBlankLayout() ? 'email/bulk_blank.html.twig' : 'email/bulk.html.twig';
-        $textTemplate = $email->isUseBlankLayout() ? 'email/bulk_blank.txt.twig' : 'email/bulk.txt.twig';
-
         /** @var User $sender */
         $sender = $this->getUser();
 
-        $sent    = 0;
+        $queued  = 0;
         $skipped = [];
 
         foreach ($recipients as $user) {
@@ -326,45 +317,18 @@ class AdminEmailController extends AbstractController
                 continue;
             }
 
-            $context = [
-                'subject' => $email->getSubject(),
-                'body'    => $email->getBody(),
-                'user'    => $user,
-            ];
-
-            // Event-attendee, certification-holder, and single-member emails aren't a newsletter
-            // — no unsubscribe footer (omitting recipientEmail suppresses it).
-            if (!$isFixedAudience) {
-                $context['recipientEmail'] = $user->getEmail();
-            }
-
-            $message = (new TemplatedEmail())
-                ->from(new Address($this->mailerFrom, $this->mailerFromName))
-                ->to($user->getEmail())
-                ->subject($email->getSubject())
-                ->htmlTemplate($htmlTemplate)
-                ->textTemplate($textTemplate)
-                ->context($context);
-
-            try {
-                $mailer->send($message);
-                $sent++;
-                // Per-recipient audit trail — "who was sent what" — linked back to the full
-                // Email record (subject, body, audience) via Note::$email.
-                $userService->addNote($user, 'Emailed: ' . $email->getSubject(), $sender, $email);
-            } catch (\Throwable $e) {
-                // One bad address (or a transient mailer error) shouldn't halt the whole batch and
-                // leave everyone after it in the list never emailed.
-                $skipped[] = $user;
-                error_log('Email #' . $email->getId() . ' failed for user ' . $user->getId() . ': ' . $e->getMessage());
-            }
+            // Actual sending happens later, off-request, in SendBulkEmailMessageHandler — this
+            // just hands each recipient to the bulk_email queue so a large audience can't blow
+            // the request timeout. See config/packages/messenger.yaml for how that's consumed.
+            $bus->dispatch(new SendBulkEmailMessage($email->getId(), $user->getId(), $sender->getId()));
+            $queued++;
         }
 
         $email->markSent($sender);
-        $email->setSentCount($sent);
+        $email->setSentCount($queued);
         $em->flush();
 
-        $this->addFlash('success', sprintf('Email sent to %d member%s.', $sent, $sent === 1 ? '' : 's'));
+        $this->addFlash('success', sprintf('Queued %d member%s to be emailed — delivery happens in the background.', $queued, $queued === 1 ? '' : 's'));
         if ($skipped) {
             $this->addFlash('error', sprintf(
                 '%d member%s could not be emailed and %s skipped: %s.',
