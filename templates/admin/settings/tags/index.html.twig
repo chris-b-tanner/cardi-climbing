@@ -19,6 +19,7 @@
         <tr>
           <th>Name</th>
           <th>Description</th>
+          <th>Public</th>
           <th>Used by</th>
           <th></th>
         </tr>
@@ -32,6 +33,13 @@
               </a>
             </td>
             <td class="admin-table__muted">{{ tag.description ?: '—' }}</td>
+            <td>
+              {% if tag.public %}
+                <span class="status-pill status-pill--published">Public</span>
+              {% else %}
+                <span class="admin-table__muted">—</span>
+              {% endif %}
+            </td>
             <td class="admin-table__muted">{{ tag.users|length }}</td>
             <td>
               <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">Edit</a>

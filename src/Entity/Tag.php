@@ -22,6 +22,10 @@ class Tag
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    /** Public tags double as newsletter "interest groups" — offered as opt-in checkboxes on the member's own account page (§ AccountController::edit()), not just an internal staff filter. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $public = false;
+
     #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'tags')]
     private Collection $users;
 
@@ -54,6 +58,17 @@ class Tag
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+        return $this;
+    }
+
+    public function isPublic(): bool
+    {
+        return $this->public;
+    }
+
+    public function setPublic(bool $public): static
+    {
+        $this->public = $public;
         return $this;
     }
 

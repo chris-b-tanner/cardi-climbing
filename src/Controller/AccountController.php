@@ -3,9 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Attendee;
+use App\Entity\Tag;
 use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Repository\AttendeeRepository;
+use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\BookingService;
 use App\Service\UserService;
@@ -27,11 +29,16 @@ class AccountController extends AbstractController
         EntityManagerInterface $em,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
+        TagRepository $tagRepository,
         UserService $userService,
     ): Response {
         /** @var User $user */
         $user  = $this->getUser();
         $error = null;
+
+        // Public tags double as newsletter "interest groups" offered as checkboxes below — needed
+        // for both rendering them and validating/saving a submission.
+        $publicTags = $tagRepository->findBy(['public' => true], ['name' => 'ASC']);
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('account_edit', $request->request->get('_csrf_token'))) {
@@ -52,6 +59,17 @@ class AccountController extends AbstractController
                 }
             }
 
+            $newOptIn        = $request->request->has('optIn');
+            $submittedTagIds = array_map('intval', $request->request->all('tags'));
+            $hasSelectedTag  = (bool) array_filter(
+                $publicTags,
+                static fn (Tag $t) => in_array($t->getId(), $submittedTagIds, true),
+            );
+
+            if (!$error && $hasSelectedTag && !$newOptIn) {
+                $error = 'Please tick "Keep me updated about Y Wal news" to subscribe to any interest groups below.';
+            }
+
             if (!$error) {
                 $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
                 $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
@@ -62,13 +80,24 @@ class AccountController extends AbstractController
                 $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
                 $user->setTown(trim($request->request->get('town', '')) ?: null);
                 $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
-                $user->setOptIn($request->request->has('optIn'));
+                $user->setOptIn($newOptIn);
 
                 $dob = trim($request->request->get('dateOfBirth', ''));
                 $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
 
                 $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
                 $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
+
+                // Only ever touches public tags — never removes a non-public tag staff may have
+                // assigned internally, since those never appear as a checkbox here at all.
+                foreach ($publicTags as $tag) {
+                    $selected = in_array($tag->getId(), $submittedTagIds, true);
+                    if ($selected && !$user->hasTag($tag)) {
+                        $user->addTag($tag);
+                    } elseif (!$selected && $user->hasTag($tag)) {
+                        $user->removeTag($tag);
+                    }
+                }
 
                 $em->flush();
 
@@ -81,10 +110,11 @@ class AccountController extends AbstractController
         }
 
         return $this->render('account/edit.html.twig', [
-            'user'      => $user,
-            'error'     => $error,
-            'attendees' => $attendeeRepository->findAllForUser($user),
-            'today'     => new \DateTimeImmutable('today'),
+            'user'       => $user,
+            'error'      => $error,
+            'attendees'  => $attendeeRepository->findAllForUser($user),
+            'publicTags' => $publicTags,
+            'today'      => new \DateTimeImmutable('today'),
         ]);
     }
 

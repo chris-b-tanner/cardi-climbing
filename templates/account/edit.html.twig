@@ -37,7 +37,7 @@
   }
   .field input:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
 
-  .optin-label {
+  label.optin-label {
     display: flex; align-items: center; gap: 0.5rem;
     font-size: 0.875rem; color: #1a1a1a; cursor: pointer;
   }
@@ -145,6 +145,28 @@
         <input type="hidden" name="returnTo" value="{{ path('app_account', {_fragment: 'info'}) }}">
 
         {% include 'account/_profile_fields.html.twig' with {user: user} %}
+
+        {% if publicTags is not empty %}
+        <div class="account-card">
+          <div class="account-card__title">Communication preferences</div>
+          <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">
+            Choose which updates you'd like to receive. Requires "Keep me updated about Y Wal news" (above) to be ticked.
+          </p>
+          {% for tag in publicTags %}
+            <div class="field" style="{% if loop.last %}margin-bottom:0;{% endif %}">
+              <label class="optin-label" style="align-items:flex-start;">
+                <input type="checkbox" name="tags[]" value="{{ tag.id }}"{% if user.hasTag(tag) %} checked{% endif %} style="margin-top:0.15rem;">
+                <span>
+                  <span style="display:block;">{{ tag.name }}</span>
+                  {% if tag.description %}
+                    <span style="display:block;font-size:0.8rem;color:#6b7280;font-weight:normal;margin-top:0.1rem;">{{ tag.description }}</span>
+                  {% endif %}
+                </span>
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+        {% endif %}
 
         {% if user.dependents is not empty %}
         <div class="account-card">

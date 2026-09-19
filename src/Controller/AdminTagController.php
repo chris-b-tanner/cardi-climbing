@@ -45,6 +45,7 @@ class AdminTagController extends AbstractController
                 $tag = new Tag();
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
+                $tag->setPublic($request->request->has('public'));
 
                 $em->persist($tag);
                 $em->flush();
@@ -80,6 +81,7 @@ class AdminTagController extends AbstractController
             } else {
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
+                $tag->setPublic($request->request->has('public'));
 
                 $em->flush();
 

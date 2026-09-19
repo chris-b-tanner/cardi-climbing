@@ -1,0 +1,139 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ post ? 'Edit post' : 'New post' }} — Y Wal{% endblock %}
+
+{% block head %}
+<style>
+  .news-editor__title-input {
+    display: block; width: 100%; border: none; outline: none; background: transparent;
+    padding: 0; font: inherit; text-transform: inherit; letter-spacing: inherit;
+    color: var(--black);
+  }
+  .news-editor__title-input::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; }
+
+  .news-editor__slug-group { max-width: 26rem; }
+
+  .wysiwyg { border: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .wysiwyg__toolbar {
+    display: flex; flex-wrap: wrap; gap: 0.25rem;
+    padding: 0.5rem; background: var(--offwhite); border-bottom: 1px solid var(--border);
+  }
+  .wysiwyg__btn {
+    border: 1px solid transparent; background: none; cursor: pointer;
+    min-width: 2.25rem; height: 2.25rem; padding: 0 0.5rem;
+    font-family: var(--f-body); font-size: 0.8rem; font-weight: 600; color: var(--black);
+  }
+  .wysiwyg__btn:hover { border-color: var(--border); background: var(--white); }
+  .wysiwyg__sep { width: 1px; background: var(--border); margin: 0.3rem 0.25rem; }
+  .wysiwyg__editor { padding: 1.5rem; min-height: 320px; outline: none; }
+  .wysiwyg__editor.news-post__body p:first-child { margin-top: 0; }
+
+  .news-editor__actions {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem;
+  }
+  .news-editor__publish-label {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.9rem; color: var(--black); cursor: pointer;
+  }
+  .news-editor__publish-label input { width: 1.1rem; height: 1.1rem; accent-color: var(--teal-dk); }
+  .news-editor__buttons { display: flex; gap: 0.75rem; }
+  .news-editor__buttons .btn { width: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section news-post">
+  <div class="wrap news-post__wrap">
+    <a href="{{ path('app_admin_news') }}" class="news-post__back">&larr; Back to news list</a>
+
+    {% if error %}
+      <div class="alert alert--error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ post ? path('app_news_edit', {id: post.id}) : path('app_news_new') }}" novalidate id="news-editor-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token(post ? 'news_edit_' ~ post.id : 'news_new') }}">
+
+      <input type="text" name="title" id="title" class="news-post__h1 news-editor__title-input"
+             placeholder="Post title" value="{{ post ? post.title : '' }}" autocomplete="off" required>
+
+      <div class="form-group news-editor__slug-group">
+        <label for="slug">URL slug</label>
+        <input type="text" name="slug" id="slug" class="form-control"
+               value="{{ post ? post.slug : '' }}" placeholder="Leave blank to generate from the title" autocomplete="off">
+      </div>
+
+      <div class="wysiwyg" id="body-wysiwyg">
+        <div class="wysiwyg__toolbar" role="toolbar" aria-label="Formatting">
+          <button type="button" class="wysiwyg__btn" data-command="bold" title="Bold"><strong>B</strong></button>
+          <button type="button" class="wysiwyg__btn" data-command="italic" title="Italic"><em>I</em></button>
+          <button type="button" class="wysiwyg__btn" data-command="underline" title="Underline"><span style="text-decoration:underline;">U</span></button>
+          <span class="wysiwyg__sep"></span>
+          <button type="button" class="wysiwyg__btn" data-command="formatBlock" data-value="H3" title="Subheading">H3</button>
+          <button type="button" class="wysiwyg__btn" data-command="formatBlock" data-value="P" title="Paragraph">¶</button>
+          <span class="wysiwyg__sep"></span>
+          <button type="button" class="wysiwyg__btn" data-command="insertUnorderedList" title="Bulleted list">&bull; List</button>
+          <button type="button" class="wysiwyg__btn" data-command="insertOrderedList" title="Numbered list">1. List</button>
+          <span class="wysiwyg__sep"></span>
+          <button type="button" class="wysiwyg__btn" data-action="link" title="Add link">Link</button>
+          <button type="button" class="wysiwyg__btn" data-command="unlink" title="Remove link">Unlink</button>
+          <span class="wysiwyg__sep"></span>
+          <button type="button" class="wysiwyg__btn" data-command="removeFormat" title="Clear formatting">Clear</button>
+        </div>
+        <div class="wysiwyg__editor news-post__body" id="body-editor" contenteditable="true"></div>
+      </div>
+      <textarea id="body" name="body" style="display:none;" required>{{ post ? post.body : '' }}</textarea>
+
+      <div class="news-editor__actions">
+        <label class="news-editor__publish-label">
+          <input type="checkbox" name="published" value="1"{% if post and post.isPublished %} checked{% endif %}>
+          Published
+        </label>
+        <div class="news-editor__buttons">
+          <button type="submit" class="btn btn--teal">Save</button>
+          <a href="{{ path('app_admin_news') }}" class="btn btn--outline">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+  (function () {
+    const textarea = document.getElementById('body');
+    const editor   = document.getElementById('body-editor');
+    const toolbar  = document.querySelector('#body-wysiwyg .wysiwyg__toolbar');
+    const form     = document.getElementById('news-editor-form');
+
+    editor.innerHTML = textarea.value;
+
+    function syncToTextarea() {
+      textarea.value = editor.innerHTML;
+    }
+
+    editor.addEventListener('input', syncToTextarea);
+    form.addEventListener('submit', syncToTextarea);
+
+    toolbar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.wysiwyg__btn');
+      if (!btn) return;
+      e.preventDefault();
+      editor.focus();
+
+      if (btn.dataset.action === 'link') {
+        const url = window.prompt('Link URL:', 'https://');
+        if (url) {
+          document.execCommand('createLink', false, url);
+        }
+      } else {
+        document.execCommand(btn.dataset.command, false, btn.dataset.value || null);
+      }
+
+      syncToTextarea();
+    });
+  })();
+</script>
+{% endblock %}

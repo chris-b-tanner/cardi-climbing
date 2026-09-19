@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-header">
   <h1>News</h1>
-  <a href="{{ path('app_admin_news_new') }}" class="btn btn--teal btn--sm">+ New post</a>
+  <a href="{{ path('app_news_new') }}" class="btn btn--teal btn--sm">+ New post</a>
 </div>
 
 {% if posts is empty %}
@@ -26,7 +26,7 @@
         {% for post in posts %}
           <tr>
             <td>
-              <a href="{{ path('app_admin_news_edit', {id: post.id}) }}" class="admin-table__link">{{ post.title }}</a>
+              <a href="{{ path('app_news_edit', {id: post.id}) }}" class="admin-table__link">{{ post.title }}</a>
             </td>
             <td class="admin-table__muted">{{ post.isPublished ? post.publishedAt|date('d M Y') : '—' }}</td>
             <td>
