@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+{% block title %}Survey — Y Wal{% endblock %}
+
+{% block content %}
+{% set subSuccess = app.flashes('subscribe_success') %}
+{% set subError   = app.flashes('subscribe_error') %}
+
+<div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:4rem 1rem;">
+  <div style="max-width:440px;width:100%;text-align:center;">
+    <a href="{{ googleFormUrl }}" target="_blank" rel="noopener"
+       class="btn btn--teal" style="font-size:1rem;padding:1.4rem 3rem;width:100%;">
+      Fill out the survey
+    </a>
+
+    <div style="margin-top:3rem;">
+      <p style="font-family:var(--f-head);font-size:0.85rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">
+        Sign up for emails
+      </p>
+      {% if subSuccess %}
+        <p class="subscribe-form__msg subscribe-form__msg--success">{{ subSuccess|first }}</p>
+      {% elseif subError %}
+        <p class="subscribe-form__msg subscribe-form__msg--error">{{ subError|first }}</p>
+      {% else %}
+        <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          <input type="hidden" name="returnTo" value="{{ path('app_survey') }}">
+          <div class="subscribe-form__fields">
+            <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
+            <input type="text"  name="lastName"  class="subscribe-form__input" placeholder="Last name">
+            <input type="email" name="email"     class="subscribe-form__input" placeholder="Email address" required>
+          </div>
+          <button type="submit" class="btn btn--teal">Stay in the loop</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

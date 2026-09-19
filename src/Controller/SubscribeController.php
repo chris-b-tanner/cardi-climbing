@@ -38,7 +38,7 @@ class SubscribeController extends AbstractController
 
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->addFlash('subscribe_error', 'Please enter a valid email address.');
-            return $this->redirectToRoute('app_home');
+            return $this->redirect($this->resolveReturnTo($request));
         }
 
         $user = $userService->findExistingByEmail($email);
@@ -78,6 +78,16 @@ class SubscribeController extends AbstractController
         }
 
         $this->addFlash('subscribe_success', 'Thanks for signing up — we\'ll keep you in the loop!');
-        return $this->redirectToRoute('app_home');
+        return $this->redirect($this->resolveReturnTo($request));
+    }
+
+    /** Local-path-only, same pattern as AccountController — defaults to the homepage so the two existing forms there (which never send a returnTo) keep working unchanged. */
+    private function resolveReturnTo(Request $request): string
+    {
+        $returnTo = $request->request->get('returnTo', '');
+
+        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
+            ? $returnTo
+            : $this->generateUrl('app_home');
     }
 }
