@@ -36,14 +36,14 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
         $context        = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
         // Carried through from the event view's "Add attendee" button so the sale created from
         // the "Choose" form below already knows which event/occurrence to add as a line item.
         $eventId        = $context === 'new_sale' ? (int) $request->query->get('eventId', 0) : 0;
         $occurrenceDate = $context === 'new_sale' ? trim($request->query->get('occurrenceDate', '')) : '';
 
-        $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo);
+        $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId);
         $parentIds = $userRepository->findParentIds();
 
         if ($request->isXmlHttpRequest()) {
@@ -68,11 +68,13 @@ class AdminController extends AbstractController
                 array_map(static fn ($t) => $t->getId(), $tags),
                 array_map(static fn ($t) => $t->getDescription() ?: '', $tags),
             ),
+            'staff'          => $userRepository->findTeam(),
             'currentQuery'   => $query,
             'currentTagId'   => $tagId,
             'currentSort'    => $sort,
             'currentDir'     => $dir,
             'currentHasMemo' => $hasMemo,
+            'currentAssignedToId' => $assignedToId,
             'context'        => $context,
             'eventId'        => $eventId,
             'occurrenceDate' => $occurrenceDate,
@@ -87,11 +89,11 @@ class AdminController extends AbstractController
     #[Route('/users/print', name: 'app_admin_users_print')]
     public function printUsers(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
         $tag = $tagId !== null ? $tagRepository->find($tagId) : null;
 
         return $this->render('admin/users/print.html.twig', [
-            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo),
+            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId),
             'currentQuery' => $query,
             'tag'          => $tag,
         ]);
@@ -101,8 +103,8 @@ class AdminController extends AbstractController
     #[Route('/users/export.csv', name: 'app_admin_users_export')]
     public function exportUsers(Request $request, UserRepository $userRepository, UkPhoneFormatter $ukPhoneFormatter): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo] = $this->resolveUserFilters($request);
-        $users = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
+        $users = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId);
 
         $handle = fopen('php://temp', 'r+');
         fputcsv($handle, ['ID', 'Name', 'Email', 'Phone', 'Tags']);
@@ -126,7 +128,7 @@ class AdminController extends AbstractController
         return $response;
     }
 
-    /** @return array{0: string, 1: ?int, 2: string, 3: string, 4: bool} [query, tagId, sort, dir, hasMemo] — the filter set shared by the members list, its print view, and its CSV export. */
+    /** @return array{0: string, 1: ?int, 2: string, 3: string, 4: bool, 5: ?int} [query, tagId, sort, dir, hasMemo, assignedToId] — the filter set shared by the members list, its print view, and its CSV export. assignedToId is 0 for "unassigned", null for no filter. */
     private function resolveUserFilters(Request $request): array
     {
         $query = trim($request->query->get('q', ''));
@@ -136,8 +138,14 @@ class AdminController extends AbstractController
         $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
         $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
         $hasMemo = $request->query->getBoolean('hasMemo');
+        $assignedToRaw = $request->query->get('assignedTo', '');
+        $assignedToId = match (true) {
+            $assignedToRaw === '' => null,
+            $assignedToRaw === 'unassigned' => 0,
+            default => (int) $assignedToRaw,
+        };
 
-        return [$query, $tagId, $sort, $dir, $hasMemo];
+        return [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId];
     }
 
     #[Route('/users/new', name: 'app_admin_user_new', methods: ['GET', 'POST'])]
@@ -266,6 +274,39 @@ class AdminController extends AbstractController
         $em->flush();
 
         return new JsonResponse(['id' => $tag->getId()]);
+    }
+
+    /** Assigns (or, with an empty userId, unassigns) this contact to a team member — same modal/flow as pinned-note assignment. */
+    #[Route('/users/{id}/assign', name: 'app_admin_user_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function assign(Request $request, User $user, UserRepository $userRepository, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_user_assign_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $userId = (int) $request->request->get('userId', 0);
+
+        if (!$userId) {
+            $user->setAssignedTo(null);
+            $em->flush();
+            $this->addFlash('success', 'Contact unassigned.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $assignee = $userRepository->find($userId);
+        $isStaff  = $assignee && (in_array(User::ROLE_ADMIN, $assignee->getRoles(), true) || in_array(User::ROLE_TEAM, $assignee->getRoles(), true));
+
+        if (!$isStaff) {
+            $this->addFlash('error', 'Contacts can only be assigned to a team member.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        $user->setAssignedTo($assignee);
+        $em->flush();
+
+        $this->addFlash('success', 'Assigned to ' . $assignee->getDisplayName() . '.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
     /** Reads a named param from either a JSON body or a form-encoded one, so an action can be called by a plain fetch() as well as a form submit. */

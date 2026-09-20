@@ -72,6 +72,20 @@
           </div>
         {% endif %}
       </div>
+      <div style="margin-left:auto;font-size:0.8rem;color:var(--muted);white-space:nowrap;">
+        {% if user.assignedTo %}
+          Assigned to
+          <button type="button" class="contact-assign-trigger"
+                  data-assign-url="{{ path('app_admin_user_assign', {id: user.id}) }}"
+                  data-csrf="{{ csrf_token('admin_user_assign_' ~ user.id) }}"
+                  style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;font-weight:600;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">{{ user.assignedTo.displayName }}</button>
+        {% else %}
+          <button type="button" class="contact-assign-trigger"
+                  data-assign-url="{{ path('app_admin_user_assign', {id: user.id}) }}"
+                  data-csrf="{{ csrf_token('admin_user_assign_' ~ user.id) }}"
+                  style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Assign</button>
+        {% endif %}
+      </div>
       <p id="tag-error" class="flash flash--error" style="display:none;margin-top:0.6rem;margin-bottom:0;width:100%;"></p>
     </div>
   </div>
@@ -544,6 +558,8 @@
     {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id} %}
   </div>
 </div>
+
+{% include 'admin/_assign_modal.html.twig' with {prefix: 'contact-assign'} %}
 
 </div>
 </div>

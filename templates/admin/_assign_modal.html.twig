@@ -1,0 +1,88 @@
+{#
+  Shared "assign to a team member" modal — opened by any `.{{ prefix }}-trigger` button carrying
+  `data-assign-url` (where to POST the chosen userId) and `data-csrf`. `prefix` namespaces this
+  instance's DOM ids so more than one can exist on the same page (e.g. one for pinned notes, one
+  for the contact itself).
+#}
+<div id="{{ prefix }}-modal" class="pos-modal" style="display:none;">
+  <div id="{{ prefix }}-modal-backdrop" class="pos-modal__backdrop"></div>
+  <div class="pos-modal__box">
+    <div class="pos-modal__header">
+      <strong>Assign</strong>
+      <button type="button" id="{{ prefix }}-modal-close" class="btn btn--ghost btn--sm">✕</button>
+    </div>
+    <form id="{{ prefix }}-form" method="post">
+      <input type="hidden" name="_csrf_token" id="{{ prefix }}-csrf">
+      <input type="hidden" name="userId" id="{{ prefix }}-user-id">
+    </form>
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+      <button type="button" id="{{ prefix }}-to-me" class="btn btn--teal btn--sm">Assign to me</button>
+      <button type="button" id="{{ prefix }}-unassign" class="btn btn--ghost btn--sm">Unassign</button>
+    </div>
+    <div class="tag-picker__list" id="{{ prefix }}-staff-list" style="max-height:260px;"></div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const prefix        = {{ prefix|json_encode|raw }};
+    const modal          = document.getElementById(prefix + '-modal');
+    const backdrop       = document.getElementById(prefix + '-modal-backdrop');
+    const closeBtn       = document.getElementById(prefix + '-modal-close');
+    const form           = document.getElementById(prefix + '-form');
+    const csrfInput      = document.getElementById(prefix + '-csrf');
+    const userIdInput    = document.getElementById(prefix + '-user-id');
+    const toMeBtn        = document.getElementById(prefix + '-to-me');
+    const unassignBtn    = document.getElementById(prefix + '-unassign');
+    const staffList      = document.getElementById(prefix + '-staff-list');
+    const currentUserId  = {{ app.user.id }};
+    const staffListUrl   = '{{ path('app_admin_note_staff_list') }}';
+    let staffCache = null;
+
+    function openModal(assignUrl, csrf) {
+      form.action = assignUrl;
+      csrfInput.value = csrf;
+      modal.style.display = 'flex';
+      renderStaffList();
+    }
+
+    function closeModal() {
+      modal.style.display = 'none';
+    }
+
+    function submitAssign(userId) {
+      userIdInput.value = userId;
+      form.submit();
+    }
+
+    function renderStaffList() {
+      staffList.innerHTML = '<p style="padding:0.5rem;color:var(--muted);font-size:0.85rem;">Loading…</p>';
+
+      const load = staffCache
+        ? Promise.resolve(staffCache)
+        : fetch(staffListUrl).then(r => r.json()).then(data => { staffCache = data; return data; });
+
+      load.then(staff => {
+        staffList.innerHTML = '';
+        staff.forEach(person => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'tag-picker__item';
+          btn.textContent = person.name;
+          btn.addEventListener('click', () => submitAssign(person.id));
+          staffList.appendChild(btn);
+        });
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('.' + prefix + '-trigger');
+      if (trigger) openModal(trigger.dataset.assignUrl, trigger.dataset.csrf);
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    toMeBtn.addEventListener('click', () => submitAssign(currentUserId));
+    unassignBtn.addEventListener('click', () => submitAssign(''));
+  })();
+</script>

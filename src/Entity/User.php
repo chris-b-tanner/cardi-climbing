@@ -144,6 +144,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?User $deletedBy = null;
 
+    /** The team member currently handling this contact, if any — set from the "Assign" control on the contact view. */
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(name: 'assigned_to_id', onDelete: 'SET NULL')]
+    private ?User $assignedTo = null;
+
     public function __construct()
     {
         $this->createdAt      = new \DateTimeImmutable();
@@ -495,6 +500,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getDeletedBy(): ?User { return $this->deletedBy; }
     public function setDeletedBy(?User $deletedBy): static { $this->deletedBy = $deletedBy; return $this; }
+
+    public function getAssignedTo(): ?User { return $this->assignedTo; }
+    public function setAssignedTo(?User $assignedTo): static { $this->assignedTo = $assignedTo; return $this; }
 
     public function isDeleted(): bool { return $this->deletedAt !== null; }
 }

@@ -27,6 +27,13 @@
       <option value="{{ tag.id }}"{% if currentTagId == tag.id %} selected{% endif %}>{{ tag.name }}</option>
     {% endfor %}
   </select>
+  <select id="search-assigned-to" aria-label="Filter by assignee" style="flex:1 1 80px;">
+    <option value="">Assigned to anyone</option>
+    <option value="unassigned"{% if currentAssignedToId is same as(0) %} selected{% endif %}>Unassigned</option>
+    {% for member in staff %}
+      <option value="{{ member.id }}"{% if currentAssignedToId == member.id %} selected{% endif %}>{{ member.displayName }}</option>
+    {% endfor %}
+  </select>
   {% if context != 'new_sale' %}
     <div style="margin-left:auto;display:flex;gap:0.5rem;">
       <a id="print-link" href="{{ path('app_admin_users_print') }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm"><i class="bi bi-printer"></i> Print</a>
@@ -70,6 +77,7 @@
   const searchInput   = document.getElementById('search-q');
   const showMemoCheck = document.getElementById('show-memo');
   const tagSelect     = document.getElementById('search-tag');
+  const assignedToSelect = document.getElementById('search-assigned-to');
   const tagDescBox    = document.getElementById('tag-description');
   const tagDescriptions = {{ tagDescriptions|json_encode|raw }};
   const results     = document.getElementById('results');
@@ -149,6 +157,7 @@
     const params = new URLSearchParams();
     if (searchInput.value) params.set('q', searchInput.value);
     if (tagSelect.value)   params.set('tag', tagSelect.value);
+    if (assignedToSelect.value) params.set('assignedTo', assignedToSelect.value);
     if (showMemoCheck.checked) params.set('hasMemo', '1');
     if (currentSort !== 'name') params.set('sort', currentSort);
     if (currentDir !== 'asc')   params.set('dir', currentDir);
@@ -194,6 +203,8 @@
     fetchResults();
   });
   updateTagDescription();
+
+  assignedToSelect.addEventListener('change', fetchResults);
 
   // Both a display toggle (reveals the memo column — `results` itself is never replaced, only its
   // innerHTML is, on each fetch, so the class survives without needing to be re-applied) and a

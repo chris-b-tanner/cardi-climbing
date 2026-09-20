@@ -72,8 +72,11 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
-    /** @param 'id'|'name'|'email' $sort */
-    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc', bool $hasMemo = false): array
+    /**
+     * @param 'id'|'name'|'email' $sort
+     * @param ?int $assignedToId 0 means "unassigned"; null means no filter on assignment.
+     */
+    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc', bool $hasMemo = false, ?int $assignedToId = null): array
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
@@ -83,6 +86,13 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         if ($hasMemo) {
             $qb->andWhere("u.memo IS NOT NULL AND u.memo != ''");
+        }
+
+        if ($assignedToId === 0) {
+            $qb->andWhere('u.assignedTo IS NULL');
+        } elseif ($assignedToId !== null) {
+            $qb->andWhere('u.assignedTo = :assignedToId')
+               ->setParameter('assignedToId', $assignedToId);
         }
 
         if ($query !== '' && ctype_digit($query)) {

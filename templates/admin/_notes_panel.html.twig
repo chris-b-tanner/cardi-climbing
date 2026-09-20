@@ -74,7 +74,7 @@
           {% endif %}
           {% if note.pinned %}
             · <button type="button" class="note-assign-trigger"
-                      data-note-id="{{ note.id }}"
+                      data-assign-url="{{ path('app_admin_note_assign', {id: note.id}) }}"
                       data-csrf="{{ csrf_token('note_assign_' ~ note.id) }}"
                       style="border:none;background:none;padding:0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Assign</button>
           {% endif %}
@@ -99,81 +99,11 @@
   </div>
 </form>
 
-<div id="note-assign-modal" class="pos-modal" style="display:none;">
-  <div id="note-assign-modal-backdrop" class="pos-modal__backdrop"></div>
-  <div class="pos-modal__box">
-    <div class="pos-modal__header">
-      <strong>Assign note</strong>
-      <button type="button" id="note-assign-modal-close" class="btn btn--ghost btn--sm">✕</button>
-    </div>
-    <form id="note-assign-form" method="post">
-      <input type="hidden" name="_csrf_token" id="note-assign-csrf">
-      <input type="hidden" name="userId" id="note-assign-user-id">
-    </form>
-    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
-      <button type="button" id="note-assign-to-me" class="btn btn--teal btn--sm">Assign to me</button>
-      <button type="button" id="note-assign-unassign" class="btn btn--ghost btn--sm">Unassign</button>
-    </div>
-    <div class="tag-picker__list" id="note-assign-staff-list" style="max-height:260px;"></div>
-  </div>
-</div>
+{% include 'admin/_assign_modal.html.twig' with {prefix: 'note-assign'} %}
 
 <script>
   (function () {
-    const modal        = document.getElementById('note-assign-modal');
-    const backdrop      = document.getElementById('note-assign-modal-backdrop');
-    const closeBtn       = document.getElementById('note-assign-modal-close');
-    const form          = document.getElementById('note-assign-form');
-    const csrfInput      = document.getElementById('note-assign-csrf');
-    const userIdInput    = document.getElementById('note-assign-user-id');
-    const toMeBtn        = document.getElementById('note-assign-to-me');
-    const unassignBtn    = document.getElementById('note-assign-unassign');
-    const staffList      = document.getElementById('note-assign-staff-list');
-    const currentUserId  = {{ app.user.id }};
-    const noteAssignUrlPattern = '{{ path('app_admin_note_assign', {id: 0}) }}';
-    const staffListUrl   = '{{ path('app_admin_note_staff_list') }}';
-    let staffCache = null;
-
-    function openModal(noteId, csrf) {
-      form.action = noteAssignUrlPattern.replace('0', noteId);
-      csrfInput.value = csrf;
-      modal.style.display = 'flex';
-      renderStaffList();
-    }
-
-    function closeModal() {
-      modal.style.display = 'none';
-    }
-
-    function submitAssign(userId) {
-      userIdInput.value = userId;
-      form.submit();
-    }
-
-    function renderStaffList() {
-      staffList.innerHTML = '<p style="padding:0.5rem;color:var(--muted);font-size:0.85rem;">Loading…</p>';
-
-      const load = staffCache
-        ? Promise.resolve(staffCache)
-        : fetch(staffListUrl).then(r => r.json()).then(data => { staffCache = data; return data; });
-
-      load.then(staff => {
-        staffList.innerHTML = '';
-        staff.forEach(person => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'tag-picker__item';
-          btn.textContent = person.name;
-          btn.addEventListener('click', () => submitAssign(person.id));
-          staffList.appendChild(btn);
-        });
-      });
-    }
-
     document.addEventListener('click', (e) => {
-      const trigger = e.target.closest('.note-assign-trigger');
-      if (trigger) openModal(trigger.dataset.noteId, trigger.dataset.csrf);
-
       const toggle = e.target.closest('.note-toggle-more');
       if (toggle) {
         const target = document.getElementById(toggle.dataset.target);
@@ -184,10 +114,5 @@
         }
       }
     });
-
-    closeBtn.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-    toMeBtn.addEventListener('click', () => submitAssign(currentUserId));
-    unassignBtn.addEventListener('click', () => submitAssign(''));
   })();
 </script>

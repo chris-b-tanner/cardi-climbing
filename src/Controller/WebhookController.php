@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\UserRepository;
+use App\Service\ContactReplyMailer;
 use App\Service\UserService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,6 +36,7 @@ class WebhookController extends AbstractController
         string $secret,
         UserService $userService,
         UserRepository $userRepository,
+        ContactReplyMailer $contactReplyMailer,
     ): JsonResponse {
         if (!hash_equals($this->webhookSecret, $secret)) {
             return new JsonResponse(['error' => 'Unauthorized'], 401);
@@ -55,6 +57,7 @@ class WebhookController extends AbstractController
                 $replyText = $this->stripForwardHeader($textBody);
                 if ($replyText !== '') {
                     $userService->addNote($trackedUser, 'Email reply: ' . $replyText);
+                    $contactReplyMailer->sendReplyNotification($trackedUser, $replyText);
                 }
                 return new JsonResponse(['status' => 'noted', 'id' => $trackedUser->getId()]);
             }
