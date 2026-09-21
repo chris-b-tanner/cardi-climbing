@@ -49,6 +49,13 @@
                 <a href="{{ path('app_admin_user_show', {id: event.keyholderUser.id}) }}" class="admin-table__link">
                   {{ event.keyholderUser.displayName }}
                 </a>
+              {% elseif event.cardUser %}
+                <a href="{{ path('app_admin_user_show', {id: event.cardUser.id}) }}" class="admin-table__link">
+                  {{ event.cardUser.displayName }}
+                </a>
+                <span class="admin-table__muted">(card, no active booking)</span>
+              {% elseif event.cardUid %}
+                <span class="admin-table__muted">Unregistered card ({{ event.cardUid }})</span>
               {% else %}
                 <span class="admin-table__muted">—</span>
               {% endif %}

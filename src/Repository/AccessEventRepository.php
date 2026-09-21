@@ -28,6 +28,7 @@ class AccessEventRepository extends ServiceEntityRepository
             ->leftJoin('ae.attendee', 'a')->addSelect('a')
             ->leftJoin('a.user', 'au')->addSelect('au')
             ->leftJoin('ae.keyholderUser', 'ku')->addSelect('ku')
+            ->leftJoin('ae.cardUser', 'cu')->addSelect('cu')
             ->orderBy('ae.createdAt', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
