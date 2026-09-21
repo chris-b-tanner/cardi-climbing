@@ -96,6 +96,7 @@ class RegistrationController extends AbstractController
                 $user->setPostcode($input['postcode'] ?: null);
                 $user->setOptIn($input['optIn']);
                 $user->setPassword($passwordHasher->hashPassword($user, $password));
+                $user->setCreatedBy($user);
 
                 $em->persist($user);
                 $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId

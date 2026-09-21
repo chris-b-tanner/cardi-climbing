@@ -68,7 +68,7 @@ class AdminController extends AbstractController
                 array_map(static fn ($t) => $t->getId(), $tags),
                 array_map(static fn ($t) => $t->getDescription() ?: '', $tags),
             ),
-            'staff'          => $userRepository->findTeam(),
+            'staff'          => $userRepository->findTeam('firstName'),
             'currentQuery'   => $query,
             'currentTagId'   => $tagId,
             'currentSort'    => $sort,
@@ -309,6 +309,26 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
+    /**
+     * Pulls a hex card UID out of either a bare hex string or the scanner's own log line (e.g.
+     * "[NFC] scanned UID=B0A9FF5C (4 bytes)"), normalised to uppercase with no separators — see
+     * door-access-spec.md § Card-based entry (NFC). Returns null if nothing hex-shaped was found.
+     */
+    private function normalizeCardUid(string $raw): ?string
+    {
+        if (preg_match('/UID\s*=\s*([0-9A-Fa-f]+)/', $raw, $m)) {
+            $raw = $m[1];
+        }
+
+        $hex = strtoupper(preg_replace('/[^0-9A-Fa-f]/', '', $raw));
+
+        if ($hex === '' || strlen($hex) % 2 !== 0 || strlen($hex) > 32) {
+            return null;
+        }
+
+        return $hex;
+    }
+
     /** Reads a named param from either a JSON body or a form-encoded one, so an action can be called by a plain fetch() as well as a form submit. */
     private function paramFromRequest(Request $request, string $key): string
     {
@@ -405,6 +425,22 @@ class AdminController extends AbstractController
                     return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
                 } else {
                     $user->setKeyholderPin($keyholderPin);
+                }
+
+                $cardUidRaw = trim($request->request->get('cardUid', ''));
+                if ($cardUidRaw === '') {
+                    $user->setCardUid(null);
+                } else {
+                    $cardUid = $this->normalizeCardUid($cardUidRaw);
+                    if ($cardUid === null) {
+                        $this->addFlash('error', 'Could not read a card UID from that — paste the hex UID (e.g. "B0A9FF5C") or the scanner\'s own "UID=..." line.');
+                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                    } elseif ($userRepository->cardUidExists($cardUid, $user->getId())) {
+                        $this->addFlash('error', 'That card is already registered to another member.');
+                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                    } else {
+                        $user->setCardUid($cardUid);
+                    }
                 }
             }
 

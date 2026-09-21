@@ -77,6 +77,12 @@ class UserService
         $this->em->persist($user);
         $this->em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
 
+        // $addedBy is only set when an admin did this on the contact's behalf (e.g. "+ New person",
+        // adding a sale beneficiary); every other route here is the contact showing up on their own
+        // (subscribing, donating, replying to an email) — self-created, not creator-less.
+        $user->setCreatedBy($addedBy ?? $user);
+        $this->em->flush();
+
         $this->addNote($user, $noteContent, $addedBy);
 
         return $user;

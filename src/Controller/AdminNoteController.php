@@ -200,7 +200,7 @@ class AdminNoteController extends AbstractController
     {
         return new JsonResponse(array_map(
             static fn(User $u) => ['id' => $u->getId(), 'name' => $u->getDisplayName() ?: $u->getEmail()],
-            $this->userRepository->findTeam(),
+            $this->userRepository->findTeam('firstName'),
         ));
     }
 

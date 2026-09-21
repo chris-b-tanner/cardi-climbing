@@ -179,6 +179,21 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
+    /** Whether {uid} is already someone's registered membership card — cards and PINs live in disjoint value spaces (see door-access-spec.md § Card-based entry), so this is only ever checked against itself. */
+    public function cardUidExists(string $uid, ?int $excludeUserId = null): bool
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.cardUid = :uid')
+            ->setParameter('uid', $uid);
+
+        if ($excludeUserId !== null) {
+            $qb->andWhere('u.id != :excludeId')->setParameter('excludeId', $excludeUserId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
     public function findByAnyEmail(string $email): ?User
     {
         return $this->createQueryBuilder('u')
@@ -197,15 +212,19 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
      * Filters in PHP rather than in DQL since roles are stored as a JSON column,
      * which isn't reliably queryable across DB engines.
      *
+     * @param 'lastName'|'firstName' $sort
      * @return User[]
      */
-    public function findTeam(): array
+    public function findTeam(string $sort = 'lastName'): array
     {
+        $primary   = $sort === 'firstName' ? 'firstName' : 'lastName';
+        $secondary = $sort === 'firstName' ? 'lastName' : 'firstName';
+
         $all = $this->createQueryBuilder('u')
-            ->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
-            ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')
-            ->orderBy('sortLast', 'ASC')
-            ->addOrderBy('sortFirst', 'ASC')
+            ->addSelect("COALESCE(u.$primary, u.email) AS HIDDEN sortPrimary")
+            ->addSelect("COALESCE(u.$secondary, u.email) AS HIDDEN sortSecondary")
+            ->orderBy('sortPrimary', 'ASC')
+            ->addOrderBy('sortSecondary', 'ASC')
             ->getQuery()
             ->getResult();
 

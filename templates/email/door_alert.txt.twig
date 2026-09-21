@@ -5,8 +5,8 @@ Y WAL — DOOR ALERT
 
 {{ log.message }}
 
-Device time:   {{ log.timestamp|date('l j F Y, H:i:s') }} UTC
-Server time:   {{ log.receivedAt|date('l j F Y, H:i:s') }} UTC
+Device time:   {{ log.timestamp|date('l j F Y, H:i:s', 'UTC') }} UTC
+Server time:   {{ log.receivedAt|date('l j F Y, H:i:s', 'UTC') }} UTC
 
 This is an automated alert from the self-access door controller — no action needed from this
 email itself, but the door may need checking in person.

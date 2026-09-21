@@ -171,7 +171,14 @@
     </div>
     <div>
       <div class="card__label">Joined</div>
-      <div class="card__value">{{ user.createdAt|date('j M Y') }}</div>
+      <div class="card__value">
+        {{ user.createdAt|date('j M Y') }}
+        {% if user.createdBy == user %}
+          <span style="color:var(--muted);font-size:0.85em;">(self-registered)</span>
+        {% elseif user.createdBy %}
+          <span style="color:var(--muted);font-size:0.85em;">(added by {{ user.createdBy.displayName }})</span>
+        {% endif %}
+      </div>
     </div>
     <div>
       <div class="card__label">Date of birth</div>

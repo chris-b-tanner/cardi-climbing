@@ -189,8 +189,10 @@ class DoorAccessService
     /**
      * The active + near-future credentials a door should hold right now — an authoritative list
      * the device replaces its whole local cache with on every sync (see spec's firmware notes).
+     * `card_uid` rides alongside `pin` (§ Card-based entry) so a tap authenticates the same
+     * attendee-credential row a PIN already represents — null if the member has no card registered.
      *
-     * @return array<int, array{credential_id: int, pin: string, valid_from: \DateTimeImmutable, valid_until: \DateTimeImmutable, status: string}>
+     * @return array<int, array{credential_id: int, pin: string, card_uid: ?string, valid_from: \DateTimeImmutable, valid_until: \DateTimeImmutable, status: string}>
      */
     public function findCredentialsForDoor(int $doorId, \DateTimeImmutable $now): array
     {
@@ -213,6 +215,7 @@ class DoorAccessService
             $credentials[] = [
                 'credential_id' => $attendee->getId(),
                 'pin'           => $attendee->getPin(),
+                'card_uid'      => $attendee->getUser()->getCardUid(),
                 'valid_from'    => $validFrom,
                 'valid_until'   => $validUntil,
                 'status'        => $attendee->getPinStatus(),

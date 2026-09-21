@@ -1,5 +1,11 @@
 twig:
     file_name_pattern: '*.twig'
+    # Every stored datetime is a UTC instant (PHP's date.timezone ini setting is UTC). The club operates
+    # out of Cardigan, Wales, so the |date filter should render times in local wall-clock (BST/GMT,
+    # whichever applies) rather than UTC, wherever a template doesn't pass its own explicit timezone
+    # argument.
+    date:
+        timezone: Europe/London
 
 when@test:
     twig:

@@ -372,6 +372,7 @@ class EventController extends AbstractController
             $user->setLastName($lastName);
             $user->setOptIn($optIn);
             $user->setPassword($passwordHasher->hashPassword($user, $password));
+            $user->setCreatedBy($user);
 
             $em->persist($user);
             $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId

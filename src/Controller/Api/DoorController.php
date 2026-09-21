@@ -39,7 +39,7 @@ class DoorController extends AbstractController
     /** Per-door cooldown between alert emails — a stuck sensor generating repeat alert-worthy entries shouldn't flood an inbox (see § Server-side alerting). */
     private const ALERT_COOLDOWN_MINUTES = 10;
 
-    /** Active + near-future (next 2h) PIN credentials, plus keyholder disarm PINs, for this door — an authoritative full replace of the device's local cache on every poll. */
+    /** Active + near-future (next 2h) PIN (and, where registered, card) credentials, plus keyholder disarm PINs, for this door — an authoritative full replace of the device's local cache on every poll. */
     #[Route('/credentials', name: 'app_api_door_credentials', requirements: ['doorId' => '\d+'], methods: ['GET'])]
     public function credentials(Request $request, int $doorId): Response
     {
@@ -54,13 +54,22 @@ class DoorController extends AbstractController
         $now = new \DateTimeImmutable();
 
         $credentials = array_map(
-            static fn (array $c) => [
-                'credential_id' => $c['credential_id'],
-                'pin'           => $c['pin'],
-                'valid_from'    => $c['valid_from']->format('Y-m-d\TH:i:s\Z'),
-                'valid_until'   => $c['valid_until']->format('Y-m-d\TH:i:s\Z'),
-                'status'        => $c['status'],
-            ],
+            static function (array $c) {
+                $entry = [
+                    'credential_id' => $c['credential_id'],
+                    'pin'           => $c['pin'],
+                    'valid_from'    => $c['valid_from']->format('Y-m-d\TH:i:s\Z'),
+                    'valid_until'   => $c['valid_until']->format('Y-m-d\TH:i:s\Z'),
+                    'status'        => $c['status'],
+                ];
+
+                // Omitted rather than null — see door-access-spec.md § Card-based entry.
+                if ($c['card_uid'] !== null) {
+                    $entry['card_uid'] = $c['card_uid'];
+                }
+
+                return $entry;
+            },
             $this->doorAccessService->findCredentialsForDoor($doorId, $now),
         );
 

@@ -67,6 +67,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 6, nullable: true, unique: true)]
     private ?string $keyholderPin = null;
 
+    /** Membership card NFC UID for tap-to-enter door access — see door-access-spec.md § Card-based entry (NFC). Stored as the reader's native UID, uppercase hex, no separators (e.g. "B0A9FF5C"), so an admin-entered UID and a device-read UID are byte-for-byte comparable. Null until a card is registered for this member. */
+    #[ORM\Column(length: 32, nullable: true, unique: true)]
+    private ?string $cardUid = null;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $addressLine1 = null;
 
@@ -148,6 +152,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\ManyToOne(targetEntity: self::class)]
     #[ORM\JoinColumn(name: 'assigned_to_id', onDelete: 'SET NULL')]
     private ?User $assignedTo = null;
+
+    /** Who added this contact, if it was an admin action (see UserService::createContact()) — null for self-registration and other member-initiated signups. */
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(name: 'created_by_id', onDelete: 'SET NULL')]
+    private ?User $createdBy = null;
 
     public function __construct()
     {
@@ -337,6 +346,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setKeyholderPin(?string $keyholderPin): static { $this->keyholderPin = $keyholderPin; return $this; }
     public function isKeyholder(): bool { return $this->keyholderPin !== null; }
 
+    public function getCardUid(): ?string { return $this->cardUid; }
+    public function setCardUid(?string $cardUid): static { $this->cardUid = $cardUid; return $this; }
+
     public function getAddressLine1(): ?string { return $this->addressLine1; }
     public function setAddressLine1(?string $addressLine1): static { $this->addressLine1 = $addressLine1; return $this; }
 
@@ -503,6 +515,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getAssignedTo(): ?User { return $this->assignedTo; }
     public function setAssignedTo(?User $assignedTo): static { $this->assignedTo = $assignedTo; return $this; }
+
+    public function getCreatedBy(): ?User { return $this->createdBy; }
+    public function setCreatedBy(?User $createdBy): static { $this->createdBy = $createdBy; return $this; }
 
     public function isDeleted(): bool { return $this->deletedAt !== null; }
 }

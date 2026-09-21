@@ -581,11 +581,14 @@ Fail-safe vs fail-secure catch wiring — confirm against local fire code if thi
   chris@lend-engine.com) — shipped this way deliberately for now rather than building a real
   distribution list/admin UI ahead of need. Revisit once there's more than one person who needs
   to see `door_propped`/`door_unexpected_open` alerts.
-- **Admin UX for registering `user.card_uid` isn't fully designed** (§ Card-based entry) — the
-  proposed flow (read the UID off the door's local status page, type it into a text field on the
-  member's profile) reuses existing infrastructure but hasn't been reviewed; a dedicated
-  desktop/USB enrolment reader, or a phone-based NFC-read admin page, are reasonable alternatives
-  if the "walk to the door and read a screen" flow turns out to be impractical in practice.
+- ~~Admin UX for registering `user.card_uid` isn't fully designed~~ — **implemented as proposed**:
+  a plain text field on the member's edit page (next to `keyholder_pin`), accepting either a bare
+  hex UID or the scanner's own "`[NFC] scanned UID=... (N bytes)`" log line — the server extracts
+  and normalises the UID either way. `GET /v1/doors/{door_id}/credentials` now includes `card_uid`
+  per credential exactly as specced above, sourced from `Attendee::getUser()->getCardUid()`. Still
+  no dedicated enrolment reader/phone-based NFC-read admin page — revisit if the "walk to the door
+  and read a screen, then type it in" flow proves impractical in practice. The exit reader
+  (`exit_cards`, `member_exit`, `checked_out_at`/`checked_out_method`) remains entirely unbuilt.
 - **Whether keyholders should also get cards** (tap instead of typing their disarm PIN) isn't
   addressed — this revision only adds cards for booking-attendee entry and for the unconditional
   exit reader. Keyholder PIN entry is unchanged. Worth revisiting once cards are in use and the
