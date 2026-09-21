@@ -98,11 +98,15 @@ class DoorAccessService
     /**
      * Applies one stage of an `attendee_access` event — idempotent and upsert-keyed on
      * {eventId}: a stage only ever advances (see AccessEvent::advanceStage()), so a retried or
-     * reordered POST for a stage already applied is a harmless no-op. Only `door_closed` marks
-     * the attendee as checked in; `authorized` already flips the PIN to used regardless, since
-     * reuse-prevention doesn't wait on the physical outcome.
+     * reordered POST for a stage already applied is a harmless no-op.
      *
-     * @param ?string $cardUid Set when this access came from the entry NFC reader rather than the keypad — resolved to a member (if any) and recorded on the event even though {attendee} already identifies who this was, so card-triggered and PIN-triggered access reads consistently either way.
+     * The credential is deliberately NOT single-use: a PIN or card stays `active` (and therefore
+     * synced to the door) for the attendee's whole session window, so the same PIN/card grants
+     * entry any number of times during it — someone stepping out and back in, or a card that also
+     * doubles as the exit-adjacent re-entry method, shouldn't get locked out after the first tap.
+     * `checked_in_at` (set once, at `door_closed`) is the "did they ever show up" summary — that's
+     * a one-time fact regardless of how many times the credential is later reused; `pin_status`
+     * only ever changes via cancellation (`revokePin()`) or an explicit regenerate.
      */
     public function applyAttendeeAccessEvent(string $eventId, string $stage, Attendee $attendee, \DateTimeImmutable $timestamp, ?string $cardUid = null): void
     {
@@ -115,10 +119,6 @@ class DoorAccessService
 
         if (!$event->advanceStage($stage, $timestamp)) {
             return;
-        }
-
-        if ($stage === AccessEvent::STAGE_AUTHORIZED && $attendee->getPinStatus() !== Attendee::PIN_STATUS_USED) {
-            $attendee->setPinStatus(Attendee::PIN_STATUS_USED);
         }
 
         if ($stage === AccessEvent::STAGE_DOOR_CLOSED && !$attendee->isCheckedIn()) {

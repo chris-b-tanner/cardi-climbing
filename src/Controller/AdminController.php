@@ -310,19 +310,15 @@ class AdminController extends AbstractController
     }
 
     /**
-     * Pulls a hex card UID out of either a bare hex string or the scanner's own log line (e.g.
-     * "[NFC] scanned UID=B0A9FF5C (4 bytes)"), normalised to uppercase with no separators — see
-     * door-access-spec.md § Card-based entry (NFC). Returns null if nothing hex-shaped was found.
+     * Validates a bare hex card UID, normalised to uppercase — see door-access-spec.md § Card-based
+     * entry (NFC). Returns null if it isn't a plain even-length hex string (no separators, no
+     * surrounding text — just the UID itself).
      */
     private function normalizeCardUid(string $raw): ?string
     {
-        if (preg_match('/UID\s*=\s*([0-9A-Fa-f]+)/', $raw, $m)) {
-            $raw = $m[1];
-        }
+        $hex = strtoupper(trim($raw));
 
-        $hex = strtoupper(preg_replace('/[^0-9A-Fa-f]/', '', $raw));
-
-        if ($hex === '' || strlen($hex) % 2 !== 0 || strlen($hex) > 32) {
+        if (!preg_match('/^[0-9A-F]{8,32}$/', $hex) || strlen($hex) % 2 !== 0) {
             return null;
         }
 
@@ -433,7 +429,7 @@ class AdminController extends AbstractController
                 } else {
                     $cardUid = $this->normalizeCardUid($cardUidRaw);
                     if ($cardUid === null) {
-                        $this->addFlash('error', 'Could not read a card UID from that — paste the hex UID (e.g. "B0A9FF5C") or the scanner\'s own "UID=..." line.');
+                        $this->addFlash('error', 'That doesn\'t look like a card UID — enter just the hex UID (e.g. "B0A9FF5C").');
                         return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
                     } elseif ($userRepository->cardUidExists($cardUid, $user->getId())) {
                         $this->addFlash('error', 'That card is already registered to another member.');

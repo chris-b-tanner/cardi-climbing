@@ -38,21 +38,32 @@ Notes:
 
 ## PIN lifecycle
 
-- `pin_status` transitions: `active` → `used` (on valid door entry) | `revoked` (booking cancelled) | `expired` (past valid_until + grace, background job or lazy-check).
+- **Not single-use — reusable for the whole session window.** `pin_status` transitions: `active` →
+  `revoked` (booking cancelled) | `expired` (past valid_until + grace, background job or
+  lazy-check). There is no `active` → `used` transition on door entry: a valid PIN or card keeps
+  granting access, any number of times, for as long as the attendee's session window (§ schema
+  changes above, `valid_from`/`valid_until` + grace) is still open. **Revised from the original
+  design**, which flipped to `used` on the first `stage=authorized` event and treated that as a
+  reuse lock — that broke the ordinary case of someone stepping out and back in in during a
+  session (or a card and a PIN being tried back-to-back by the same person), denying them with
+  `already_used` despite having a perfectly valid booking still under way.
 - Grace: 5 min before event start, 5–10 min after event end. Config constant, not per-row.
-- Single use: `checked_in_at IS NOT NULL` (or `pin_status='used'`) blocks reuse regardless of channel (door or manual).
+- `checked_in_at`/`checked_in_by_id`/`checked_in_method` (§ schema changes above) are still a
+  one-time "did they ever show up" summary, set once at the first `door_closed` and never
+  overwritten — that fact doesn't change just because the credential itself stays reusable after
+  it's recorded.
 - Attendee PIN generation excludes any value currently held in `user.keyholder_pin`, and vice versa
   when a keyholder PIN is (re)assigned — see § Keyholder disarm PIN. The two pools are numerically
   indistinguishable to the device (both are just a 6-digit string), so they must never collide;
   enforcing it at generation/assignment time is cheap given how small the keyholder set is.
 - **A membership card is just a second key to the same lock, not a second lifecycle.** Whichever
-  channel — typed PIN or tapped card (§ Card-based entry) — reaches the door first for a given
-  booking is the one that consumes it: same `pin_status` transition to `used`, same
-  `checked_in_at`/`checked_in_method` write, same single-use guard. There's no separate
-  "card status" to track; a card tap and a PIN entry are two presentations of the identical
-  attendee-credential row, so whichever arrives first naturally locks the other one out as
-  `already_used`. This only applies to entry — the exit reader (§ Exit reader) isn't part of this
-  lifecycle at all, it isn't gated on a booking or a PIN.
+  channel — typed PIN or tapped card (§ Card-based entry) — presents for a given booking, it's the
+  same reusable attendee-credential row responding either way: same `checked_in_at`/
+  `checked_in_method` write (once, at the first `door_closed`), same lack of a single-use guard.
+  There's no separate "card status" to track, and no "whichever arrives first locks the other
+  out" — both channels stay live side by side for the whole window. This only applies to entry —
+  the exit reader (§ Exit reader) isn't part of this lifecycle at all, it isn't gated on a booking
+  or a PIN.
 
 ## Access event log
 
@@ -412,26 +423,21 @@ sign of duplicate/confused events.
   fields get set or when. `keyholder_access`/`unexpected_open`/`member_exit` don't send it — none
   of them are ambiguous about how they were triggered.
 - `stage=authorized` (`attendee_access`/`keyholder_access`/`member_exit` only): server sets
-  `authorized_at`. For `attendee_access` specifically, also sets `pin_status='used'` on the
-  attendee row — reuse-prevention doesn't wait on the physical outcome, and applies identically
-  whether `channel` is `pin` or `card`. Not yet "checked in." **For `member_exit` specifically,
+  `authorized_at`. For `attendee_access` specifically, `pin_status` is deliberately left
+  untouched — see § PIN lifecycle's "not single-use" revision — so it does **not** flip to `used`
+  here, or anywhere else in this flow. Not yet "checked in." **For `member_exit` specifically,
   this stage is also where checkout completes** (§ Exit reader) — the server resolves
   `card_uid → exit_user_id`, finds that user's active session if one exists, and sets
   `checked_out_at=authorized_at`, `checked_out_method='door_card'` right here, not waiting for
   `door_closed`. This is the one place entry and exit deliberately diverge in this table.
   - **Expect more than one `attendee_access`/`authorized` event (distinct `event_id`s) for the
-    same `credential_id` in normal operation, not just as a retry edge case.** The device (per
-    `door-access-firmware-spec.md` § Repeat scans within the valid window) has no door-position
-    sensor yet, so it deliberately doesn't block a repeat local grant of an already-used PIN/card
-    within its still-valid window — the only thing standing between a legitimate retry and true
-    reuse is this `pin_status='used'` write actually reaching the device on its *next* credential
-    poll (every 20–30s). A handful of `attendee_access` events for one `credential_id` within that
-    window, all at `stage=authorized`, is the expected shape of "the door didn't open the first
-    time" — not a data-integrity concern, and not something worth a special server-side reaction
-    beyond the `pin_status='used'` write already happening on the first one (subsequent writes of
-    the same value are a harmless no-op). This is a firmware-side deviation from what this
-    document originally assumed (a device-local single-use block backing this up) — flagging it
-    here so the two specs don't quietly drift apart on it.
+    same `credential_id` in normal operation — this is the intended shape now, not a tolerated
+    edge case.** Since the credential is reusable for the whole session window (§ PIN lifecycle),
+    every legitimate re-entry during that window produces its own `event_id`/`access_event` row,
+    same `credential_id`, same `channel` either way. This also covers the old rationale (the
+    device has no door-position sensor yet, so a retry after "the door didn't open the first
+    time" was always going to look identical to a deliberate second entry) — it's simply no longer
+    something that needs a separate excuse, since both are now valid by design.
 - `stage=door_open`: server sets `door_open_at` on the `access_event` row. Still not "checked in"
   for `attendee_access`/`keyholder_access` — this stage exists for timing/tailgating visibility,
   not attendance. `unexpected_open` has no `authorized` stage at all; it starts here. For

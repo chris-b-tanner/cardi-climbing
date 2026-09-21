@@ -106,7 +106,7 @@
         </p>
       </div>
       <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
-        <label for="cardUid">Membership card UID</label>
+        <label for="cardUid">Access card UID</label>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <input type="text" id="cardUid" name="cardUid" class="form-control"
                  value="{{ user.cardUid }}" maxlength="64"
@@ -115,11 +115,6 @@
             <button type="button" id="clearCardUid" class="btn btn--ghost btn--sm">Clear</button>
           {% endif %}
         </div>
-        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
-          Tap the member's card at the door, then paste what the reader shows — either the bare UID
-          (e.g. "B0A9FF5C") or the whole scanner line (e.g. "[NFC] scanned UID=B0A9FF5C (4 bytes)");
-          either way, only the UID itself is kept. Leave blank if they don't have a card.
-        </p>
       </div>
     {% endif %}
   </div>
