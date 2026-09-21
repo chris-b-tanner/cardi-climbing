@@ -250,7 +250,7 @@ class DoorController extends AbstractController
         }
 
         $timestamp = $this->timestampForStage($event, $stage);
-        $this->doorAccessService->applyAttendeeAccessEvent($eventId, $stage, $attendee, $timestamp);
+        $this->doorAccessService->applyAttendeeAccessEvent($eventId, $stage, $attendee, $timestamp, $this->cardUidFromEvent($event));
     }
 
     private function applyKeyholderAccess(string $eventId, array $event): void
@@ -285,10 +285,19 @@ class DoorController extends AbstractController
         $attendee     = $credentialId ? $this->attendeeRepository->find($credentialId) : null;
         $reason       = is_string($event['reason'] ?? null) ? $event['reason'] : null;
         $timestamp    = $this->parseTimestamp($event['timestamp'] ?? null) ?? new \DateTimeImmutable();
+        $cardUid      = $this->cardUidFromEvent($event);
 
-        $this->doorAccessService->applyAccessDenied($eventId, $attendee, $reason, $timestamp);
+        $this->doorAccessService->applyAccessDenied($eventId, $attendee, $reason, $timestamp, $cardUid);
 
-        error_log(sprintf('Door %d access denied: credential_id=%s reason=%s', $doorId, $credentialId ?: 'unknown', $reason ?? 'unknown'));
+        error_log(sprintf('Door %d access denied: credential_id=%s reason=%s card_uid=%s', $doorId, $credentialId ?: 'unknown', $reason ?? 'unknown', $cardUid ?? 'n/a'));
+    }
+
+    /** {event['card_uid']} when this was a card-channel event — normalised uppercase to match how User::$cardUid is stored (see AdminController::normalizeCardUid()); null for a PIN-channel event or a malformed/missing field. */
+    private function cardUidFromEvent(array $event): ?string
+    {
+        $cardUid = $event['card_uid'] ?? null;
+
+        return is_string($cardUid) && $cardUid !== '' ? strtoupper($cardUid) : null;
     }
 
     /** Picks whichever timestamp field matches {stage} out of the event payload, falling back to now. */

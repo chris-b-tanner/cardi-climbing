@@ -101,11 +101,17 @@ class DoorAccessService
      * reordered POST for a stage already applied is a harmless no-op. Only `door_closed` marks
      * the attendee as checked in; `authorized` already flips the PIN to used regardless, since
      * reuse-prevention doesn't wait on the physical outcome.
+     *
+     * @param ?string $cardUid Set when this access came from the entry NFC reader rather than the keypad — resolved to a member (if any) and recorded on the event even though {attendee} already identifies who this was, so card-triggered and PIN-triggered access reads consistently either way.
      */
-    public function applyAttendeeAccessEvent(string $eventId, string $stage, Attendee $attendee, \DateTimeImmutable $timestamp): void
+    public function applyAttendeeAccessEvent(string $eventId, string $stage, Attendee $attendee, \DateTimeImmutable $timestamp, ?string $cardUid = null): void
     {
         $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_ATTENDEE_ACCESS);
         $event->setAttendee($attendee);
+
+        if ($cardUid !== null) {
+            $event->setCard($cardUid, $this->userRepository->findOneByCardUid($cardUid));
+        }
 
         if (!$event->advanceStage($stage, $timestamp)) {
             return;
@@ -137,13 +143,22 @@ class DoorAccessService
         $event->advanceStage($stage, $timestamp);
     }
 
-    /** Records a denied attempt — single-stage, no progression. {attendee} is null if the PIN didn't resolve to anything at all. */
-    public function applyAccessDenied(string $eventId, ?Attendee $attendee, ?string $reason, \DateTimeImmutable $timestamp): void
+    /**
+     * Records a denied attempt — single-stage, no progression. {attendee} is null if the PIN/card
+     * didn't resolve to anything at all — but a denied *card* tap still carries {cardUid}, and if
+     * that UID is registered to a member, this still identifies who tried even though they had no
+     * valid booking to grant them entry (the whole point: tracking denied-but-identifiable taps).
+     */
+    public function applyAccessDenied(string $eventId, ?Attendee $attendee, ?string $reason, \DateTimeImmutable $timestamp, ?string $cardUid = null): void
     {
         $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_ACCESS_DENIED);
         $event->setAttendee($attendee);
         $event->setDeniedReason($reason);
         $event->recordDeniedAt($timestamp);
+
+        if ($cardUid !== null) {
+            $event->setCard($cardUid, $this->userRepository->findOneByCardUid($cardUid));
+        }
     }
 
     /** Manual reception check-in. No AccessEvent is created for this — there's no door hardware involved, just a staff member confirming attendance directly. @throws \InvalidArgumentException if already checked in (via either channel) */

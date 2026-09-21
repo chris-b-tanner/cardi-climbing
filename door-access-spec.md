@@ -413,12 +413,25 @@ sign of duplicate/confused events.
   of them are ambiguous about how they were triggered.
 - `stage=authorized` (`attendee_access`/`keyholder_access`/`member_exit` only): server sets
   `authorized_at`. For `attendee_access` specifically, also sets `pin_status='used'` on the
-  attendee row — same as before, reuse-prevention doesn't wait on the physical outcome, and applies
-  identically whether `channel` is `pin` or `card`. Not yet "checked in." **For `member_exit`
-  specifically, this stage is also where checkout completes** (§ Exit reader) — the server resolves
+  attendee row — reuse-prevention doesn't wait on the physical outcome, and applies identically
+  whether `channel` is `pin` or `card`. Not yet "checked in." **For `member_exit` specifically,
+  this stage is also where checkout completes** (§ Exit reader) — the server resolves
   `card_uid → exit_user_id`, finds that user's active session if one exists, and sets
   `checked_out_at=authorized_at`, `checked_out_method='door_card'` right here, not waiting for
   `door_closed`. This is the one place entry and exit deliberately diverge in this table.
+  - **Expect more than one `attendee_access`/`authorized` event (distinct `event_id`s) for the
+    same `credential_id` in normal operation, not just as a retry edge case.** The device (per
+    `door-access-firmware-spec.md` § Repeat scans within the valid window) has no door-position
+    sensor yet, so it deliberately doesn't block a repeat local grant of an already-used PIN/card
+    within its still-valid window — the only thing standing between a legitimate retry and true
+    reuse is this `pin_status='used'` write actually reaching the device on its *next* credential
+    poll (every 20–30s). A handful of `attendee_access` events for one `credential_id` within that
+    window, all at `stage=authorized`, is the expected shape of "the door didn't open the first
+    time" — not a data-integrity concern, and not something worth a special server-side reaction
+    beyond the `pin_status='used'` write already happening on the first one (subsequent writes of
+    the same value are a harmless no-op). This is a firmware-side deviation from what this
+    document originally assumed (a device-local single-use block backing this up) — flagging it
+    here so the two specs don't quietly drift apart on it.
 - `stage=door_open`: server sets `door_open_at` on the `access_event` row. Still not "checked in"
   for `attendee_access`/`keyholder_access` — this stage exists for timing/tailgating visibility,
   not attendance. `unexpected_open` has no `authorized` stage at all; it starts here. For

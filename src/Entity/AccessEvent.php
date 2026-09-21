@@ -54,6 +54,15 @@ class AccessEvent
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $keyholderUser = null;
 
+    /** Raw NFC UID that produced this event — set on attendee_access/access_denied whenever the entry reader (not the keypad) produced it. Null for a PIN-triggered event. */
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $cardUid = null;
+
+    /** The member {cardUid} resolves to, if any — set even when there's no valid attendee/booking (attendee stays null), so a denied tap from a registered card still identifies who tried. Null for an unregistered card or a PIN-triggered event. */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $cardUser = null;
+
     /** authorized | door_open | door_closed — null for access_denied. */
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $stage = null;
@@ -125,6 +134,24 @@ class AccessEvent
     public function setKeyholderUser(?User $keyholderUser): static
     {
         $this->keyholderUser = $keyholderUser;
+        return $this;
+    }
+
+    public function getCardUid(): ?string
+    {
+        return $this->cardUid;
+    }
+
+    public function getCardUser(): ?User
+    {
+        return $this->cardUser;
+    }
+
+    /** Records which card (and, if it resolves to one, which member) produced this event — see UserRepository::findOneByCardUid(). A no-op for a PIN-triggered event, which never calls this. */
+    public function setCard(string $cardUid, ?User $cardUser): static
+    {
+        $this->cardUid = $cardUid;
+        $this->cardUser = $cardUser;
         return $this;
     }
 
