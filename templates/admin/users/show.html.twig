@@ -325,14 +325,58 @@
 
   <div class="card" style="margin-bottom:0;">
     <div class="card__label" style="margin-bottom:0.6rem;">Membership</div>
-    {% if user.cardUid %}
-      <div style="background:linear-gradient(135deg, var(--teal-dk), var(--teal)); border-radius:10px; padding:0.9rem 1rem; color:#fff; margin-bottom:0.85rem; box-shadow:0 2px 8px rgba(0,0,0,0.18);">
+    {% if accessCard %}
+      <div style="background:{{ accessCard.isLocked ? 'linear-gradient(135deg, #6b6b6b, #3a3a3a)' : 'linear-gradient(135deg, #3a3a3a, #1e1e1e)' }}; border-radius:10px; padding:0.9rem 1rem; color:#fff; margin-bottom:0.6rem; box-shadow:0 2px 8px rgba(0,0,0,0.18);">
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <span style="font-size:0.7rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; opacity:0.9;">Y Wal</span>
-          <span style="font-size:0.62rem; letter-spacing:0.05em; text-transform:uppercase; opacity:0.7;">Access card</span>
+          <span style="font-size:0.62rem; letter-spacing:0.05em; text-transform:uppercase; opacity:0.7;">
+            Access card{% if accessCard.isLocked %} · Locked{% endif %}
+          </span>
         </div>
-        <div style="margin-top:1.5rem; font-family:'Courier New', monospace; font-size:1.05rem; letter-spacing:0.14em;">{{ user.cardUid }}</div>
-        <div style="margin-top:0.4rem; font-size:0.75rem; opacity:0.9;">{{ displayName ?: user.email }}</div>
+        <div style="margin-top:1.5rem; font-family:'Courier New', monospace; font-size:1.05rem; letter-spacing:0.14em;">{{ accessCard.uid }}</div>
+        <div style="margin-top:0.4rem; display:flex; justify-content:space-between; align-items:flex-end; gap:0.5rem;">
+          <span style="font-size:0.75rem; opacity:0.9;">{{ displayName ?: user.email }}</span>
+          {% if is_granted('ROLE_ADMIN') %}
+            <button type="button" class="card-scan-trigger"
+                    data-url="{{ path('app_admin_user_card_scan_start', {id: user.id}) }}"
+                    data-mode="verify"
+                    data-user-name="{{ displayName ?: user.email }}"
+                    data-csrf="{{ csrf_token('card_scan_' ~ user.id) }}"
+                    style="flex-shrink:0; background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.5); color:#fff; border-radius:6px; padding:0.2rem 0.65rem; font-size:0.68rem; font-weight:600; letter-spacing:0.02em; cursor:pointer;">Verify</button>
+          {% endif %}
+        </div>
+      </div>
+      {% if is_granted('ROLE_ADMIN') %}
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.85rem;">
+          <button type="button" class="card-scan-trigger btn btn--ghost btn--sm"
+                  data-url="{{ path('app_admin_user_card_scan_start', {id: user.id}) }}"
+                  data-mode="link"
+                  data-user-name="{{ displayName ?: user.email }}"
+                  data-csrf="{{ csrf_token('card_scan_' ~ user.id) }}"
+                  data-on-linked="cardScanReload">Scan card</button>
+          {% if accessCard.isLocked %}
+            <form method="post" action="{{ path('app_admin_user_card_unlock', {id: user.id}) }}" style="display:inline;">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_manage_' ~ user.id) }}">
+              <button type="submit" class="btn btn--ghost btn--sm">Unlock</button>
+            </form>
+          {% else %}
+            <form method="post" action="{{ path('app_admin_user_card_lock', {id: user.id}) }}" style="display:inline;"
+                  onsubmit="return confirm('Lock this card? It will stop opening doors, but stays linked to {{ (displayName ?: user.email)|e('js') }}.');">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_manage_' ~ user.id) }}">
+              <button type="submit" class="btn btn--ghost btn--sm">Lock</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% elseif is_granted('ROLE_ADMIN') %}
+      <div style="border:1px dashed var(--border); border-radius:10px; padding:1.1rem; text-align:center; margin-bottom:0.85rem;">
+        <p style="color:var(--muted); font-size:0.85rem; margin-bottom:0.6rem;">No card registered.</p>
+        <button type="button" class="card-scan-trigger btn btn--teal btn--sm"
+                data-url="{{ path('app_admin_user_card_scan_start', {id: user.id}) }}"
+                data-mode="link"
+                data-user-name="{{ displayName ?: user.email }}"
+                data-csrf="{{ csrf_token('card_scan_' ~ user.id) }}"
+                data-on-linked="cardScanReload">Scan card</button>
       </div>
     {% endif %}
     {% if ownMembership %}
@@ -577,12 +621,20 @@
 </div>
 
 {% include 'admin/_assign_modal.html.twig' with {prefix: 'contact-assign'} %}
+{% include 'admin/_card_scan_modal.html.twig' with {prefix: 'card-scan'} %}
 
 </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script>
+  // Card linking is a separate persisted record (AccessCard), not a form field — a successful
+  // station scan just reloads the page to show the freshly-linked card's summary.
+  function cardScanReload() {
+    window.location.reload();
+  }
+</script>
 <script>
   (function () {
     const tabs   = document.querySelectorAll('#member-tabs .pos-tab');

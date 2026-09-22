@@ -147,7 +147,7 @@ class AccessEvent
         return $this->cardUser;
     }
 
-    /** Records which card (and, if it resolves to one, which member) produced this event — see UserRepository::findOneByCardUid(). A no-op for a PIN-triggered event, which never calls this. */
+    /** Records which card (and, if it resolves to one, which member) produced this event — see AccessCardRepository::findOneByUid(). A no-op for a PIN-triggered event, which never calls this. */
     public function setCard(string $cardUid, ?User $cardUser): static
     {
         $this->cardUid = $cardUid;

@@ -14,6 +14,7 @@ services:
             string $stripePublishableKey: '%env(STRIPE_PUBLISHABLE_KEY)%'
             string $stripeTerminalReaderId: '%env(STRIPE_TERMINAL_READER_ID)%'
             string $doorApiKey: '%env(DOOR_API_KEY)%'
+            string $cardStationApiKey: '%env(CARD_STATION_API_KEY)%'
             string $doorSimSecret: '%env(DOOR_SIM_SECRET)%'
             int $doorMinFirmwareVersion: '%env(int:DOOR_MIN_FIRMWARE_VERSION)%'
             string $s3Bucket: '%env(AWS_S3_BUCKET)%'

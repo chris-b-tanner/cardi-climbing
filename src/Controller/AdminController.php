@@ -9,6 +9,7 @@ use App\Entity\Payment;
 use App\Entity\Refund;
 use App\Entity\User;
 use App\Entity\UserCertification;
+use App\Repository\AccessCardRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\NoteRepository;
@@ -223,7 +224,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository, AccessCardRepository $accessCardRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -235,6 +236,7 @@ class AdminController extends AbstractController
             'bookings'   => $attendeeRepository->findAllForUser($user),
             'notes'      => $noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()),
             'allTags'    => $tagRepository->findBy([], ['name' => 'ASC']),
+            'accessCard' => $accessCardRepository->findCurrentForUser($user),
         ]);
     }
 
@@ -309,22 +311,6 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
-    /**
-     * Validates a bare hex card UID, normalised to uppercase — see door-access-spec.md § Card-based
-     * entry (NFC). Returns null if it isn't a plain even-length hex string (no separators, no
-     * surrounding text — just the UID itself).
-     */
-    private function normalizeCardUid(string $raw): ?string
-    {
-        $hex = strtoupper(trim($raw));
-
-        if (!preg_match('/^[0-9A-F]{8,32}$/', $hex) || strlen($hex) % 2 !== 0) {
-            return null;
-        }
-
-        return $hex;
-    }
-
     /** Reads a named param from either a JSON body or a form-encoded one, so an action can be called by a plain fetch() as well as a form submit. */
     private function paramFromRequest(Request $request, string $key): string
     {
@@ -351,6 +337,7 @@ class AdminController extends AbstractController
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
         UserService $userService,
+        AccessCardRepository $accessCardRepository,
     ): Response {
         $allTags = $tagRepository->findBy([], ['name' => 'ASC']);
         $canHaveDependents = $user->getParent() === null && $user->getEmail() !== null;
@@ -423,21 +410,9 @@ class AdminController extends AbstractController
                     $user->setKeyholderPin($keyholderPin);
                 }
 
-                $cardUidRaw = trim($request->request->get('cardUid', ''));
-                if ($cardUidRaw === '') {
-                    $user->setCardUid(null);
-                } else {
-                    $cardUid = $this->normalizeCardUid($cardUidRaw);
-                    if ($cardUid === null) {
-                        $this->addFlash('error', 'That doesn\'t look like a card UID — enter just the hex UID (e.g. "B0A9FF5C").');
-                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
-                    } elseif ($userRepository->cardUidExists($cardUid, $user->getId())) {
-                        $this->addFlash('error', 'That card is already registered to another member.');
-                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
-                    } else {
-                        $user->setCardUid($cardUid);
-                    }
-                }
+                // Card linking/locking is handled by its own dedicated actions (AdminCardScanController)
+                // — deliberately not part of this form, so saving an unrelated field here can never
+                // touch the card record as a side effect. See card-setup.md's "Why two real tables".
             }
 
             $submittedTagIds = array_map('intval', $request->request->all('tags'));
@@ -486,6 +461,7 @@ class AdminController extends AbstractController
             'allTags'           => $allTags,
             'canHaveDependents' => $canHaveDependents,
             'bookings'          => $attendeeRepository->findAllForUser($user),
+            'accessCard'        => $accessCardRepository->findCurrentForUser($user),
         ]);
     }
 

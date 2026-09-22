@@ -1,0 +1,140 @@
+{#
+  Shared card-station link/verify modal — see card-setup.md. Opened by any `.{{ prefix }}-trigger`
+  button carrying `data-url` (the `/admin/users/{id}/card-scan` endpoint for this member — same URL
+  for arm/poll/cancel, just a different HTTP method), `data-mode` ("link" or "verify"),
+  `data-user-name`, and `data-csrf`. `prefix` namespaces this instance's DOM ids in case more than
+  one copy ever lands on the same page.
+#}
+<div id="{{ prefix }}-modal" class="pos-modal" style="display:none;">
+  <div id="{{ prefix }}-modal-backdrop" class="pos-modal__backdrop"></div>
+  <div class="pos-modal__box">
+    <div class="pos-modal__header">
+      <strong id="{{ prefix }}-title">Card station</strong>
+      <button type="button" id="{{ prefix }}-modal-close" class="btn btn--ghost btn--sm">✕</button>
+    </div>
+    <p id="{{ prefix }}-message" style="font-size:0.9375rem;line-height:1.6;margin-bottom:0;"></p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const prefix   = {{ prefix|json_encode|raw }};
+    const modal    = document.getElementById(prefix + '-modal');
+    const backdrop = document.getElementById(prefix + '-modal-backdrop');
+    const closeBtn = document.getElementById(prefix + '-modal-close');
+    const title    = document.getElementById(prefix + '-title');
+    const message  = document.getElementById(prefix + '-message');
+
+    let currentUrl  = null;
+    let currentCsrf = null;
+    let pollTimer   = null;
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function closeModal(cancel) {
+      stopPolling();
+      modal.style.display = 'none';
+
+      if (cancel && currentUrl) {
+        fetch(currentUrl, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _csrf_token: currentCsrf }),
+        }).catch(() => {});
+      }
+
+      currentUrl = null;
+      currentCsrf = null;
+    }
+
+    function render(status, userName) {
+      if (status.status === 'pending') {
+        message.textContent = 'Waiting for a tap on the card station…';
+      } else if (status.status === 'linked') {
+        message.textContent = 'Card linked to ' + userName + '.';
+      } else if (status.status === 'matched') {
+        message.textContent = '✓ This card belongs to ' + userName + '.';
+      } else if (status.status === 'mismatch') {
+        message.textContent = status.matchedUserName
+          ? '✗ This card is registered to ' + status.matchedUserName + ', not ' + userName + '. Nothing changed.'
+          : '✗ This card isn\'t registered to anyone. Nothing changed.';
+      } else if (status.status === 'conflict') {
+        message.textContent = 'That card is already registered to another member. Nothing changed.';
+      } else {
+        message.textContent = 'Timed out — try again.';
+      }
+    }
+
+    function poll(url, userName, onLinked) {
+      fetch(url)
+        .then(r => r.json())
+        .then(status => {
+          render(status, userName);
+
+          if (status.status === 'pending') {
+            pollTimer = setTimeout(() => poll(url, userName, onLinked), 1000);
+            return;
+          }
+
+          stopPolling();
+          currentUrl = null;
+          currentCsrf = null;
+
+          if (status.status === 'linked' && onLinked) {
+            onLinked(status.cardUid);
+          }
+        })
+        .catch(() => {
+          message.textContent = 'Lost contact with the server — try again.';
+          stopPolling();
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('.' + prefix + '-trigger');
+      if (!trigger) return;
+
+      const url      = trigger.dataset.url;
+      const mode     = trigger.dataset.mode;
+      const userName = trigger.dataset.userName;
+      const csrf     = trigger.dataset.csrf;
+      const onLinked = trigger.dataset.onLinked && window[trigger.dataset.onLinked];
+
+      currentUrl = url;
+      currentCsrf = csrf;
+
+      title.textContent = mode === 'verify' ? 'Verify card' : 'Link card';
+      message.textContent = 'Arming the card station…';
+      modal.style.display = 'flex';
+
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: mode, _csrf_token: csrf }),
+      })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            message.textContent = data.error || 'Could not start — try again.';
+            currentUrl = null;
+            currentCsrf = null;
+            return;
+          }
+          poll(url, userName, onLinked);
+        })
+        .catch(() => {
+          message.textContent = 'Could not reach the server — try again.';
+          currentUrl = null;
+          currentCsrf = null;
+        });
+    });
+
+    closeBtn.addEventListener('click', () => closeModal(true));
+    backdrop.addEventListener('click', () => closeModal(true));
+  })();
+</script>

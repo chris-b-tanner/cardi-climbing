@@ -179,27 +179,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    /** Resolves a tapped NFC UID to its registered member, if any — used to identify who a denied/unrecognised-booking card tap belonged to (see AccessEvent::$cardUser), not just whether the door should open. */
-    public function findOneByCardUid(string $uid): ?User
-    {
-        return $this->findOneBy(['cardUid' => $uid]);
-    }
-
-    /** Whether {uid} is already someone's registered membership card — cards and PINs live in disjoint value spaces (see door-access-spec.md § Card-based entry), so this is only ever checked against itself. */
-    public function cardUidExists(string $uid, ?int $excludeUserId = null): bool
-    {
-        $qb = $this->createQueryBuilder('u')
-            ->select('COUNT(u.id)')
-            ->where('u.cardUid = :uid')
-            ->setParameter('uid', $uid);
-
-        if ($excludeUserId !== null) {
-            $qb->andWhere('u.id != :excludeId')->setParameter('excludeId', $excludeUserId);
-        }
-
-        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
-    }
-
     public function findByAnyEmail(string $email): ?User
     {
         return $this->createQueryBuilder('u')

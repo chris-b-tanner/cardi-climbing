@@ -1,130 +1,163 @@
-# Card setup spec (slim)
+# Card setup spec
 
-Companion to `door-access-spec.md` (which owns `user.card_uid` itself, and the door's own
-credential sync) — this document covers a **separate physical device**, purpose-built for staff to
-(a) **link** a new card to a member and (b) **verify** that a card someone's holding really is the
-one on file for them. Not a door: it never opens anything, has no relay, and isn't gated on a
-booking. Its only job is turning "hold a card near a reader" into a UID on the server and a
-name on its own screen, so staff never types a UID by hand and never has to guess whether two
-members swapped cards.
+Companion to `door-access-spec.md` (the door's own credential sync, and the general "cards are a
+second presentation of the same attendee credential" model) — this document owns the *identity and
+lifecycle* of a physical membership card itself: `access_card` (replacing what an earlier revision
+of `door-access-spec.md` put directly on `user.card_uid`), plus a separate physical device,
+purpose-built for staff to (a) **link** a new card to a member, (b) **verify** that a card someone's
+holding really is the one on file for them, and (c) **lock**/**unlock** a card without losing who
+it belongs to.
 
-## Why this exists, not just the admin text field
+## Why two real tables, not a field on `user`
 
-The admin edit screen already has a plain `cardUid` text input (`AdminController::editUser()`) —
-that stays, as the fallback for "type it in remotely, no station nearby." This spec adds the fast
-path: stand at the reception desk, tap the card, watch the name appear, done. It also adds
-something the text field can't do at all — **verification**: confirming a card already on file
-still belongs to the person holding it, without anyone having to read a UID out loud and compare
-it by eye.
+An earlier revision of this spec (and its implementation) put the card UID directly on
+`user.card_uid`, with an in-flight link/verify session encoded as reserved non-hex string prefixes
+temporarily written into that same column (`PENDING:`, `RESULT_LINKED:`, etc.), specifically to
+avoid a migration. That worked for the original, narrow ask, but broke down the moment a second,
+*persistent* concern (locking, with a real audit trail — who deployed this card, who locked it,
+when) needed to live somewhere too:
 
-## No new table — everything lives in `user.card_uid` itself
+- **No audit trail is possible in a single overwritable field.** "Who locked this, and when" is a
+  fact about a point in time — it needs its own row, not a string that gets replaced.
+- **Every reader of the field had to become aware of every sentinel.** Locking added an 8th
+  reserved prefix, and meant `UserRepository::findOneByCardUid()`, `cardUidExists()`,
+  `DoorAccessService::findCredentialsForDoor()`, and the admin edit form *all* needed updating to
+  stay "lock-aware" on top of already being "scan-session-aware" — the classic sign a single field
+  is doing the job of several real entities.
+- **A real, sharp bug surfaced from exactly this.** Rendering the manual UID field as `disabled`
+  while locked (so a routine profile save wouldn't clobber the lock) meant the field was never
+  submitted at all — which would have hit the "field submitted empty → clear the card" branch and
+  silently wiped the lock *and* the UID on the next unrelated save (e.g. updating a phone number).
+  Avoiding that meant every write path needed its own bespoke guard.
+- **A card is a real entity with its own lifecycle**, independent of `User`: issued on some date, by
+  some staff member; possibly locked later; possibly replaced by a different physical card
+  entirely, with the old one's history worth keeping. That's what a row represents naturally.
 
-Deliberately not a `card_session` table. There is exactly one physical station (§ Assumptions), so
-"is anything currently armed, and for whom" can be answered by a single query against `user` —
-**reusing the column's own uniqueness for free** — instead of standing up a second piece of state
-that has to be kept in sync with the first.
+Two tables fix all of this and, as a bonus, remove the trickiest part of the previous design: the
+"whichever poll reads a result first consumes it" mechanism the session needed just to have
+somewhere to put an outcome. A real `status` column doesn't need that — it's just read.
 
-A handful of reserved, non-hex string values get written into `card_uid` *in place of* a real UID
-while a link/verify is in flight, then replaced with either a real UID or the original value once
-it resolves. This works safely because every real UID is validated elsewhere
-(`AdminController::normalizeCardUid()`) as `^[0-9A-F]{8,32}$` — pure uppercase hex, no separators —
-so any sentinel containing a `:`, `|`, or a non-hex letter can **never** collide with a real,
-legitimately-stored card UID. No flag column, no extra table, just a small, deliberately
-non-hex-shaped string convention on the one column that already exists.
+## Schema
 
+```sql
+CREATE TABLE `access_card` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`         INT NOT NULL,
+  `uid`             VARCHAR(32) NOT NULL,        -- uppercase hex, no separators (unchanged format)
+  `status`          VARCHAR(20) NOT NULL,        -- active | locked | replaced
+  `deployed_at`     DATETIME NOT NULL,
+  `deployed_by_id`  INT DEFAULT NULL,             -- staff who linked it (null: manual DB fixup, not a real path)
+  `locked_at`       DATETIME DEFAULT NULL,
+  `locked_by_id`    INT DEFAULT NULL,
+  `unlocked_at`     DATETIME DEFAULT NULL,
+  `unlocked_by_id`  INT DEFAULT NULL,
+  `replaced_at`     DATETIME DEFAULT NULL,        -- set when a newer card supersedes this one
+  UNIQUE KEY `UNQ_access_card_uid` (`uid`),
+  KEY `IDX_access_card_user` (`user_id`),
+  CONSTRAINT `FK_access_card_user`        FOREIGN KEY (`user_id`)        REFERENCES `user` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `FK_access_card_deployed_by` FOREIGN KEY (`deployed_by_id`) REFERENCES `user` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `FK_access_card_locked_by`   FOREIGN KEY (`locked_by_id`)   REFERENCES `user` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `FK_access_card_unlocked_by` FOREIGN KEY (`unlocked_by_id`) REFERENCES `user` (`id`) ON DELETE SET NULL
+);
+
+CREATE TABLE `card_link_session` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`          INT NOT NULL,
+  `mode`             VARCHAR(10) NOT NULL,        -- link | verify
+  `status`           VARCHAR(20) NOT NULL,        -- pending | linked | matched | mismatch | conflict | cancelled | expired
+  `scanned_uid`      VARCHAR(32) DEFAULT NULL,
+  `matched_user_id`  INT DEFAULT NULL,             -- verify only: set when the tap belongs to a DIFFERENT known member
+  `created_by_id`    INT DEFAULT NULL,
+  `created_at`       DATETIME NOT NULL,
+  `expires_at`       DATETIME NOT NULL,
+  `resolved_at`      DATETIME DEFAULT NULL,
+  KEY `IDX_card_link_session_user` (`user_id`),
+  KEY `IDX_card_link_session_matched_user` (`matched_user_id`),
+  KEY `IDX_card_link_session_status` (`status`),
+  CONSTRAINT `FK_card_link_session_user`         FOREIGN KEY (`user_id`)         REFERENCES `user` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `FK_card_link_session_matched_user` FOREIGN KEY (`matched_user_id`) REFERENCES `user` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `FK_card_link_session_created_by`   FOREIGN KEY (`created_by_id`)   REFERENCES `user` (`id`) ON DELETE SET NULL
+);
 ```
-Idle:                          <a real hex UID>, or NULL
-Armed for link:                PENDING:<original-or-empty>
-Armed for verify:               PENDING_VERIFY:<original>
-Verify resolved, mismatch:      MISMATCH:<original>|<tapped>
-```
 
-- **`PENDING:<original-or-empty>`** — arming a link remembers whatever was there before (empty if
-  this member never had a card), so a failed/conflicting attempt has something to roll back to
-  instead of guessing.
-- **`PENDING_VERIFY:<original>`** — verify can only be armed when a real card is already on file,
-  so there's always an `<original>` to embed. This is the one case where overwriting the column
-  might look destructive at a glance — it isn't, because every resolution path below restores it.
-- **`MISMATCH:<original>|<tapped>`** — the *only* sentinel that survives past the tap itself,
-  and only for as long as it takes the admin browser's next poll to read it (see § Resolving a
-  verify below) — restoring `<original>` is a side effect of that read, not a separate cleanup
-  step someone has to remember to run.
-- A **match** on verify needs no sentinel at all: the server just writes `<original>` straight
-  back the instant it confirms the tap equals it — from the browser's point of view, "the pending
-  marker vanished and the value underneath is exactly what I remembered arming with" *is* "matched."
-- **Migration needed: widen `user.card_uid` from `VARCHAR(32)` to `VARCHAR(96)`.** Worst case is
-  `MISMATCH:` (9) + a 32-char original + `|` (1) + a 32-char tapped value = 74 chars; 96 leaves
-  headroom without a second migration if the format grows a field later. Everything else about the
-  column (nullable, unique) is unchanged — this is the entire schema footprint of this whole spec.
+- **`access_card` rows are never deleted or overwritten in place** — locking, unlocking, and
+  replacing all just update `status`/timestamps on the existing row (or insert a new row for a
+  replacement, marking the superseded one `replaced`). That *is* the audit trail — no separate log
+  table needed for "who deployed/locked/unlocked this and when," since those are just columns.
+- **`uid` is unique across the whole table, forever** — once a physical card is registered, its row
+  is its permanent record regardless of status. This is what makes "whose card is this, actually"
+  a plain `WHERE uid = :uid` lookup with no status-aware branching, unlike the old
+  sentinel-prefixed design.
+- **At most one `active` row per `user_id`** is an application rule (MySQL has no native partial
+  unique index) — linking a new card first marks any existing active row `replaced`.
+- **`card_link_session` rows are normal, persisted, terminal-once-resolved records** — `status`
+  transitions directly from `pending` to a final value and stays there; nothing needs to be
+  "consumed" by whichever request reads it first, because the row simply holds the answer.
+- **At most one `pending` session across the whole system at a time** (single-station assumption,
+  same as the original design) — arming a new one first cancels any other still-`pending` row.
+- `expires_at` gives a plain TTL (proposed: 60s) for an abandoned arm; `resolved_at` records when a
+  station's tap (or a cancel) actually closed it out.
 
 ## Assumptions locked in
 
-- Single station for now: same "one hardcoded id" pattern as `door_id = 1` in
-  door-access-spec.md, except there isn't even an id to hardcode — the station has nothing to poll
-  by id at all, it just asks "who's currently pending?" (§ API below). Add a real
-  station-identity concept later if a second desk needs one.
+- Single station for now, same spirit as `door_id = 1` in door-access-spec.md — the station has
+  nothing to identify itself by at all, it just asks "what's the one pending session?" (§ API).
 - Staff-initiated only, not a public kiosk. Every arm happens from the admin UI, already
-  authenticated as `ROLE_TEAM`, for one specific, already-known member. The station never lets a
-  walk-up figure out whose card they're holding — see § Privacy.
-- **Only one member can be "pending" (either mode) across the whole system at a time** — enforced
-  at arm time, not by the database: arming a new link/verify first clears whatever other row is
-  currently in a `PENDING%`/`MISMATCH:%` state (restoring *that* row from its own embedded
-  original first, exactly as if its own session had been cancelled). This is the direct
-  replacement for "only one `pending` `card_session` row" from a table-based design — same
-  invariant, enforced by "clear the old one before writing the new one" instead of a second table.
-- All times UTC, nothing here is date-sensitive enough for that to matter beyond consistency with
-  the rest of the app.
+  authenticated as `ROLE_ADMIN` (same gate as the card fields it replaces), for one specific,
+  already-known member. The station never lets a walk-up figure out whose card they're holding —
+  see § Privacy.
+- Manual entry (typing a UID straight into the admin UI, no station involved) stays available as a
+  fallback — it's a **synchronous** action against `access_card` directly (create/replace the
+  active row immediately), not a `card_link_session` at all; there's nothing to wait for.
+- All times UTC, consistent with the rest of the app; nothing here is date-sensitive enough for
+  that to matter beyond consistency.
 
 ## API — server exposes to the card station device
 
-Auth: `Authorization: Bearer <card_station_api_key>` (a new `CARD_STATION_API_KEY` env var — a
-different secret from the door's `DOOR_API_KEY`, since this is a different physical device with a
-different trust boundary: it lives at a staffed desk, not bolted to an access-controlled door).
+Auth: `Authorization: Bearer <card_station_api_key>` (`CARD_STATION_API_KEY` env var — a different
+secret from the door's `DOOR_API_KEY`, since this is a different physical device with a different
+trust boundary: it lives at a staffed desk, not bolted to an access-controlled door).
 
 ### `GET /v1/card-station/pending`
 
-Polled by the station every **1–2 seconds** — this is an interactive, watched-in-person flow, not
-a background sync, so it needs to feel instant rather than tolerate the door's 20–30s cadence. No
-id in the path — there's at most one pending row, full stop.
+Polled every **1–2 seconds** — an interactive, watched-in-person flow, not a background sync.
 
 ```json
 // Nothing armed right now:
 { "server_time": "2026-09-22T10:00:00Z", "pending": null }
 
-// Armed (mode read straight off the sentinel prefix):
+// Armed:
 {
   "server_time": "2026-09-22T10:00:02Z",
   "pending": { "mode": "link", "user_name": "Chris Tanner" }
 }
 ```
 
-- `user_name` is the only identifying info the station ever receives — no email, no member id.
-  It's there purely so the screen can prompt "Link card for Chris Tanner — tap now" /
-  "Verify card for Chris Tanner — tap now".
-- The station always displays whatever this endpoint currently says, full stop — no local "remember
-  the last poll" state to reconcile. If the response says `null`, the screen goes back to idle
-  immediately, even if a tap is mid-flight (the next endpoint makes that race harmless).
+`user_name` is the only identifying info the station ever receives — no email, no member id, just
+enough for "Link card for Chris Tanner — tap now." / "Verify card for Chris Tanner — tap now."
 
 ### `POST /v1/card-station/scan`
-
-Fired once per tap, immediately after `card_reader.cpp`-style UID capture (same PN532/NFC reading
-approach as the door's entry reader — see § Hardware note for why reusing that exact
-UID-formatting logic matters).
 
 ```json
 { "card_uid": "B0A9FF5C" }
 ```
 
-Server behaviour — finds whichever single row is currently `PENDING%` (there's at most one; if
-none, respond `expired` — the browser side must have been cancelled/timed out between polls):
+Finds the one `pending` session (if none: respond `expired` — cancelled/timed out between polls).
+Writes the outcome directly onto that row (`status`, `scanned_uid`, `resolved_at`, and
+`matched_user_id` for a verify mismatch against a known member) and, for `link`, also
+creates/updates the `access_card` row right here — no separate finalise step, since there's no
+"consumed on read" trick to defer:
 
-- **Link:** if `card_uid` isn't already registered to a different user, write it straight in
-  (`user.card_uid = card_uid`) → respond `linked`. If it's already someone else's real UID, restore
-  the embedded original (or `NULL`) → respond `conflict`.
-- **Verify, tap equals the embedded original:** write the original straight back (a no-op value,
-  clearing the `PENDING_VERIFY:` wrapper) → respond `matched`.
-- **Verify, tap differs:** write `MISMATCH:<original>|<card_uid>` (deliberately *not* restored yet
-  — see § Resolving a verify) → respond `mismatch`.
+- **Link, UID free:** mark any existing active `access_card` for this user `replaced`; insert a new
+  one (`status='active'`, `deployed_at=now`, `deployed_by_id=<session.created_by_id>`) → session
+  `status='linked'` → respond `linked`.
+- **Link, UID already belongs to a different user's row (any status):** session `status='conflict'`
+  → respond `conflict`. Nothing written to `access_card`.
+- **Verify, tap equals the target's active card's `uid`:** session `status='matched'` → respond
+  `matched`.
+- **Verify, tap differs:** session `status='mismatch'`, `matched_user_id` set if
+  `AccessCardRepository::findOneByUid()` resolves the tapped UID to someone else's row → respond
+  `mismatch`.
 
 ```json
 { "result": "linked" }
@@ -134,26 +167,25 @@ none, respond `expired` — the browser side must have been cancelled/timed out 
 { "result": "expired" }
 ```
 
-The station's screen never needs more than this five-value enum — see § Privacy for exactly what
-text each one maps to. It never learns whose card it actually was on a mismatch; that answer is
-for the browser only.
+The station's screen never needs more than this five-value enum — see § Privacy for what text each
+one maps to. It never learns whose card it actually was on a mismatch; that's for the browser only.
 
 ## API — server exposes to the admin UI
 
-Auth: normal session auth, `ROLE_TEAM`, CSRF-protected on the mutating calls — same as every other
-`/admin/...` action in this app, nothing device-specific here.
+Auth: normal session auth, `ROLE_ADMIN` (matching the gate the card fields already sit behind),
+CSRF-protected on every mutating call.
 
 ### `POST /admin/users/{id}/card-scan`
 
-Body: `{ "mode": "link" | "verify" }`. Clears any other row's pending/mismatch sentinel first (§
-Assumptions), then writes this user's own `PENDING:`/`PENDING_VERIFY:` sentinel. `verify` is
-rejected with a flash error if the user has no `card_uid` to verify against. No response body
-needed beyond 200 — the calling page already knows which user it armed and immediately starts
-polling the next endpoint.
+Body: `{ "mode": "link" | "verify" }`. Cancels any other user's still-`pending` session first (§
+Assumptions), then creates a fresh `card_link_session` row for this user. `verify` is rejected with
+an error if the user has no active card. Response: `{ "ok": true }` — the calling page already
+knows which user it armed and starts polling the next endpoint.
 
 ### `GET /admin/users/{id}/card-scan`
 
-Polled by the browser every ~1s while the "waiting for tap" modal is open.
+Polled every ~1s while the "waiting for tap" modal is open — a plain read of this user's latest
+session, no side effects:
 
 ```json
 { "status": "pending" }
@@ -161,56 +193,64 @@ Polled by the browser every ~1s while the "waiting for tap" modal is open.
 { "status": "matched" }
 { "status": "mismatch", "matchedUserName": "Jane Doe" }   // null matchedUserName = tapped card is unregistered
 { "status": "conflict" }
-{ "status": "idle" }                                       // nothing pending for this user — expired, cancelled, or never armed
+{ "status": "idle" }                                       // no session for this user at all, or already cancelled/expired
 ```
 
-**Resolving a verify** happens as a side effect of *this* endpoint, not the station's POST: seeing
-`MISMATCH:<original>|<tapped>` on this user's row, it (a) looks up `tapped` via
-`UserRepository::findOneByCardUid()` for `matchedUserName` (null if unregistered), (b) atomically
-restores `card_uid = original` (an `UPDATE ... WHERE card_uid = 'MISMATCH:<original>|<tapped>'`
-guard makes this safe against a duplicate/racing read re-doing it), and (c) returns `mismatch`
-with that name. The very next poll — from this tab or any other — just sees the row back to a
-plain real UID and reports `idle`, so the mismatch reveal fires exactly once, right when a
-human is actually looking at it.
-
-The modal's copy per status:
-- `linked` → "Card linked to {member}." — closes, updates the visible card-UID field/badge.
+Modal copy per status is unchanged from the original draft:
+- `linked` → "Card linked to {member}." — closes, updates the visible card badge.
 - `matched` → "✓ This card belongs to {member}."
 - `mismatch` (with name) → "✗ This card is registered to Jane Doe, not {member}. Nothing changed —
   reassign it from Jane Doe's profile first if that's not intended."
 - `mismatch` (no name) → "✗ This card isn't registered to anyone. Nothing changed."
-- `conflict` → "That card is already registered to another member. Nothing changed." — offers a
-  staff-only "Reassign to {member} anyway" follow-up button, a normal separate confirmed action
-  (§ Open items), not something this flow resolves automatically.
+- `conflict` → "That card is already registered to another member. Nothing changed."
 - `idle`/timeout → "Timed out — try again."
 
 ### `DELETE /admin/users/{id}/card-scan`
 
-Cancels a still-pending arm for this user — restores the embedded original and clears the
-sentinel. Called automatically when the modal is closed/navigated away from. A no-op (not an
-error) if it's already resolved, or if some other user's arm has since superseded it.
+Cancels this user's still-`pending` session (`status='cancelled'`, `resolved_at=now`) — called
+automatically when the modal is closed/navigated away from. A no-op if already resolved or if no
+session exists.
+
+## API — server exposes to the admin UI (card lifecycle, no station involved)
+
+Plain form POSTs, not fetch/JSON — these are one-shot actions with a redirect-and-flash result,
+matching the rest of the admin app's convention (e.g. cancel-membership, delete-user), not the
+live-polling modal the station flow needs.
+
+- **`POST /admin/users/{id}/card-link-manual`** — body `uid`. Same validation
+  (`^[0-9A-F]{8,32}$`) and free-uid-conflict check as the station path, applied synchronously:
+  marks any existing active card `replaced`, inserts a new active row with
+  `deployed_by_id=<current admin>`. No session row at all — nothing to wait for.
+- **`POST /admin/users/{id}/card-lock`** — locks the user's current active card
+  (`status='locked'`, `locked_at=now`, `locked_by_id=<admin>`). No-op with a flash error if there's
+  no active card.
+- **`POST /admin/users/{id}/card-unlock`** — reverses it (`status='active'`, `unlocked_at=now`,
+  `unlocked_by_id=<admin>`). No-op with a flash error if the card isn't locked.
 
 ## UI flow
 
-**Contact edit screen** (`templates/admin/users/edit.html.twig`, next to the existing `cardUid`
-text field): a **"Scan card"** button alongside the manual input — arms `link`, opens the polling
-modal above. On `linked`, the modal closes and the text field is populated with the new UID
-client-side, so the existing save button/flow is unchanged — this button is purely an alternative
-way to *fill in* the field, not a parallel save path. The manual field and its existing validation
-(`AdminController::normalizeCardUid()`) stay exactly as they are, for whenever the station isn't
-available or an admin is doing this remotely.
+**Contact edit screen**: the card section shows the current active card (UID, deployed date, who
+deployed it) read-only, plus:
+- **"Scan card"** — arms `link` via the station modal (§ above); on success, the page reloads (or
+  the visible summary updates) to reflect the newly active card.
+- A small **manual-entry form** (its own `<form>`, independent of the main profile-save form) for
+  typing a UID directly when the station isn't available.
+- **"Lock"** / **"Unlock"** — shown depending on current status.
 
-**Contact show screen** (`templates/admin/users/show.html.twig`, on the access-card visual): a
-**"Verify"** button, shown only when `user.cardUid` is already set — arms `verify`, same modal.
-Nothing on this screen is editable from a verify outcome; it's a read-only check. Fixing a
-`mismatch`/`conflict` always means navigating to the relevant member's edit screen and using "Scan
-card" there — deliberately no one-click "steal this card" action buried in a verify result.
+None of this lives inside the big "Edit person" form any more — every card action is its own
+independent POST, so saving an unrelated profile field (phone number, memo, …) can never touch the
+card record as a side effect. This was the actual bug that prompted this redesign (§ above).
+
+**Contact show screen** (access-card visual): unchanged in spirit — shows the active card's UID and
+a **"Verify"** button in the card's bottom-right corner, admin-only, read-only outcome. A `locked`
+card is shown visibly differently (§ Privacy doesn't apply here — this is staff-only anyway) —
+proposed: a "LOCKED" badge overlaid on the card graphic, still showing the UID underneath (locking
+doesn't hide identity, it hides door access).
 
 ## Privacy: what the station's screen shows
 
 - **Idle:** a neutral "Y Wal" idle screen — nothing armed, nothing to see.
-- **Armed:** "{Link/Verify} card for {member's name} — tap now." Always the *target* member's
-  name — the one staff already selected in the browser — never anyone else's.
+- **Armed:** "{Link/Verify} card for {member's name} — tap now." Always the *target* member's name.
 - **After a tap**, exactly one of:
   - `linked` → "✓ Linked to {member's name}."
   - `conflict` → "✗ Already registered to someone else." (no name)
@@ -221,8 +261,19 @@ card" there — deliberately no one-click "steal this card" action buried in a v
 
 The **only** place "whose card is this, actually" ever gets answered is `matchedUserName` on the
 authenticated `GET /admin/users/{id}/card-scan` response — consumed by a staff member already
-looking at a specific other member's profile, never pushed to the station's screen, which anyone
-walking past a reception desk could see.
+looking at a specific other member's profile, never pushed to the station's screen.
+
+## Door credential sync (door-access-spec.md, updated)
+
+`DoorAccessService::findCredentialsForDoor()` now sources `card_uid` from
+`AccessCardRepository::findActiveForUser($attendee->getUser())?->getUid()` instead of a column
+read — a `locked` or `replaced` card is naturally excluded (not `active`), so a locked card simply
+stops working at the door without anyone needing to remember to also touch the credential sync.
+`AccessEvent::$cardUser` resolution (denied/granted card taps, § door-access-spec.md's Access event
+log) now goes through `AccessCardRepository::findOneByUid()` instead of `UserRepository`, matching
+regardless of the card's current status — a **locked** card that gets tapped and denied still
+correctly identifies who it belongs to in the access log, which is the entire point of locking
+rather than deleting: the "bad actor" stays traceable.
 
 ## Hardware note
 
@@ -230,41 +281,36 @@ Not designed in detail here — this stays a server/API/UI spec, same split as
 door-access-spec.md/door-access-firmware-spec.md. When built, expect:
 
 - A small networked (WiFi is fine — this sits at a staffed desk, not on the door's dedicated
-  ethernet drop) microcontroller + NFC reader + small display (an SSD1306 OLED or similar small
-  TFT is plenty for two lines of text and a checkmark/cross glyph) + no relay, no door-position
-  sensor, none of the door's physical I/O.
+  ethernet drop) microcontroller + NFC reader + small display, no relay, no door-position sensor.
 - Reuse the door firmware's exact UID-capture/formatting approach (`card_reader.cpp`'s
   `formatUid()`: uppercase hex, no separators) so a UID read by either device is byte-for-byte the
-  same string — no per-device normalisation quirks to keep in sync.
+  same string.
 - A companion `card-station-firmware-spec.md`, living in its own PlatformIO project the same way
-  `door-access-firmware-spec.md` lives in `/Documents/PlatformIO/Projects/y-wal/spec.md` — likely
-  its own project rather than a mode of the door firmware, since the two devices share almost no
-  physical I/O beyond "has an NFC reader."
+  `door-access-firmware-spec.md` lives in `/Documents/PlatformIO/Projects/y-wal/spec.md`.
 
 ## Open items
 
-- **Reassigning a card already registered to someone else** (the `conflict` follow-up) is
-  explicitly scoped out of this flow — proposed as a plain, separate confirmed admin action
-  (clearing the old owner's `card_uid` and setting the new one in one transaction), not something
-  the scan flow itself does automatically.
-- **The "clear any other pending row first" rule (§ Assumptions) is an application-level
-  invariant, not a database one** — unlike the old table-based design's DB-enforced "one row",
-  two different users' sentinels never collide as strings, so nothing stops two arm calls from
-  racing in theory. Acceptable for a single staffed station operated by one person at a time; would
-  need real locking if a second station is ever added (§ next item).
-- **Multiple stations** would break the "there's only ever one pending row" assumption this whole
-  no-new-table design leans on — supporting a second desk is the point at which a small
-  `station_id`-aware table (closer to the earlier draft of this spec) probably becomes the right
-  call again, rather than stretching the sentinel convention further.
+- **Reassigning a card already registered to someone else** (the `conflict` follow-up) stays a
+  plain, separate confirmed admin action — mark the old owner's active row `replaced`
+  (not silently deleted — its history stays queryable) and create a fresh active row for the new
+  owner — not something the scan flow itself does automatically.
+- **The "only one pending session" and "only one active card per user" rules are application-level
+  invariants, not database ones** — acceptable for a single staffed station operated by one person
+  at a time; would need real locking (a transaction + `SELECT ... FOR UPDATE`, or a unique
+  constraint on `(user_id)` filtered to `status='active'`/`'pending'` if the DB ever supports
+  partial indexes) if concurrent use becomes real.
+- **Multiple stations** — add a `station_id` column to both tables and thread it through the API
+  once a second desk exists; not designed here.
 - **Self-service verification** ("is this my card?" without staff involved) is a deliberate
-  non-goal — see § Privacy. Worth reconsidering only behind a member's own login (matched against
-  `app.user`, never an arbitrary tap), not as a station-floor kiosk mode.
-- **Poll cadence (1–2s) and no explicit TTL on a pending sentinel** — unlike the table-based draft,
-  there's no `expires_at` here, so an abandoned arm (browser tab closed without the modal's cleanup
-  firing) leaves that member stuck `PENDING` until someone else's arm clears it, or it's noticed
-  and cancelled manually. Worth adding a lazy "older than N minutes" check on the next arm/poll if
-  this turns out to happen often in practice — not designed in here to keep the sentinel format
-  from growing a timestamp field too.
-- **What happens if the station itself is offline** isn't specially handled — the admin-side modal
-  just sits on `pending` indefinitely rather than timing out (see previous item) — same "no
-  station-unreachable detection" gap as the original draft.
+  non-goal — see § Privacy. Worth reconsidering only behind a member's own login, never as a
+  station-floor kiosk mode.
+- **No background expiry job for a stale `pending` session** — an abandoned arm (browser tab closed
+  without the modal's cleanup firing) sits at `pending` past its `expires_at` until something else
+  cancels or supersedes it. `expires_at` exists so a lazy check *could* be added (e.g. the "only one
+  pending" cancel-first step also treating a past-due `pending` row as already expired) — not built
+  as a real background job here.
+- **Full lock/unlock *history*** (more than the single most-recent lock/unlock pair of timestamps)
+  isn't kept — if a card is locked and unlocked multiple times, only the latest cycle's
+  `locked_at`/`locked_by_id`/`unlocked_at`/`unlocked_by_id` survive. A genuine multi-event audit log
+  would need its own append-only table (mirroring `access_event`'s own shape) — not proposed here
+  since a manual, rare, staff-driven action doesn't obviously need it yet.

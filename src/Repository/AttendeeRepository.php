@@ -268,7 +268,7 @@ class AttendeeRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('a')
             ->innerJoin('a.event', 'e')->addSelect('e')
-            ->innerJoin('a.user', 'u')->addSelect('u') // needed for User::getCardUid() in DoorAccessService::findCredentialsForDoor()
+            ->innerJoin('a.user', 'u')->addSelect('u') // eager-loaded since findCredentialsForDoor() reads $attendee->getUser() for every row
             ->where('a.pinStatus = :active')
             ->andWhere('a.status != :cancelled')
             ->setParameter('active', Attendee::PIN_STATUS_ACTIVE)

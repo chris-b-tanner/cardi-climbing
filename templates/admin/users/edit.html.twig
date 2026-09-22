@@ -106,15 +106,35 @@
         </p>
       </div>
       <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
-        <label for="cardUid">Access card UID</label>
-        <div style="display:flex;gap:0.5rem;align-items:center;">
-          <input type="text" id="cardUid" name="cardUid" class="form-control"
-                 value="{{ user.cardUid }}" maxlength="64"
-                 placeholder="No card registered" autocomplete="off" style="max-width:20rem;">
-          {% if user.cardUid %}
-            <button type="button" id="clearCardUid" class="btn btn--ghost btn--sm">Clear</button>
-          {% endif %}
-        </div>
+        <label>Access card</label>
+        {% if accessCard %}
+          <p style="font-size:0.9375rem;margin-bottom:0.35rem;">
+            <span style="font-family:'Courier New', monospace;letter-spacing:0.08em;">{{ accessCard.uid }}</span>
+            {% if accessCard.isLocked %}
+              <span class="status-pill status-pill--cancelled" style="margin-left:0.4rem;">Locked</span>
+            {% endif %}
+          </p>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;">
+            Deployed {{ accessCard.deployedAt|date('j M Y') }}{% if accessCard.deployedBy %} by {{ accessCard.deployedBy.displayName }}{% endif %}
+            {%- if accessCard.isLocked and accessCard.lockedAt %}
+              &middot; Locked {{ accessCard.lockedAt|date('j M Y') }}{% if accessCard.lockedBy %} by {{ accessCard.lockedBy.displayName }}{% endif %}
+            {% endif %}
+          </p>
+        {% else %}
+          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;">No card registered.</p>
+        {% endif %}
+
+        <form method="post" action="{{ path('app_admin_user_card_link_manual', {id: user.id}) }}"
+              style="display:flex;gap:0.5rem;align-items:center;">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_manage_' ~ user.id) }}">
+          <input type="text" name="uid" class="form-control" placeholder="Type a UID manually (e.g. B0A9FF5C)" autocomplete="off" style="max-width:20rem;">
+          <button type="submit" class="btn btn--ghost btn--sm">Link</button>
+        </form>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
+          Fallback for typing a UID in directly when the card station isn't available — the member's
+          own contact page has a "Scan card" button that waits for a tap instead, plus lock/unlock.
+          Either way, linking a new card replaces whatever card this member had before.
+        </p>
       </div>
     {% endif %}
   </div>
@@ -265,6 +285,7 @@
     {% endif %}
   </div>
 {% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -284,14 +305,6 @@
     if (clrBtn) {
       clrBtn.addEventListener('click', () => { input.value = ''; });
     }
-  })();
-
-  (function () {
-    const input  = document.getElementById('cardUid');
-    const clrBtn = document.getElementById('clearCardUid');
-    if (!input || !clrBtn) return;
-
-    clrBtn.addEventListener('click', () => { input.value = ''; });
   })();
 </script>
 {% if canHaveDependents %}

@@ -33,7 +33,7 @@ Notes:
   reaches `door_closed`, same trigger as before, just sourced from the new table instead of storing
   the raw timestamps directly.
 - Manual reception check-in writes the same `checked_in_at`/`checked_in_by_id`/`checked_in_method='manual'` fields — single source for attendance reporting regardless of channel. It creates no `access_event` row (see § Manual check-in) since nothing physical is being observed.
-- Uniqueness: PIN must be unique among attendees with `pin_status='active'` for the same door at overlapping/near-term windows, **and** against any value currently held in `user.keyholder_pin` (§ Keyholder disarm PIN) — the two PIN pools must never collide. If one event maps to one door, scope uniqueness by `event_id`'s door; if multiple doors, add `door_id` resolution via event → venue/door mapping (not detailed here — plug into your existing model). `user.card_uid` (§ Card-based entry) lives in a completely separate value space (NFC UID, not a 6-digit number) so it never needs to be checked against either PIN pool.
+- Uniqueness: PIN must be unique among attendees with `pin_status='active'` for the same door at overlapping/near-term windows, **and** against any value currently held in `user.keyholder_pin` (§ Keyholder disarm PIN) — the two PIN pools must never collide. If one event maps to one door, scope uniqueness by `event_id`'s door; if multiple doors, add `door_id` resolution via event → venue/door mapping (not detailed here — plug into your existing model). A card's `uid` (§ Card-based entry; schema in `card-setup.md`) lives in a completely separate value space (NFC UID, not a 6-digit number) so it never needs to be checked against either PIN pool.
 - `checked_out_at`/`checked_out_method` are new in this revision, added for the internal exit reader (§ Exit reader). They're set once, same "single completion, not a running log" shape as `checked_in_at` — but, unlike `checked_in_at`, set at the tap itself (`stage=authorized`) rather than waiting for the matching `access_event` to reach `door_closed`. See § Exit reader for why entry and exit are deliberately asymmetric here.
 
 ## PIN lifecycle
@@ -84,7 +84,7 @@ CREATE TABLE `access_event` (
   `type`              VARCHAR(20) NOT NULL,       -- attendee_access | keyholder_access | access_denied | unexpected_open | member_exit
   `attendee_id`       INT DEFAULT NULL,           -- set for attendee_access / access_denied; also set for member_exit if an active session was found and closed (see § Exit reader)
   `keyholder_user_id` INT DEFAULT NULL,           -- set for keyholder_access
-  `exit_user_id`      INT DEFAULT NULL,           -- set for member_exit — resolved from the tapped card_uid via user.card_uid
+  `exit_user_id`      INT DEFAULT NULL,           -- set for member_exit — resolved from the tapped card_uid via access_card (card-setup.md)
   `channel`           VARCHAR(10) DEFAULT NULL,   -- pin | card — set for attendee_access and access_denied only; NULL for keyholder_access/unexpected_open/member_exit (those aren't ambiguous about how they were triggered)
   `stage`             VARCHAR(20) DEFAULT NULL,   -- authorized | door_open | door_closed — NULL for access_denied
   `denied_reason`     VARCHAR(20) DEFAULT NULL,   -- expired | not_found | already_used — access_denied only
@@ -220,18 +220,22 @@ Deliberately **not** a new, parallel credential system — a card is a second wa
 *same* attendee-credential row a PIN already represents (§ PIN lifecycle), which is what makes
 this a small addition rather than a second access-control model to maintain.
 
-```sql
-ALTER TABLE `user`
-  ADD COLUMN `card_uid` varchar(32) DEFAULT NULL,
-  ADD UNIQUE KEY `UNQ_user_card_uid` (`card_uid`);
-```
+**Schema: see `card-setup.md`**, which owns the card's identity and lifecycle as its own
+`access_card` table (`user_id`, `uid`, `status`, `deployed_at`/`deployed_by`,
+`locked_at`/`locked_by`, `unlocked_at`/`unlocked_by`, `replaced_at`) — superseding an earlier
+revision of this section, which put a single `card_uid` column directly on `user`. That was
+simpler at first but couldn't hold an audit trail (who deployed/locked a card, when) or survive a
+card being locked without losing which member it belonged to; `card-setup.md` § "Why two real
+tables, not a field on `user`" has the full reasoning.
 
-- Lives on `user`, not `attendee` — a physical card belongs to the person and is issued once, not
-  reissued per booking. Whether *this* tap unlocks the door still depends entirely on whether the
-  member currently has a valid, unused attendee credential for this door — the card just identifies
-  who's asking, exactly the same role a typed PIN plays today, just without the typing.
-- Nullable — most members won't have a card issued immediately; entry keeps working via PIN alone
-  for anyone without one.
+- Lives on its own table, not `attendee` or a `user` column — a physical card belongs to the
+  person and is issued once, not reissued per booking, and its own status (active/locked/replaced)
+  is independent of any particular booking. Whether *this* tap unlocks the door still depends
+  entirely on whether the member currently has a valid, unused attendee credential for this door —
+  the card just identifies who's asking, exactly the same role a typed PIN plays today, just
+  without the typing.
+- A member with no `active` `access_card` row behaves exactly as "no card" did under the old
+  design — entry keeps working via PIN alone.
 - Stored as the reader's native UID, uppercase hex, no separators (e.g. `"04A3B2C1"`) — pick one
   canonical format now so an admin-entered UID and a device-read UID are byte-for-byte comparable
   without normalisation logic on either side. See `door-access-firmware-spec.md` § NFC card
@@ -239,13 +243,9 @@ ALTER TABLE `user`
 - No uniqueness conflict with `pin`/`keyholder_pin` to design around — an NFC UID and a 6-digit PIN
   live in disjoint value spaces and are matched via entirely different physical input channels
   (reader vs. keypad), so nothing needs cross-checking the way the two PIN pools do.
-- **Admin UX for registering a card is not fully designed here** — see Open items. The proposed
-  flow: the door's existing local status page (`door-access-firmware-spec.md` § Local
-  status/config web server) already has everywhere it needs to show a `%LAST_CARD_UID%` token once
-  a reader exists; a staff member taps the new card at the door, reads the UID off that page, and
-  types it into a plain text field on the member's admin profile (same pattern as
-  `user.keyholder_pin` today). This avoids inventing a second device role (an "enrolment reader")
-  just for this — reusing the door's own entry reader as a read-only UID display is enough for v1.
+- **Admin UX for registering a card:** see `card-setup.md` in full — a dedicated card station
+  (separate hardware from the door, its own screen) handles link/verify/lock/unlock, with a manual
+  text-entry fallback on the member's admin profile for when the station isn't available.
 
 **Device sync** extends the existing `GET /v1/doors/{door_id}/credentials` response — each
 credential entry gains an optional `card_uid` (present only if the linked member has one
@@ -600,16 +600,14 @@ Fail-safe vs fail-secure catch wiring — confirm against local fire code if thi
   chris@lend-engine.com) — shipped this way deliberately for now rather than building a real
   distribution list/admin UI ahead of need. Revisit once there's more than one person who needs
   to see `door_propped`/`door_unexpected_open` alerts.
-- ~~Admin UX for registering `user.card_uid` isn't fully designed~~ — **implemented as proposed,
-  then superseded**: a plain text field on the member's edit page (next to `keyholder_pin`) accepts
-  a bare hex UID (paste only — an earlier version also parsed the scanner's raw
-  "`[NFC] scanned UID=... (N bytes)`" log line, since dropped in favour of requiring just the UID
-  itself). `GET /v1/doors/{door_id}/credentials` includes `card_uid` per credential exactly as
-  specced above, sourced from `Attendee::getUser()->getCardUid()`. The "walk to the door and read a
-  screen, then type it in" flow this section originally proposed turned out not to be worth
-  building — **`card-setup.md`** (new, separate file, same repo) instead designs a dedicated
-  tap-to-link/tap-to-verify station with its own screen, so the door's entry reader never needs to
-  double as an enrolment device at all. The exit reader (`exit_cards`, `member_exit`,
+- ~~Admin UX for registering a card isn't fully designed~~ — **superseded by `card-setup.md`**
+  (new, separate file, same repo), which designs a dedicated tap-to-link/tap-to-verify/lock/unlock
+  station with its own screen — the door's entry reader never needs to double as an enrolment
+  device. Card identity/lifecycle also moved off `user.card_uid` (this section's original schema)
+  onto its own `access_card` table, once locking needed a real audit trail — see that doc's "Why
+  two real tables" for why. `GET /v1/doors/{door_id}/credentials` still includes `card_uid` per
+  credential exactly as specced above; it's just sourced from a member's active `access_card` row
+  now instead of a `user` column. The exit reader (`exit_cards`, `member_exit`,
   `checked_out_at`/`checked_out_method`) remains entirely unbuilt.
 - **Whether keyholders should also get cards** (tap instead of typing their disarm PIN) isn't
   addressed — this revision only adds cards for booking-attendee entry and for the unconditional

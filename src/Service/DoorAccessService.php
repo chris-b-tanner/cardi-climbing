@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\AccessEvent;
 use App\Entity\Attendee;
 use App\Entity\User;
+use App\Repository\AccessCardRepository;
 use App\Repository\AccessEventRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\UserRepository;
@@ -52,6 +53,7 @@ class DoorAccessService
         private readonly AttendeeRepository $attendeeRepository,
         private readonly UserRepository $userRepository,
         private readonly AccessEventRepository $accessEventRepository,
+        private readonly AccessCardRepository $accessCardRepository,
     ) {}
 
     /** Issues a PIN for {attendee} if its event is self-access and it doesn't already have an active one. A no-op otherwise (e.g. a normal event, or a cancelled/pending booking). */
@@ -114,7 +116,7 @@ class DoorAccessService
         $event->setAttendee($attendee);
 
         if ($cardUid !== null) {
-            $event->setCard($cardUid, $this->userRepository->findOneByCardUid($cardUid));
+            $event->setCard($cardUid, $this->accessCardRepository->findOneByUid($cardUid)?->getUser());
         }
 
         if (!$event->advanceStage($stage, $timestamp)) {
@@ -157,7 +159,7 @@ class DoorAccessService
         $event->recordDeniedAt($timestamp);
 
         if ($cardUid !== null) {
-            $event->setCard($cardUid, $this->userRepository->findOneByCardUid($cardUid));
+            $event->setCard($cardUid, $this->accessCardRepository->findOneByUid($cardUid)?->getUser());
         }
     }
 
@@ -230,7 +232,7 @@ class DoorAccessService
             $credentials[] = [
                 'credential_id' => $attendee->getId(),
                 'pin'           => $attendee->getPin(),
-                'card_uid'      => $attendee->getUser()->getCardUid(),
+                'card_uid'      => $this->accessCardRepository->findActiveForUser($attendee->getUser())?->getUid(),
                 'valid_from'    => $validFrom,
                 'valid_until'   => $validUntil,
                 'status'        => $attendee->getPinStatus(),

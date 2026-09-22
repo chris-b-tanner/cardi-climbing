@@ -67,9 +67,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 6, nullable: true, unique: true)]
     private ?string $keyholderPin = null;
 
-    /** Membership card NFC UID for tap-to-enter door access — see door-access-spec.md § Card-based entry (NFC). Stored as the reader's native UID, uppercase hex, no separators (e.g. "B0A9FF5C"), so an admin-entered UID and a device-read UID are byte-for-byte comparable. Null until a card is registered for this member. */
-    #[ORM\Column(length: 32, nullable: true, unique: true)]
-    private ?string $cardUid = null;
+    /** This member's access cards — identity, status, and full deploy/lock/replace history. See card-setup.md; at most one row is ever `active` at a time (CardService owns that invariant). */
+    #[ORM\OneToMany(targetEntity: AccessCard::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['deployedAt' => 'DESC'])]
+    private Collection $accessCards;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $addressLine1 = null;
@@ -169,6 +170,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->salesOrders    = new ArrayCollection();
         $this->creditLedgerEntries = new ArrayCollection();
         $this->dependents     = new ArrayCollection();
+        $this->accessCards    = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -346,8 +348,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setKeyholderPin(?string $keyholderPin): static { $this->keyholderPin = $keyholderPin; return $this; }
     public function isKeyholder(): bool { return $this->keyholderPin !== null; }
 
-    public function getCardUid(): ?string { return $this->cardUid; }
-    public function setCardUid(?string $cardUid): static { $this->cardUid = $cardUid; return $this; }
+    public function getAccessCards(): Collection { return $this->accessCards; }
+
+    /** This member's current active card, if any — prefer AccessCardRepository::findActiveForUser() for a targeted lookup that doesn't load the whole history collection first. */
+    public function getActiveAccessCard(): ?AccessCard
+    {
+        foreach ($this->accessCards as $card) {
+            if ($card->isActive()) {
+                return $card;
+            }
+        }
+
+        return null;
+    }
 
     public function getAddressLine1(): ?string { return $this->addressLine1; }
     public function setAddressLine1(?string $addressLine1): static { $this->addressLine1 = $addressLine1; return $this; }
