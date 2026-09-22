@@ -1,0 +1,63 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Cards — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Cards</h1>
+</div>
+
+{% if cards is empty %}
+  <div class="empty">
+    <strong>No cards seen yet</strong>
+    Every card linked to a member, plus every card-station scan that ever resolved a UID — including ones that never became a registered card — will show up here.
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>UID</th>
+          <th>Owner</th>
+          <th>Status</th>
+          <th>Scans</th>
+          <th>Last seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for card in cards %}
+          <tr>
+            <td>
+              <a href="{{ path('app_admin_settings_card_show', {uid: card.uid}) }}" class="admin-table__link" style="font-family:'Courier New', monospace;">
+                {{ card.uid }}
+              </a>
+            </td>
+            <td>
+              {% if card.owner %}
+                <a href="{{ path('app_admin_user_show', {id: card.owner.id}) }}" class="admin-table__link">{{ card.owner.displayName }}</a>
+              {% else %}
+                <span class="admin-table__muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if card.status == 'active' %}
+                <span class="status-pill status-pill--published">Active</span>
+              {% elseif card.status == 'locked' %}
+                <span class="status-pill status-pill--cancelled">Locked</span>
+              {% elseif card.status == 'replaced' %}
+                <span class="status-pill status-pill--pending">Replaced</span>
+              {% elseif card.status == 'removed' %}
+                <span class="status-pill status-pill--pending">Removed</span>
+              {% else %}
+                <span class="admin-table__muted">Unregistered</span>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted">{{ card.scanCount }}</td>
+            <td class="admin-table__muted">{{ card.lastSeenAt|date('d M Y H:i') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.78rem;color:var(--muted);margin-top:0.75rem;">Showing {{ cards|length }} card{{ cards|length == 1 ? '' : 's' }}.</p>
+{% endif %}
+{% endblock %}

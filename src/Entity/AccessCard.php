@@ -128,6 +128,12 @@ class AccessCard
         return $this->unlockedBy;
     }
 
+    /** Set for STATUS_REPLACED and STATUS_REMOVED alike — see the field's own docblock. */
+    public function getReplacedAt(): ?\DateTimeImmutable
+    {
+        return $this->replacedAt;
+    }
+
     /** @throws \LogicException if not currently active */
     public function lock(User $by): void
     {

@@ -1,0 +1,119 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}{{ uid }} — Cards — Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <a href="{{ path('app_admin_settings_cards') }}" class="page-header__crumb">Cards</a> &raquo;
+    <span style="font-family:'Courier New', monospace;">{{ uid }}</span>
+  </h1>
+</div>
+
+<div class="card">
+  <div class="card__label" style="margin-bottom:0.6rem;">Registration</div>
+  {% if card %}
+    <div class="detail-grid">
+      <div>
+        <div class="card__label">Owner</div>
+        <div class="card__value">
+          <a href="{{ path('app_admin_user_show', {id: card.user.id}) }}" style="color:var(--teal);">{{ card.user.displayName }}</a>
+        </div>
+      </div>
+      <div>
+        <div class="card__label">Status</div>
+        <div class="card__value">
+          {% if card.status == 'active' %}
+            <span class="status-pill status-pill--published">Active</span>
+          {% elseif card.status == 'locked' %}
+            <span class="status-pill status-pill--cancelled">Locked</span>
+          {% elseif card.status == 'replaced' %}
+            <span class="status-pill status-pill--pending">Replaced</span>
+          {% else %}
+            <span class="status-pill status-pill--pending">Removed</span>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="card__label">Deployed</div>
+        <div class="card__value">{{ card.deployedAt|date('j M Y H:i') }}{% if card.deployedBy %} by {{ card.deployedBy.displayName }}{% endif %}</div>
+      </div>
+      {% if card.lockedAt %}
+        <div>
+          <div class="card__label">Locked</div>
+          <div class="card__value">{{ card.lockedAt|date('j M Y H:i') }}{% if card.lockedBy %} by {{ card.lockedBy.displayName }}{% endif %}</div>
+        </div>
+      {% endif %}
+      {% if card.unlockedAt %}
+        <div>
+          <div class="card__label">Unlocked</div>
+          <div class="card__value">{{ card.unlockedAt|date('j M Y H:i') }}{% if card.unlockedBy %} by {{ card.unlockedBy.displayName }}{% endif %}</div>
+        </div>
+      {% endif %}
+      {% if card.replacedAt %}
+        <div>
+          <div class="card__label">{{ card.status == 'removed' ? 'Removed' : 'Replaced' }}</div>
+          <div class="card__value">{{ card.replacedAt|date('j M Y H:i') }}</div>
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <p style="color:var(--muted);font-size:0.875rem;">
+      This UID has never been linked to a member — every appearance below came from a station scan
+      that didn't result in (or no longer has) a registration.
+    </p>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Scan history</div>
+  {% if sessions is empty %}
+    <p style="color:var(--muted);font-size:0.875rem;">No card-station scans recorded for this UID.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Mode</th>
+            <th>Target</th>
+            <th>Result</th>
+            <th>Armed by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in sessions %}
+            <tr>
+              <td class="admin-table__muted">{{ (session.resolvedAt ?? session.createdAt)|date('d M Y H:i') }}</td>
+              <td>{{ session.mode|capitalize }}</td>
+              <td>
+                {% if session.user %}
+                  <a href="{{ path('app_admin_user_show', {id: session.user.id}) }}" class="admin-table__link">{{ session.user.displayName }}</a>
+                {% else %}
+                  <span class="admin-table__muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if session.status == 'linked' %}
+                  <span class="status-pill status-pill--published">Linked</span>
+                {% elseif session.status == 'matched' or session.status == 'found' %}
+                  <span class="status-pill status-pill--published">{{ session.status|capitalize }}</span>
+                {% elseif session.status == 'mismatch' or session.status == 'not_found' or session.status == 'conflict' %}
+                  <span class="status-pill status-pill--cancelled">{{ session.status == 'not_found' ? 'Not found' : session.status|capitalize }}</span>
+                {% else %}
+                  <span class="admin-table__muted">{{ session.status|capitalize }}</span>
+                {% endif %}
+                {% if session.matchedUser %}
+                  <br><span class="admin-table__muted">
+                    → <a href="{{ path('app_admin_user_show', {id: session.matchedUser.id}) }}" class="admin-table__link">{{ session.matchedUser.displayName }}</a>
+                  </span>
+                {% endif %}
+              </td>
+              <td class="admin-table__muted">{{ session.createdBy ? session.createdBy.displayName : '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

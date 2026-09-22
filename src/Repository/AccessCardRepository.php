@@ -55,4 +55,17 @@ class AccessCardRepository extends ServiceEntityRepository
 
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
+
+    /** Every registered card, any status — for the Settings > Cards report. */
+    public function findAllOrdered(): array
+    {
+        return $this->createQueryBuilder('c')
+            ->leftJoin('c.user', 'u')->addSelect('u')
+            ->leftJoin('c.deployedBy', 'db')->addSelect('db')
+            ->leftJoin('c.lockedBy', 'lb')->addSelect('lb')
+            ->leftJoin('c.unlockedBy', 'ub')->addSelect('ub')
+            ->orderBy('c.deployedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
 }

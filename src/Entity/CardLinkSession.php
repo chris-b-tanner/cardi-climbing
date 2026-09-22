@@ -128,6 +128,16 @@ class CardLinkSession
         return $this->expiresAt;
     }
 
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getResolvedAt(): ?\DateTimeImmutable
+    {
+        return $this->resolvedAt;
+    }
+
     public function getCreatedBy(): ?User
     {
         return $this->createdBy;

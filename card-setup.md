@@ -321,6 +321,26 @@ authenticated `GET /admin/users/{id}/card-scan` response (verify) and `userName`
 `GET /admin/card-lookup` (lookup) — both consumed by a staff member already at their own screen,
 never pushed to the station's.
 
+## Settings > Cards (report)
+
+Read-only, `ROLE_ADMIN`, at `/admin/settings/cards` — every UID the card station has ever resolved
+a scan for, merged from two sources: `access_card` (linked at some point, any status) and
+`card_link_session.scanned_uid` (resolved a tap even if it never became — or no longer is — a
+registration: a mismatched verify, a not-found lookup, a conflicting link attempt). The merge
+happens in PHP (`AdminCardController::index()`), not a SQL `UNION` — two capped, indexed queries
+or'd together into one array keyed by UID, easier to read than a hand-written cross-table query
+for what's expected to be a small table at this venue's scale.
+
+Deliberately doesn't fold in door taps (`access_event.card_uid`) — those already have their own
+report (Settings > Access log, door-access-spec.md) and are a different device's history; merging
+a third source here would blur two pages that are each already a complete, correct account of
+their own device.
+
+Clicking a UID goes to `/admin/settings/cards/{uid}` — the `access_card` registration details (if
+any) plus every `card_link_session` row for that exact UID, most recent first. A UID with no
+`access_card` row at all still gets a page (as long as at least one session mentions it) — "this
+was scanned but never registered" is itself useful information, not a 404.
+
 ## Door credential sync (door-access-spec.md, updated)
 
 `DoorAccessService::findCredentialsForDoor()` now sources `card_uid` from

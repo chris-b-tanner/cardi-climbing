@@ -40,4 +40,38 @@ class CardLinkSessionRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['mode' => $mode], ['createdAt' => 'DESC']);
     }
+
+    /**
+     * Every resolved session that actually read a UID (i.e. reached the station's scan handler) —
+     * for the Settings > Cards report, which is built from this plus
+     * AccessCardRepository::findAllOrdered(), not every armed-then-abandoned attempt. Capped
+     * (unlike findAllOrdered(), which only grows as fast as real link/lock/unlock actions) since
+     * this table grows one row per tap, including repeat test taps.
+     */
+    public function findAllWithScannedUid(int $limit = 500): array
+    {
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.user', 'u')->addSelect('u')
+            ->leftJoin('s.matchedUser', 'mu')->addSelect('mu')
+            ->leftJoin('s.createdBy', 'cb')->addSelect('cb')
+            ->where('s.scannedUid IS NOT NULL')
+            ->orderBy('s.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** {uid}'s full scan history — every session that ever resolved with this UID tapped, most recent first. */
+    public function findByScannedUid(string $uid): array
+    {
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.user', 'u')->addSelect('u')
+            ->leftJoin('s.matchedUser', 'mu')->addSelect('mu')
+            ->leftJoin('s.createdBy', 'cb')->addSelect('cb')
+            ->where('s.scannedUid = :uid')
+            ->setParameter('uid', $uid)
+            ->orderBy('s.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
 }
