@@ -366,6 +366,11 @@
               <button type="submit" class="btn btn--ghost btn--sm">Lock</button>
             </form>
           {% endif %}
+          <form method="post" action="{{ path('app_admin_user_card_remove', {id: user.id}) }}" style="display:inline;"
+                onsubmit="return confirm('Remove this card from {{ (displayName ?: user.email)|e('js') }}? They\'ll have no card until a new one is linked.');">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_manage_' ~ user.id) }}">
+            <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+          </form>
         </div>
       {% endif %}
     {% elseif is_granted('ROLE_ADMIN') %}

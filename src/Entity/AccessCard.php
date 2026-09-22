@@ -17,6 +17,7 @@ class AccessCard
     public const STATUS_ACTIVE   = 'active';
     public const STATUS_LOCKED   = 'locked';
     public const STATUS_REPLACED = 'replaced';
+    public const STATUS_REMOVED  = 'removed';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -55,6 +56,7 @@ class AccessCard
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $unlockedBy = null;
 
+    /** When this row stopped being current — set for STATUS_REPLACED (superseded by a newer card) and STATUS_REMOVED (no replacement) alike. Who did it and why lives on the Note this same action writes (see CardService), not a dedicated column here. */
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $replacedAt = null;
 
@@ -148,6 +150,17 @@ class AccessCard
         $this->status = self::STATUS_ACTIVE;
         $this->unlockedAt = new \DateTimeImmutable();
         $this->unlockedBy = $by;
+    }
+
+    /** @throws \LogicException if not currently active or locked */
+    public function remove(): void
+    {
+        if ($this->isActive() === false && $this->isLocked() === false) {
+            throw new \LogicException('Only an active or locked card can be removed.');
+        }
+
+        $this->status = self::STATUS_REMOVED;
+        $this->replacedAt = new \DateTimeImmutable();
     }
 
     /** Superseded by a newer card for the same member — see CardService::link(). */

@@ -44,14 +44,14 @@ CREATE TABLE `access_card` (
   `id`              INT AUTO_INCREMENT PRIMARY KEY,
   `user_id`         INT NOT NULL,
   `uid`             VARCHAR(32) NOT NULL,        -- uppercase hex, no separators (unchanged format)
-  `status`          VARCHAR(20) NOT NULL,        -- active | locked | replaced
+  `status`          VARCHAR(20) NOT NULL,        -- active | locked | replaced | removed
   `deployed_at`     DATETIME NOT NULL,
   `deployed_by_id`  INT DEFAULT NULL,             -- staff who linked it (null: manual DB fixup, not a real path)
   `locked_at`       DATETIME DEFAULT NULL,
   `locked_by_id`    INT DEFAULT NULL,
   `unlocked_at`     DATETIME DEFAULT NULL,
   `unlocked_by_id`  INT DEFAULT NULL,
-  `replaced_at`     DATETIME DEFAULT NULL,        -- set when a newer card supersedes this one
+  `replaced_at`     DATETIME DEFAULT NULL,        -- set for `replaced` (superseded by a newer card) AND `removed` (no replacement) alike
   UNIQUE KEY `UNQ_access_card_uid` (`uid`),
   KEY `IDX_access_card_user` (`user_id`),
   CONSTRAINT `FK_access_card_user`        FOREIGN KEY (`user_id`)        REFERENCES `user` (`id`) ON DELETE CASCADE,
@@ -80,10 +80,20 @@ CREATE TABLE `card_link_session` (
 );
 ```
 
-- **`access_card` rows are never deleted or overwritten in place** — locking, unlocking, and
-  replacing all just update `status`/timestamps on the existing row (or insert a new row for a
-  replacement, marking the superseded one `replaced`). That *is* the audit trail — no separate log
-  table needed for "who deployed/locked/unlocked this and when," since those are just columns.
+- **`access_card` rows are never deleted or overwritten in place** — locking, unlocking, removing,
+  and replacing all just update `status`/timestamps on the existing row (or, for a replacement,
+  insert a new row and mark the superseded one `replaced`). That's most of the audit trail —
+  "who deployed/locked/unlocked this and when" are just columns — but **who did a `remove`, and
+  why, isn't a column here at all**: `CardService::remove()`/`link()`/`lock()`/`unlock()` each also
+  write a `Note` (`Note::TYPE_MEMBER`) on the member's own history via the existing
+  `UserService::addNote()`, worded per action ("Access card added/replaced/removed/locked/unlocked:
+  ..."). That note *is* the "who and why" record for every transition — deliberately not a 5th
+  `removed_at`/`removed_by` column pair, since the note already carries it and is visible right on
+  the member's profile rather than needing a separate admin screen to inspect `access_card` rows.
+- **`removed` vs `replaced`**: both mean "no longer current" and are excluded identically from
+  `findActiveForUser()`/`findCurrentForUser()` — the only difference is intent, for the humans
+  reading the history later. `replaced` means a specific newer card exists; `removed` means the
+  member now has no card at all until one is linked again.
 - **`uid` is unique across the whole table, forever** — once a physical card is registered, its row
   is its permanent record regardless of status. This is what makes "whose card is this, actually"
   a plain `WHERE uid = :uid` lookup with no status-aware branching, unlike the old
@@ -229,23 +239,29 @@ live-polling modal the station flow needs.
 
 ## UI flow
 
-**Contact edit screen**: the card section shows the current active card (UID, deployed date, who
-deployed it) read-only, plus:
-- **"Scan card"** — arms `link` via the station modal (§ above); on success, the page reloads (or
-  the visible summary updates) to reflect the newly active card.
-- A small **manual-entry form** (its own `<form>`, independent of the main profile-save form) for
-  typing a UID directly when the station isn't available.
-- **"Lock"** / **"Unlock"** — shown depending on current status.
+**Contact show screen** hosts every live card action — moved here (from an earlier draft that put
+them on the edit screen) so they sit right next to the card visual itself, where staff are already
+looking:
+- The access-card graphic shows the active card's UID, with a **"Verify"** button in its
+  bottom-right corner (admin-only, read-only outcome). A `locked` card renders visibly greyed out
+  and labelled "· Locked" in the card's own header — locking doesn't hide identity, it hides door
+  access, so the UID stays visible underneath.
+- Directly below the graphic: **"Scan card"** (arms `link` via the station modal, § above — on
+  success, reloads to show the freshly-linked card), **"Lock"**/**"Unlock"** (whichever applies),
+  and **"Remove"** (no replacement — confirms first, since the member is left with no card at all
+  until one's linked again).
+- No card yet: a dashed placeholder sits where the graphic would be, with just a **"Scan card"**
+  button — the same trigger, same modal, just with no existing UID to show first.
 
-None of this lives inside the big "Edit person" form any more — every card action is its own
-independent POST, so saving an unrelated profile field (phone number, memo, …) can never touch the
-card record as a side effect. This was the actual bug that prompted this redesign (§ above).
+**Contact edit screen** keeps only the read-only card summary (UID, deployed date, who deployed it,
+locked-since if applicable) plus a small **manual-entry form** (its own `<form>`, independent of
+the main profile-save form) for typing a UID directly when the station isn't available — every
+other action lives on the show screen instead.
 
-**Contact show screen** (access-card visual): unchanged in spirit — shows the active card's UID and
-a **"Verify"** button in the card's bottom-right corner, admin-only, read-only outcome. A `locked`
-card is shown visibly differently (§ Privacy doesn't apply here — this is staff-only anyway) —
-proposed: a "LOCKED" badge overlaid on the card graphic, still showing the UID underneath (locking
-doesn't hide identity, it hides door access).
+None of this lives inside the big "Edit person" form — every card action (station-driven or manual)
+is its own independent POST, so saving an unrelated profile field (phone number, memo, …) can never
+touch the card record as a side effect. This was the actual bug that prompted this redesign
+(§ "Why two real tables" above).
 
 ## Privacy: what the station's screen shows
 

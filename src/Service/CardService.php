@@ -19,6 +19,7 @@ class CardService
         private readonly EntityManagerInterface $em,
         private readonly AccessCardRepository $accessCardRepository,
         private readonly CardLinkSessionRepository $cardLinkSessionRepository,
+        private readonly UserService $userService,
     ) {}
 
     /** A bare hex UID, normalised to uppercase — no separators, no surrounding text. Null if it isn't one. */
@@ -31,7 +32,9 @@ class CardService
 
     /**
      * Links {uid} to {user} as their new active card — marking any existing active card
-     * `replaced` first. Used by both manual entry and a successful station scan.
+     * `replaced` first. Used by both manual entry and a successful station scan. Notes the
+     * member's history either way (see card-setup.md's audit-trail rationale) — worded
+     * differently depending on whether this is their first card or a replacement.
      *
      * @throws \InvalidArgumentException if {uid} is already claimed by any card (any status)
      */
@@ -48,19 +51,37 @@ class CardService
         $this->em->persist($card);
         $this->em->flush();
 
+        $note = $existing !== null
+            ? 'Access card replaced: ' . $existing->getUid() . ' → ' . $uid . '.'
+            : 'Access card added: ' . $uid . '.';
+        $this->userService->addNote($user, $note, $staff);
+
         return $card;
+    }
+
+    /** @throws \LogicException if {card} isn't currently active or locked */
+    public function remove(AccessCard $card, User $staff): void
+    {
+        $card->remove();
+        $this->em->flush();
+
+        $this->userService->addNote($card->getUser(), 'Access card removed: ' . $card->getUid() . '.', $staff);
     }
 
     public function lock(AccessCard $card, User $staff): void
     {
         $card->lock($staff);
         $this->em->flush();
+
+        $this->userService->addNote($card->getUser(), 'Access card locked: ' . $card->getUid() . '.', $staff);
     }
 
     public function unlock(AccessCard $card, User $staff): void
     {
         $card->unlock($staff);
         $this->em->flush();
+
+        $this->userService->addNote($card->getUser(), 'Access card unlocked: ' . $card->getUid() . '.', $staff);
     }
 
     /**

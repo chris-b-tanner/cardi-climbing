@@ -140,4 +140,26 @@ class AdminCardScanController extends AbstractController
 
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
+
+    /** Removes this member's card with no replacement — distinct from linking a new one, which replaces it automatically. */
+    #[Route('/card-remove', name: 'app_admin_user_card_remove', methods: ['POST'])]
+    public function remove(Request $request, User $user): Response
+    {
+        if (!$this->isCsrfTokenValid('card_manage_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $card = $this->accessCardRepository->findCurrentForUser($user);
+        if ($card === null) {
+            $this->addFlash('error', 'This member has no card to remove.');
+        } else {
+            /** @var User $admin */
+            $admin = $this->getUser();
+            $this->cardService->remove($card, $admin);
+            $this->addFlash('success', 'Card removed.');
+        }
+
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
 }
