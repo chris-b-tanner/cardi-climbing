@@ -9,10 +9,17 @@
   {% else %}
     <div class="btn-row">
       <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Send bulk email</a>
+      <button type="button" class="card-scan-trigger btn btn--ghost btn--sm"
+              data-url="{{ path('app_admin_card_lookup_start') }}"
+              data-mode="lookup"
+              data-csrf="{{ csrf_token('card_lookup') }}"
+              data-on-found="cardLookupRedirect">Find by card</button>
       <a href="{{ path('app_admin_user_new') }}" class="btn btn--teal btn--sm">+ New person</a>
     </div>
   {% endif %}
 </div>
+
+{% include 'admin/_card_scan_modal.html.twig' with {prefix: 'card-scan'} %}
 
 <div class="filter-form">
   <input type="search" id="search-q" placeholder="Search…" style="flex:0 0 22rem;"
@@ -73,6 +80,16 @@
   .admin-table__memo-col { display: none; }
   #results.show-memo .admin-table__memo-col { display: table-cell; }
 </style>
+<script>
+  function cardLookupRedirect(userId) {
+    // The found member's id isn't known until the async lookup resolves, so this can't be a plain
+    // data-url like the other card-scan triggers. app_admin_user_show requires a real \d+ for
+    // `id` (path() validates that server-side even for this placeholder render), so 0 stands in —
+    // then swapped for the real id, anchored to the end so it can't match a digit elsewhere in
+    // the path.
+    window.location.href = '{{ path('app_admin_user_show', {id: 0}) }}'.replace(/\/0$/, '/' + userId);
+  }
+</script>
 <script>
   const searchInput   = document.getElementById('search-q');
   const showMemoCheck = document.getElementById('show-memo');

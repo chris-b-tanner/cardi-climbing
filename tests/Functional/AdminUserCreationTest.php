@@ -30,7 +30,7 @@ class AdminUserCreationTest extends WebTestCase
         $crawler = $client->request('GET', '/admin/users/new');
         self::assertResponseIsSuccessful();
 
-        $form = $crawler->selectButton('Create member')->form([
+        $form = $crawler->selectButton('Create')->form([
             'firstName'   => 'Testy',
             'lastName'    => 'McTestface',
             'email'       => $email,

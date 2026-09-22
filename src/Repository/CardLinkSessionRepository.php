@@ -34,4 +34,10 @@ class CardLinkSessionRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['user' => $user], ['createdAt' => 'DESC']);
     }
+
+    /** The most recent session of {mode} regardless of user — MODE_LOOKUP has no user to key by, so the admin browser's poll for it reports against this instead of findLatestForUser(). */
+    public function findLatestByMode(string $mode): ?CardLinkSession
+    {
+        return $this->findOneBy(['mode' => $mode], ['createdAt' => 'DESC']);
+    }
 }

@@ -21,7 +21,13 @@ class CardStationController extends AbstractController
         private readonly CardService $cardService,
     ) {}
 
-    /** Polled every 1-2s: whoever's currently armed for a link/verify, or null if nobody is — see card-setup.md's privacy note on why this is the only member info the station ever receives. */
+    /**
+     * Polled every 1-2s: whoever's currently armed for a link/verify, or null if nobody is — see
+     * card-setup.md's privacy note on why this is the only member info the station ever receives.
+     * `user_name` is null for a lookup (there's no target member to name — the whole point is
+     * finding out who it is) — the station should show a generic "tap a card to look up" prompt
+     * for that mode rather than "for {name}".
+     */
     #[Route('/pending', name: 'app_api_card_station_pending', methods: ['GET'])]
     public function pending(Request $request): JsonResponse
     {
@@ -35,7 +41,7 @@ class CardStationController extends AbstractController
             'server_time' => (new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z'),
             'pending' => $session ? [
                 'mode'      => $session->getMode(),
-                'user_name' => $session->getUser()->getDisplayName(),
+                'user_name' => $session->getUser()?->getDisplayName(),
             ] : null,
         ]);
     }

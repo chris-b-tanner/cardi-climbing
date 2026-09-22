@@ -1,9 +1,10 @@
 {#
-  Shared card-station link/verify modal — see card-setup.md. Opened by any `.{{ prefix }}-trigger`
-  button carrying `data-url` (the `/admin/users/{id}/card-scan` endpoint for this member — same URL
-  for arm/poll/cancel, just a different HTTP method), `data-mode` ("link" or "verify"),
-  `data-user-name`, and `data-csrf`. `prefix` namespaces this instance's DOM ids in case more than
-  one copy ever lands on the same page.
+  Shared card-station link/verify/lookup modal — see card-setup.md. Opened by any
+  `.{{ prefix }}-trigger` button carrying `data-url` (the arm/poll/cancel endpoint for this
+  action — same URL, just a different HTTP method each time), `data-mode` ("link", "verify", or
+  "lookup"), `data-csrf`, and (for link/verify only — lookup has no target member) `data-user-name`.
+  `prefix` namespaces this instance's DOM ids in case more than one copy ever lands on the same
+  page.
 #}
 <div id="{{ prefix }}-modal" class="pos-modal" style="display:none;">
   <div id="{{ prefix }}-modal-backdrop" class="pos-modal__backdrop"></div>
@@ -54,7 +55,9 @@
 
     function render(status, userName) {
       if (status.status === 'pending') {
-        message.textContent = 'Waiting for a tap on the card station…';
+        message.textContent = userName
+          ? 'Waiting for a tap on the card station…'
+          : 'Waiting for a tap on the card station… tap any registered card to find its member.';
       } else if (status.status === 'linked') {
         message.textContent = 'Card linked to ' + userName + '.';
       } else if (status.status === 'matched') {
@@ -65,19 +68,23 @@
           : '✗ This card isn\'t registered to anyone. Nothing changed.';
       } else if (status.status === 'conflict') {
         message.textContent = 'That card is already registered to another member. Nothing changed.';
+      } else if (status.status === 'found') {
+        message.textContent = '✓ Found ' + status.userName + ' — opening their contact page…';
+      } else if (status.status === 'not_found') {
+        message.textContent = 'That card isn\'t registered to anyone.';
       } else {
         message.textContent = 'Timed out — try again.';
       }
     }
 
-    function poll(url, userName, onLinked) {
+    function poll(url, userName, onLinked, onFound) {
       fetch(url)
         .then(r => r.json())
         .then(status => {
           render(status, userName);
 
           if (status.status === 'pending') {
-            pollTimer = setTimeout(() => poll(url, userName, onLinked), 1000);
+            pollTimer = setTimeout(() => poll(url, userName, onLinked, onFound), 1000);
             return;
           }
 
@@ -87,6 +94,8 @@
 
           if (status.status === 'linked' && onLinked) {
             onLinked(status.cardUid);
+          } else if (status.status === 'found' && onFound) {
+            onFound(status.userId, status.userName);
           }
         })
         .catch(() => {
@@ -101,14 +110,15 @@
 
       const url      = trigger.dataset.url;
       const mode     = trigger.dataset.mode;
-      const userName = trigger.dataset.userName;
+      const userName = trigger.dataset.userName || null;
       const csrf     = trigger.dataset.csrf;
       const onLinked = trigger.dataset.onLinked && window[trigger.dataset.onLinked];
+      const onFound  = trigger.dataset.onFound && window[trigger.dataset.onFound];
 
       currentUrl = url;
       currentCsrf = csrf;
 
-      title.textContent = mode === 'verify' ? 'Verify card' : 'Link card';
+      title.textContent = mode === 'verify' ? 'Verify card' : mode === 'lookup' ? 'Find by card' : 'Link card';
       message.textContent = 'Arming the card station…';
       modal.style.display = 'flex';
 
@@ -125,7 +135,7 @@
             currentCsrf = null;
             return;
           }
-          poll(url, userName, onLinked);
+          poll(url, userName, onLinked, onFound);
         })
         .catch(() => {
           message.textContent = 'Could not reach the server — try again.';

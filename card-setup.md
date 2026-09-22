@@ -62,11 +62,11 @@ CREATE TABLE `access_card` (
 
 CREATE TABLE `card_link_session` (
   `id`               INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`          INT NOT NULL,
-  `mode`             VARCHAR(10) NOT NULL,        -- link | verify
-  `status`           VARCHAR(20) NOT NULL,        -- pending | linked | matched | mismatch | conflict | cancelled | expired
+  `user_id`          INT DEFAULT NULL,             -- NULL only for mode=lookup — see below
+  `mode`             VARCHAR(10) NOT NULL,        -- link | verify | lookup
+  `status`           VARCHAR(20) NOT NULL,        -- pending | linked | matched | mismatch | conflict | found | not_found | cancelled | expired
   `scanned_uid`      VARCHAR(32) DEFAULT NULL,
-  `matched_user_id`  INT DEFAULT NULL,             -- verify only: set when the tap belongs to a DIFFERENT known member
+  `matched_user_id`  INT DEFAULT NULL,             -- verify: set when the tap belongs to a DIFFERENT known member. lookup: set to whoever it resolves to, full stop
   `created_by_id`    INT DEFAULT NULL,
   `created_at`       DATETIME NOT NULL,
   `expires_at`       DATETIME NOT NULL,
@@ -107,6 +107,11 @@ CREATE TABLE `card_link_session` (
   same as the original design) — arming a new one first cancels any other still-`pending` row.
 - `expires_at` gives a plain TTL (proposed: 60s) for an abandoned arm; `resolved_at` records when a
   station's tap (or a cancel) actually closed it out.
+- **`mode=lookup` ("find by card") is the one case `user_id` is null** — link/verify always arm
+  from an already-known member's own contact page; a lookup starts from nothing but a tap, from
+  the People list, with no target member to key the row by at all. It resolves to `found`
+  (`matched_user_id` set) or `not_found`, never `linked`/`matched`/`mismatch`/`conflict` — those
+  outcomes only make sense when there was a specific member being linked/verified against.
 
 ## Assumptions locked in
 
@@ -221,6 +226,29 @@ Cancels this user's still-`pending` session (`status='cancelled'`, `resolved_at=
 automatically when the modal is closed/navigated away from. A no-op if already resolved or if no
 session exists.
 
+### `POST` / `GET` / `DELETE /admin/card-lookup` ("find by card")
+
+Same three-verb-one-URL shape as `/admin/users/{id}/card-scan` above, but **not** user-scoped —
+there's no `{id}` yet, that's the entire point of a lookup. Gated `ROLE_TEAM`, not `ROLE_ADMIN`:
+finding a member by tapping their card is a search convenience equivalent to typing their name
+into the People list's own search box, not a credential-management action, so it doesn't need the
+tighter gate the actual card fields (link/verify/lock/unlock) sit behind.
+
+- `POST` arms it — no body beyond CSRF, cancelling whatever else is pending first (unconditionally;
+  a lookup has no "same target" case to spare re-arming for, unlike link/verify against one member).
+- `GET` polls it:
+  ```json
+  { "status": "pending" }
+  { "status": "found", "userId": 512, "userName": "Chris Tanner" }
+  { "status": "not_found" }
+  { "status": "idle" }
+  ```
+  `found` is the one status the admin browser is expected to *act* on rather than just display —
+  redirecting straight to `/admin/users/{userId}`. `not_found` just says so; nothing else happens
+  automatically (see § Open items — offering a one-click "+ New person" prefilled with the scanned
+  UID was considered and deliberately left for later, not built as part of this).
+- `DELETE` cancels it, same as the link/verify version.
+
 ## API — server exposes to the admin UI (card lifecycle, no station involved)
 
 Plain form POSTs, not fetch/JSON — these are one-shot actions with a redirect-and-flash result,
@@ -258,6 +286,11 @@ locked-since if applicable) plus a small **manual-entry form** (its own `<form>`
 the main profile-save form) for typing a UID directly when the station isn't available — every
 other action lives on the show screen instead.
 
+**People list** gets a **"Find by card"** button next to "+ New person" — arms `lookup` via the
+same shared modal, and on `found` redirects straight to `/admin/users/{userId}`. `not_found` just
+shows a message; unlike the other modes, there's no member page to reload or link update to
+reflect afterwards, so nothing else happens.
+
 None of this lives inside the big "Edit person" form — every card action (station-driven or manual)
 is its own independent POST, so saving an unrelated profile field (phone number, memo, …) can never
 touch the card record as a side effect. This was the actual bug that prompted this redesign
@@ -266,18 +299,27 @@ touch the card record as a side effect. This was the actual bug that prompted th
 ## Privacy: what the station's screen shows
 
 - **Idle:** a neutral "Y Wal" idle screen — nothing armed, nothing to see.
-- **Armed:** "{Link/Verify} card for {member's name} — tap now." Always the *target* member's name.
+- **Armed, link/verify:** "{Link/Verify} card for {member's name} — tap now." Always the *target*
+  member's name.
+- **Armed, lookup:** "Tap a card to look up its member" — deliberately generic, since a lookup has
+  no target to name.
 - **After a tap**, exactly one of:
   - `linked` → "✓ Linked to {member's name}."
   - `conflict` → "✗ Already registered to someone else." (no name)
   - `matched` → "✓ This is {member's name}'s card."
   - `mismatch` → "✗ Not {member's name}'s card." (no name — the station can't tell "someone else's"
     from "no one's" and doesn't need to)
+  - `found`/`not_found` (lookup) → a generic "✓ Card read." regardless of which — **even though
+    finding out who it is is the entire point of this mode**, that answer is deliberately withheld
+    from the station's own screen, same as every other mode. The reveal happens only once, in the
+    browser of the staff member who armed it (via the redirect on `found`), not on a device sat at
+    a reception desk anyone could glance at.
   - `expired` → "Session timed out."
 
-The **only** place "whose card is this, actually" ever gets answered is `matchedUserName` on the
-authenticated `GET /admin/users/{id}/card-scan` response — consumed by a staff member already
-looking at a specific other member's profile, never pushed to the station's screen.
+The **only** places "whose card is this, actually" ever get answered are `matchedUserName` on the
+authenticated `GET /admin/users/{id}/card-scan` response (verify) and `userName`/`userId` on
+`GET /admin/card-lookup` (lookup) — both consumed by a staff member already at their own screen,
+never pushed to the station's.
 
 ## Door credential sync (door-access-spec.md, updated)
 
@@ -306,6 +348,10 @@ door-access-spec.md/door-access-firmware-spec.md. When built, expect:
 
 ## Open items
 
+- **"Find by card" `not_found` doesn't offer to create a new contact** — an unrecognised tap during
+  a lookup could plausibly one-click into "+ New person" with the scanned UID prefilled, so an
+  unregistered card becomes a new contact and a linked card in one step. Considered and explicitly
+  deferred — the lookup flow here only ever finds existing members.
 - **Reassigning a card already registered to someone else** (the `conflict` follow-up) stays a
   plain, separate confirmed admin action — mark the old owner's active row `replaced`
   (not silently deleted — its history stays queryable) and create a fresh active row for the new

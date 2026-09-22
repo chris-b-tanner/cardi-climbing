@@ -10,8 +10,8 @@ use App\Repository\CardLinkSessionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Card identity/lifecycle (AccessCard) and the card-station link/verify flow (CardLinkSession) —
- * see card-setup.md.
+ * Card identity/lifecycle (AccessCard) and the card-station link/verify/lookup flow
+ * (CardLinkSession) — see card-setup.md.
  */
 class CardService
 {
@@ -124,6 +124,34 @@ class CardService
         $this->em->flush();
     }
 
+    /**
+     * Arms a "find by card" lookup — unlike arm(), not about any already-known member, so it
+     * always supersedes whatever else is currently pending (there's no "same target" case to
+     * spare, the way re-arming link/verify for the same member has).
+     */
+    public function armLookup(?User $staff): CardLinkSession
+    {
+        $this->cardLinkSessionRepository->findOnePending()?->markCancelled();
+
+        $session = new CardLinkSession(null, CardLinkSession::MODE_LOOKUP, $staff);
+        $this->em->persist($session);
+        $this->em->flush();
+
+        return $session;
+    }
+
+    /** Cancels the current pending lookup, if any — a no-op otherwise (including if what's pending is actually a link/verify session; this only ever touches its own mode). */
+    public function cancelLookup(): void
+    {
+        $session = $this->cardLinkSessionRepository->findOnePending();
+        if ($session === null || $session->getMode() !== CardLinkSession::MODE_LOOKUP) {
+            return;
+        }
+
+        $session->markCancelled();
+        $this->em->flush();
+    }
+
     /** The member currently armed, for the station's poll — null if nobody is. */
     public function findArmed(): ?CardLinkSession
     {
@@ -133,13 +161,27 @@ class CardService
     /**
      * Processes one tap from the station against whichever session is currently pending.
      *
-     * @return string One of 'linked' | 'conflict' | 'matched' | 'mismatch' | 'expired' (nobody's armed — the session ended between the station's last poll and this tap).
+     * @return string One of 'linked' | 'conflict' | 'matched' | 'mismatch' | 'found' | 'not_found' | 'expired' (nobody's armed — the session ended between the station's last poll and this tap).
      */
     public function submitScan(string $tappedUid): string
     {
         $session = $this->findArmed();
         if ($session === null) {
             return 'expired';
+        }
+
+        if ($session->getMode() === CardLinkSession::MODE_LOOKUP) {
+            $matchedUser = $this->accessCardRepository->findOneByUid($tappedUid)?->getUser();
+
+            if ($matchedUser === null) {
+                $session->markNotFound($tappedUid);
+                $this->em->flush();
+                return 'not_found';
+            }
+
+            $session->markFound($tappedUid, $matchedUser);
+            $this->em->flush();
+            return 'found';
         }
 
         if ($session->getMode() === CardLinkSession::MODE_VERIFY) {
@@ -192,6 +234,28 @@ class CardService
             CardLinkSession::STATUS_MATCHED  => ['status' => 'matched'],
             CardLinkSession::STATUS_CONFLICT => ['status' => 'conflict'],
             CardLinkSession::STATUS_MISMATCH => ['status' => 'mismatch', 'matchedUserName' => $session->getMatchedUser()?->getDisplayName()],
+            default => ['status' => 'idle'],
+        };
+    }
+
+    /**
+     * The admin browser's poll for a "find by card" lookup — findLatestByMode() rather than
+     * findLatestForUser() since a lookup has no target member to key by (see class docblock).
+     *
+     * @return array{status: string, userId?: int, userName?: string}
+     */
+    public function getLookupStatus(): array
+    {
+        $session = $this->cardLinkSessionRepository->findLatestByMode(CardLinkSession::MODE_LOOKUP);
+
+        if ($session === null || in_array($session->getStatus(), [CardLinkSession::STATUS_CANCELLED, CardLinkSession::STATUS_EXPIRED], true)) {
+            return ['status' => 'idle'];
+        }
+
+        return match ($session->getStatus()) {
+            CardLinkSession::STATUS_PENDING   => ['status' => 'pending'],
+            CardLinkSession::STATUS_FOUND     => ['status' => 'found', 'userId' => $session->getMatchedUser()?->getId(), 'userName' => $session->getMatchedUser()?->getDisplayName()],
+            CardLinkSession::STATUS_NOT_FOUND => ['status' => 'not_found'],
             default => ['status' => 'idle'],
         };
     }
