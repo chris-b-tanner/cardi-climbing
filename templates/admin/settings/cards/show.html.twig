@@ -95,17 +95,22 @@
               <td>
                 {% if session.status == 'linked' %}
                   <span class="status-pill status-pill--published">Linked</span>
-                {% elseif session.status == 'matched' or session.status == 'found' %}
-                  <span class="status-pill status-pill--published">{{ session.status|capitalize }}</span>
+                {% elseif session.status == 'matched' %}
+                  <span class="status-pill status-pill--published">Matched</span>
+                {% elseif session.status == 'found' %}
+                  <span class="status-pill status-pill--published">Found</span>
+                  {% if session.matchedUser %}
+                    <a href="{{ path('app_admin_user_show', {id: session.matchedUser.id}) }}" class="admin-table__link">{{ session.matchedUser.displayName }}</a>
+                  {% endif %}
                 {% elseif session.status == 'mismatch' or session.status == 'not_found' or session.status == 'conflict' %}
                   <span class="status-pill status-pill--cancelled">{{ session.status == 'not_found' ? 'Not found' : session.status|capitalize }}</span>
+                  {% if session.matchedUser %}
+                    <br><span class="admin-table__muted">
+                      → <a href="{{ path('app_admin_user_show', {id: session.matchedUser.id}) }}" class="admin-table__link">{{ session.matchedUser.displayName }}</a>
+                    </span>
+                  {% endif %}
                 {% else %}
                   <span class="admin-table__muted">{{ session.status|capitalize }}</span>
-                {% endif %}
-                {% if session.matchedUser %}
-                  <br><span class="admin-table__muted">
-                    → <a href="{{ path('app_admin_user_show', {id: session.matchedUser.id}) }}" class="admin-table__link">{{ session.matchedUser.displayName }}</a>
-                  </span>
                 {% endif %}
               </td>
               <td class="admin-table__muted">{{ session.createdBy ? session.createdBy.displayName : '—' }}</td>

@@ -311,6 +311,27 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
+    /** Quick "they said yes" action for the opted-out prompt on the contact view — staff asks the member directly, then records it here, same GDPR paper trail as opting in via the edit form. */
+    #[Route('/users/{id}/opt-in', name: 'app_admin_user_opt_in', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function optIn(Request $request, User $user, UserService $userService, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('opt_in_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $previousOptIn = $user->isOptIn();
+        $user->setOptIn(true);
+        $em->flush();
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+        $userService->recordOptInChangeIfNeeded($user, $previousOptIn, $admin);
+
+        $this->addFlash('success', (($user->getFirstName() ?: $user->getEmail()) ?: 'They') . ' are now opted in to the mailing list.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
     /** Reads a named param from either a JSON body or a form-encoded one, so an action can be called by a plain fetch() as well as a form submit. */
     private function paramFromRequest(Request $request, string $key): string
     {

@@ -167,7 +167,20 @@
     {% endif %}
     <div>
       <div class="card__label">Mailing list</div>
-      <div class="card__value">{{ user.optIn ? 'Opted in' : 'Opted out' }}</div>
+      <div class="card__value">
+        {% if user.optIn %}
+          Opted in
+        {% else %}
+          <span style="color:var(--red);font-weight:600;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:0.85em;"></i> Opted out
+          </span>
+          <form method="post" action="{{ path('app_admin_user_opt_in', {id: user.id}) }}" style="display:inline;"
+                onsubmit="return confirm('Ask {{ (displayName ?: user.email)|e('js') }} if they\'d like to opt back in to the mailing list — then confirm to record it.');">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('opt_in_' ~ user.id) }}">
+            <button type="submit" style="border:none;background:none;padding:0;margin-left:0.4rem;font:inherit;font-size:0.85em;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Ask &amp; opt in</button>
+          </form>
+        {% endif %}
+      </div>
     </div>
     <div>
       <div class="card__label">Joined</div>
@@ -333,7 +346,13 @@
             Access card{% if accessCard.isLocked %} · Locked{% endif %}
           </span>
         </div>
-        <div style="margin-top:1.5rem; font-family:'Courier New', monospace; font-size:1.05rem; letter-spacing:0.14em;">{{ accessCard.uid }}</div>
+        <div style="margin-top:1.5rem; font-family:'Courier New', monospace; font-size:1.05rem; letter-spacing:0.14em;">
+          {% if is_granted('ROLE_ADMIN') %}
+            <a href="{{ path('app_admin_settings_card_show', {uid: accessCard.uid}) }}" style="color:inherit;text-decoration:underline;">{{ accessCard.uid }}</a>
+          {% else %}
+            {{ accessCard.uid }}
+          {% endif %}
+        </div>
         <div style="margin-top:0.4rem; display:flex; justify-content:space-between; align-items:flex-end; gap:0.5rem;">
           <span style="font-size:0.75rem; opacity:0.9;">{{ displayName ?: user.email }}</span>
           {% if is_granted('ROLE_ADMIN') %}
