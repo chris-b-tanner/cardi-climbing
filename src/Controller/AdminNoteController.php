@@ -65,10 +65,11 @@ class AdminNoteController extends AbstractController
         $content = trim($request->request->get('content', ''));
 
         // "Email {address}" on the member page's add-note form — see ContactQuickEmailMailer. The
-        // note stores the "Emailed: " prefix so the list makes clear this one actually went out,
-        // but the email itself carries the plain typed text, not that prefix. Subject is required
-        // whenever this is ticked (enforced client-side too — see _notes_panel.html.twig — but
-        // checked again here since a form can always be submitted with JS disabled or bypassed).
+        // note's own content is stored verbatim, exactly what the admin typed — Note::$emailSubject
+        // being set is what marks it as sent (_notes_panel.html.twig shows an envelope icon + the
+        // subject for any note carrying one), not a text prefix baked into the content. Subject is
+        // required whenever this is ticked (enforced client-side too — see _notes_panel.html.twig —
+        // but checked again here since a form can always be submitted with JS disabled or bypassed).
         $wantsEmail = $noteableType === Note::TYPE_MEMBER
             && $request->request->getBoolean('emailContact')
             && $noteable->getEmail();
@@ -90,7 +91,7 @@ class AdminNoteController extends AbstractController
 
             $note = new Note();
             $note->setNoteable($noteable);
-            $note->setContent($wantsEmail ? 'Emailed: ' . $content : $content);
+            $note->setContent($content);
             $note->setAddedBy($admin);
 
             if ($wantsEmail) {

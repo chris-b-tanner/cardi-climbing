@@ -8,10 +8,12 @@
   ContactQuickEmailMailer). Optional `lastEmailSubject` (whatever Note::$emailSubject the most
   recent turn in this thread carries, from either side — see
   NoteRepository::findLatestEmailThreadNote()) prefills the Subject field with "Re: {that}" the
-  first time the checkbox is ticked, so a follow-up threads under the same subject by default. No
-  "insert first name" helper here — unlike the compose screen's multi-recipient audience, this is
-  always exactly one contact, already named right at the top of the page, so a personalisation
-  placeholder buys nothing.
+  first time the checkbox is ticked, so a follow-up threads under the same subject by default. Any
+  note carrying `emailSubject` (either direction — an admin's outbound send or a member's inbound
+  reply, see WebhookController::inbound()) shows it with a small envelope icon above the note's own
+  content, rather than a text prefix baked into that content. No "insert first name" helper here —
+  unlike the compose screen's multi-recipient audience, this is always exactly one contact, already
+  named right at the top of the page, so a personalisation placeholder buys nothing.
 #}
 <form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate style="margin-bottom:1.25rem;">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
@@ -54,6 +56,11 @@
       {% endif %}
         {% set contentLines = note.content|split('\n') %}
         {% set isLongNote = contentLines|length > 5 %}
+        {% if note.emailSubject %}
+          <p style="font-size:0.75rem;color:var(--teal-dk);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
+            <i class="bi bi-envelope" title="Sent by email"></i> {{ note.emailSubject }}
+          </p>
+        {% endif %}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
           <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">
             {%- if isLongNote -%}

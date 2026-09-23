@@ -37,7 +37,12 @@ use Symfony\Component\Mime\Address;
  */
 class ContactQuickEmailMailer
 {
-    /** Matches the "Emailed: " prefix AdminNoteController::add() stores on an outbound quick-email note — stripped when quoting it back, since that's an internal audit marker, not part of what the admin actually wrote. */
+    /**
+     * A quick-email note's content is stored verbatim now — an envelope icon + Note::$emailSubject
+     * marks it as sent, not a text prefix (see AdminNoteController::add()) — but this stays to
+     * gracefully strip the literal "Emailed: " prefix any note created before that change still
+     * carries, so quoting an old thread doesn't leak that internal marker into the recipient's inbox.
+     */
     private const SENT_PREFIX = 'Emailed: ';
 
     public function __construct(
