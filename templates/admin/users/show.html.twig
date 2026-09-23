@@ -453,7 +453,7 @@
     <button type="button" class="pos-tab" data-tab="sales" data-has-content="{{ hasSales ? '1' : '0' }}">Sales</button>
     <button type="button" class="pos-tab" data-tab="payments" data-has-content="{{ hasPayments ? '1' : '0' }}">Payments</button>
     <button type="button" class="pos-tab" data-tab="credits" data-has-content="{{ hasCredits ? '1' : '0' }}">Credit transactions</button>
-    <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}" data-has-pinned="{{ notes|filter(n => n.pinned) is not empty ? '1' : '0' }}">Notes</button>
+    <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}" data-has-pinned="{{ notes|filter(n => n.pinned) is not empty ? '1' : '0' }}">Notes / Email</button>
   </div>
 
   <div class="tab-panel" data-tab-panel="bookings">
@@ -641,7 +641,7 @@
 
 
   <div class="tab-panel" data-tab-panel="notes" style="display:none;">
-    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id} %}
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id, contactEmail: user.email} %}
   </div>
 </div>
 

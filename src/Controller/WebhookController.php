@@ -12,7 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Also the landing point for the "ywal-u-{id}" reply-tracking scheme: every email sent from the
- * compose window carries a "Ref: ywal-u-{recipient's user id}" line in its footer (see
+ * compose window carries a "ywal-u-{recipient's user id}" line in its footer (see
  * templates/email/bulk*.twig). A Gmail filter on that address auto-forwards any reply quoting it
  * to this same Postmark inbound endpoint — see inbound() below, which checks for that ref before
  * falling back to the generic from-email matching used for everything else forwarded here.

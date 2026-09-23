@@ -11,6 +11,7 @@ use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\ContactNoteMailer;
+use App\Service\ContactQuickEmailMailer;
 use App\Service\NoteableResolver;
 use App\Service\NoteAssignmentMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,7 @@ class AdminNoteController extends AbstractController
         private readonly NoteableResolver $noteableResolver,
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
         private readonly ContactNoteMailer $contactNoteMailer,
+        private readonly ContactQuickEmailMailer $contactQuickEmailMailer,
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
@@ -61,13 +63,29 @@ class AdminNoteController extends AbstractController
 
         $content = trim($request->request->get('content', ''));
 
+        // "Email {address}" on the member page's add-note form — see ContactQuickEmailMailer. The
+        // note stores the "Emailed: " prefix so the list makes clear this one actually went out,
+        // but the email itself carries the plain typed text, not that prefix. Subject is required
+        // whenever this is ticked (enforced client-side too — see _notes_panel.html.twig — but
+        // checked again here since a form can always be submitted with JS disabled or bypassed).
+        $wantsEmail = $noteableType === Note::TYPE_MEMBER
+            && $request->request->getBoolean('emailContact')
+            && $noteable->getEmail();
+
+        $subject = trim($request->request->get('subject', ''));
+
+        if ($wantsEmail && $subject === '') {
+            $this->addFlash('error', 'Enter a subject before emailing this note.');
+            return $this->redirectForNoteable($noteableType, $noteableId);
+        }
+
         if ($content !== '') {
             /** @var User $admin */
             $admin = $this->getUser();
 
             $note = new Note();
             $note->setNoteable($noteable);
-            $note->setContent($content);
+            $note->setContent($wantsEmail ? 'Emailed: ' . $content : $content);
             $note->setAddedBy($admin);
 
             if ($request->request->getBoolean('pinned')) {
@@ -83,6 +101,11 @@ class AdminNoteController extends AbstractController
             if ($noteableType === Note::TYPE_MEMBER) {
                 $target = $this->noteableResolver->resolve($note, absolute: true);
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
+
+                if ($wantsEmail) {
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content);
+                    $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . '.');
+                }
             }
         }
 

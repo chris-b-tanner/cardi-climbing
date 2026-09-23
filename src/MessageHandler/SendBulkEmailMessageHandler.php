@@ -6,6 +6,7 @@ use App\Entity\Email;
 use App\Entity\User;
 use App\Message\SendBulkEmailMessage;
 use App\Repository\UserRepository;
+use App\Service\EmailPlaceholders;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
@@ -29,6 +30,7 @@ final class SendBulkEmailMessageHandler
         private readonly UserRepository $userRepository,
         private readonly MailerInterface $mailer,
         private readonly UserService $userService,
+        private readonly EmailPlaceholders $emailPlaceholders,
         #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
@@ -54,7 +56,7 @@ final class SendBulkEmailMessageHandler
 
         $context = [
             'subject' => $email->getSubject(),
-            'body'    => $email->getBody(),
+            'body'    => $this->emailPlaceholders->apply($email->getBody(), $user),
             'user'    => $user,
         ];
         if (!$isFixedAudience) {

@@ -1,7 +1,40 @@
 {#
   Shared notes panel — included on the Member, Attendee (booking), Event, Product, and Order admin
-  pages. Expects `notes` (Note[], pinned first), `noteableType`, and `noteableId`.
+  pages. Expects `notes` (Note[], pinned first), `noteableType`, and `noteableId`. Optional
+  `contactEmail` (member page only) shows an "Email {address}" checkbox on the add-note form —
+  ticking it reveals a required Subject field above the note textarea, and sends the note straight
+  to that address as a blank templated email alongside saving it, the lightweight continuation of a
+  conversation that started via the full compose screen (see AdminNoteController::add() /
+  ContactQuickEmailMailer). No "insert first name" helper here — unlike the compose screen's
+  multi-recipient audience, this is always exactly one contact, already named right at the top of
+  the page, so a personalisation placeholder buys nothing.
 #}
+<form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate style="margin-bottom:1.25rem;">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
+  {% if contactEmail is defined and contactEmail %}
+    <div class="form-group note-email-subject" id="note-subject-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
+      <input type="text" name="subject" id="note-subject-{{ noteableType }}-{{ noteableId }}" class="form-control" placeholder="Subject line for this email…">
+    </div>
+  {% endif %}
+  <div class="form-group" style="margin-bottom:0.5rem;">
+    <textarea id="note-content-{{ noteableType }}-{{ noteableId }}" name="content" class="form-control" rows="3"
+              placeholder="Add a note…" style="resize:vertical;"></textarea>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+    <button type="submit" class="btn btn--teal btn--sm">Add note</button>
+    <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
+      <input type="checkbox" name="pinned" value="1" style="width:1rem;height:1rem;accent-color:var(--teal);">
+      Pinned
+    </label>
+    {% if contactEmail is defined and contactEmail %}
+      <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
+        <input type="checkbox" name="emailContact" value="1" id="note-email-toggle-{{ noteableType }}-{{ noteableId }}" style="width:1rem;height:1rem;accent-color:var(--teal);">
+        Email {{ contactEmail }}
+      </label>
+    {% endif %}
+  </div>
+</form>
+
 {% if notes is empty %}
   <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem;">No notes yet.</p>
 {% else %}
@@ -84,25 +117,37 @@
   </div>
 {% endif %}
 
-<form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate>
-  <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
-  <div class="form-group" style="margin-bottom:0.5rem;">
-    <textarea name="content" class="form-control" rows="3"
-              placeholder="Add a note…" style="resize:vertical;"></textarea>
-  </div>
-  <div style="display:flex;align-items:center;gap:0.75rem;">
-    <button type="submit" class="btn btn--teal btn--sm">Add note</button>
-    <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
-      <input type="checkbox" name="pinned" value="1" style="width:1rem;height:1rem;accent-color:var(--teal);">
-      Pinned
-    </label>
-  </div>
-</form>
-
 {% include 'admin/_assign_modal.html.twig' with {prefix: 'note-assign'} %}
 
 <script>
   (function () {
+    // Shows/requires the Subject field, and doubles the note textarea's row count, only while
+    // "Email {address}" is ticked — a plain note never needs either, but a note that's actually
+    // going out as an email always needs a subject (enforced again server-side — see
+    // AdminNoteController::add()) and tends to run longer than a quick internal note.
+    document.querySelectorAll('.note-email-subject').forEach((wrap) => {
+      const suffix  = wrap.id.slice('note-subject-wrap-'.length);
+      const toggle  = document.getElementById('note-email-toggle-' + suffix);
+      const input   = wrap.querySelector('input[name="subject"]');
+      const content = document.getElementById('note-content-' + suffix);
+      if (!toggle || !input || !content) return;
+
+      const baseRows = content.rows;
+
+      toggle.addEventListener('change', () => {
+        wrap.style.display = toggle.checked ? 'block' : 'none';
+        input.required = toggle.checked;
+        content.rows = toggle.checked ? baseRows * 2 : baseRows;
+
+        if (toggle.checked) {
+          input.focus();
+        } else {
+          input.value = '';
+          content.focus();
+        }
+      });
+    });
+
     document.addEventListener('click', (e) => {
       const toggle = e.target.closest('.note-toggle-more');
       if (toggle) {

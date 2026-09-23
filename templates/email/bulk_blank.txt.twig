@@ -1,5 +1,3 @@
-Hi{% if user is defined and user.firstName %} {{ user.firstName }}{% endif %},
-
 {{ body|striptags }}
 {% if recipientEmail is defined and recipientEmail %}
 
@@ -7,5 +5,5 @@ Unsubscribe: {{ unsubscribe_url(recipientEmail) }}
 {% endif %}
 {% if user is defined %}
 
-Ref: ywal-u-{{ user.id }}
+ywal-u-{{ user.id }}
 {% endif %}

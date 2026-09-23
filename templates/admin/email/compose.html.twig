@@ -179,8 +179,11 @@
                     style="resize:vertical;font-family:inherit;line-height:1.7;"
                     {% if not email.draft %}disabled{% endif %}>{{ email.body }}</textarea>
           {% if email.draft %}
+            <button type="button" class="insert-placeholder-trigger" data-target="body"
+                    style="border:none;background:none;padding:0.3rem 0 0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Insert first name</button>
             <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
               HTML is supported — each line becomes its own paragraph. To embed an image already hosted online, put its tag on its own line, e.g. <code>&lt;img src="https://example.com/photo.jpg" style="max-width:100%"&gt;</code>.
+              Use "Insert first name" to drop a <code>_firstName_</code> placeholder wherever you want one, substituted for real when it's sent.
             </div>
           {% endif %}
         </div>
@@ -303,6 +306,25 @@
   subjectEl.addEventListener('input', schedulePreview);
   bodyEl.addEventListener('input',    schedulePreview);
   layoutRadios.forEach(r => r.addEventListener('change', refreshPreview));
+
+  // See EmailPlaceholders — inserts the literal "_firstName_" text at the cursor so the admin can
+  // opt into personalising the message, rather than every plain-layout email getting a greeting
+  // whether it fits the wording or not. Dispatches a real "input" event so the live preview and
+  // the unsaved-changes/disable-Send tracking above both pick it up, same as typing would.
+  document.addEventListener('click', (e) => {
+    const insertBtn = e.target.closest('.insert-placeholder-trigger');
+    if (!insertBtn) return;
+
+    const el = document.getElementById(insertBtn.dataset.target);
+    if (!el) return;
+
+    const start = el.selectionStart ?? el.value.length;
+    const end   = el.selectionEnd ?? el.value.length;
+    el.value = el.value.slice(0, start) + '_firstName_' + el.value.slice(end);
+    el.focus();
+    el.selectionStart = el.selectionEnd = start + '_firstName_'.length;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   // ── Only a saved draft can be sent — disable Send the instant anything changes, since
   // sending always uses whatever was last actually saved. ─────────────────────────────

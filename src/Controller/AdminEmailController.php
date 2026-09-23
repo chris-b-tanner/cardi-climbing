@@ -15,6 +15,7 @@ use App\Repository\TagRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
 use App\Message\SendBulkEmailMessage;
+use App\Service\EmailPlaceholders;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -84,22 +85,27 @@ class AdminEmailController extends AbstractController
     }
 
     #[Route('/admin/email/preview', name: 'app_admin_email_preview', methods: ['POST'])]
-    public function preview(Request $request, UserRepository $userRepository, Environment $twig): Response
+    public function preview(Request $request, UserRepository $userRepository, EmailPlaceholders $emailPlaceholders, Environment $twig): Response
     {
+        $body = $request->request->get('body', '');
+
+        // Only a single-member-scoped send has one definite recipient to resolve `_firstName_`
+        // against in the preview — an event/certification/tag audience has many different first
+        // names, so the placeholder is left as-is (literally "_firstName_") for those, same as the
+        // real send would have nothing fixed to substitute either.
+        $userId = (int) $request->request->get('userId', 0);
+        $user   = $userId ? $userRepository->find($userId) : null;
+
+        if ($user instanceof User) {
+            $body = $emailPlaceholders->apply($body, $user);
+        }
+
         $context = [
             'subject' => $request->request->get('subject', '(No subject)'),
-            'body'    => $request->request->get('body', ''),
+            'body'    => $body,
         ];
-
-        // Only a single-member-scoped send has one definite recipient to greet by name in the
-        // preview — an event/certification/tag audience has many different first names, so the
-        // greeting stays generic ("Hi,") for those, same as before.
-        $userId = (int) $request->request->get('userId', 0);
-        if ($userId) {
-            $user = $userRepository->find($userId);
-            if ($user instanceof User) {
-                $context['user'] = $user;
-            }
+        if ($user instanceof User) {
+            $context['user'] = $user;
         }
 
         $useBlankLayout = $request->request->getBoolean('useBlankLayout');
