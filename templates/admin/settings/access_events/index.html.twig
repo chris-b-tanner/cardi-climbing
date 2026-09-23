@@ -2,6 +2,10 @@
 {% block title %}Access log — Settings{% endblock %}
 
 {% block content %}
+<style>
+  .access-log-table .admin-table { font-size: 0.75rem; }
+  .access-log-table .admin-table th, .access-log-table .admin-table td { padding: 0.5rem 0.7rem; }
+</style>
 <div class="page-header">
   <h1>Door access log</h1>
 </div>
@@ -12,7 +16,7 @@
     Door events (attendee PINs, keyholder disarms, denied attempts, and unexpected opens) will show up here as they come in.
   </div>
 {% else %}
-  <div class="table-scroll">
+  <div class="table-scroll access-log-table">
     <table class="admin-table">
       <thead>
         <tr>

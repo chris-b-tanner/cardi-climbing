@@ -81,11 +81,11 @@ CREATE TABLE `access_event` (
   `id`                INT AUTO_INCREMENT PRIMARY KEY,
   `door_id`           INT NOT NULL DEFAULT 1,
   `event_id`          CHAR(36) NOT NULL,          -- client-generated UUID, device idempotency key
-  `type`              VARCHAR(20) NOT NULL,       -- attendee_access | keyholder_access | access_denied | unexpected_open | member_exit
+  `type`              VARCHAR(20) NOT NULL,       -- attendee_access | keyholder_access | standing_access | access_denied | unexpected_open | member_exit
   `attendee_id`       INT DEFAULT NULL,           -- set for attendee_access / access_denied; also set for member_exit if an active session was found and closed (see § Exit reader)
   `keyholder_user_id` INT DEFAULT NULL,           -- set for keyholder_access
   `exit_user_id`      INT DEFAULT NULL,           -- set for member_exit — resolved from the tapped card_uid via access_card (card-setup.md)
-  `channel`           VARCHAR(10) DEFAULT NULL,   -- pin | card — set for attendee_access and access_denied only; NULL for keyholder_access/unexpected_open/member_exit (those aren't ambiguous about how they were triggered)
+  `channel`           VARCHAR(10) DEFAULT NULL,   -- pin | card — set for attendee_access and access_denied only; NULL for keyholder_access/standing_access/unexpected_open/member_exit (those aren't ambiguous about how they were triggered)
   `stage`             VARCHAR(20) DEFAULT NULL,   -- authorized | door_open | door_closed — NULL for access_denied
   `denied_reason`     VARCHAR(20) DEFAULT NULL,   -- expired | not_found | already_used — access_denied only
   `authorized_at`     DATETIME DEFAULT NULL,
@@ -111,6 +111,11 @@ CREATE TABLE `access_event` (
 - `type=access_denied` rows are a single-stage write (`stage` stays `NULL`) — `denied_reason`
   carries what used to just be called `reason`. `channel` (`pin`/`card`) records which input
   method produced the denial, now that there are two.
+- `type=standing_access` rows (§ All-hours cards) progress `authorized` → `door_open` →
+  `door_closed`, same shape as `attendee_access`/`keyholder_access` — but carry no `attendee_id` or
+  `keyholder_user_id` at all; the tapped card and the member it resolves to are recorded the same
+  way a card-channel `attendee_access`/`access_denied` row already does (`card_uid` + the member it
+  resolves to), since there's no booking to point `attendee_id` at.
 - `type=member_exit` rows (§ Exit reader) progress `authorized` → `door_open` → `door_closed` the
   same shape as `attendee_access`/`keyholder_access` — the tap itself writes `stage=authorized`
   immediately, same as any other authorization. `exit_user_id` is set as soon as the card resolves
@@ -137,13 +142,13 @@ whoever isn't typing just tailgates through unrecorded. A card reader removes th
 (everyone taps in a couple of seconds, no queue), but only if the door-side state machine stops
 assuming "one authorization ⇒ one physical door cycle."
 
-**The rule going forward: any number of independent authorizations (PIN or card, attendee or
-keyholder) can be attributed to the same physical door-open cycle, as long as they occur while
-that cycle is already under way.** Concretely, from the server's point of view nothing changes
-about how a single `access_event` row is written or upserted — this section just removes an
-assumption the server was previously allowed to make (that at most one `attendee_access` or
-`keyholder_access` row would ever share an overlapping `door_open_at`/`door_closed_at` window) and
-states the new one:
+**The rule going forward: any number of independent authorizations (PIN or card, attendee,
+keyholder, or all-hours standing card) can be attributed to the same physical door-open cycle, as
+long as they occur while that cycle is already under way.** Concretely, from the server's point of
+view nothing changes about how a single `access_event` row is written or upserted — this section
+just removes an assumption the server was previously allowed to make (that at most one
+`attendee_access`, `keyholder_access`, or `standing_access` row would ever share an overlapping
+`door_open_at`/`door_closed_at` window) and states the new one:
 
 - The **first** authorization while the door is shut and idle is the one that pulses the relay and
   starts the physical cycle.
@@ -160,7 +165,8 @@ states the new one:
 - This applies uniformly regardless of channel: a card tap, a typed PIN, and a keyholder PIN can
   all legitimately be part of the same batch (e.g. a member taps their card, and a keyholder
   behind them types their own PIN to hold the door for a delivery — both get their own accurate
-  record, one relay pulse).
+  record, one relay pulse). An all-hours standing card tap joins the same batch on exactly the same
+  terms as an attendee card tap.
 - The propped-door alarm threshold for a batch is whichever is **longest** among its members —
   practically, this only ever matters when a keyholder is part of the batch (10 minutes, § Door
   position sensing in the firmware spec), since attendee-only and card-only batches all share the
@@ -270,6 +276,53 @@ reader) are two different physical peripherals firing independent events — the
 buffer to arbitrate between them the way keyholder-vs-attendee PIN matching needs one on the
 keypad.
 
+## All-hours cards
+
+A small number of cards need standing entry access with **no attendee booking at all** — a
+caretaker, a senior keyholder who should also just be able to tap in rather than typing a PIN, that
+kind of role. Distinct from the keyholder disarm PIN above in one crucial way: **this DOES pulse
+the relay and open the door**, exactly like a normal attendee card tap — it isn't a "don't alarm on
+the key" signal, it's a real standing credential.
+
+**Schema: see `card-setup.md`** — a single `all_hours_access` column on `access_card`
+(`AccessCard::$allHoursAccess`), deliberately just a bare boolean. Unlike lock/unlock there's no
+paired `granted_at`/`granted_by`/`revoked_at`/`revoked_by` here — who changed it and when lives on
+the member's Note history (the same audit trail every other card action already writes via
+`CardService`), not a dedicated column. Only takes effect while the card is also `status=active` —
+a locked card is never all-hours regardless of this flag, same as it's never a working credential
+for anything else.
+
+- **Admin UX:** toggled from `/admin/settings/cards/{uid}` (Settings → Cards → card detail) — a
+  single Grant/Revoke button, `ROLE_ADMIN` only. Not exposed from the member's own profile page —
+  this is a property of the physical card's registration, not something to manage alongside a
+  person's other details.
+- **Device sync:** a new sibling array on `GET /v1/doors/{door_id}/credentials`, alongside
+  `keyholders`:
+  ```json
+  {
+    "server_time": "...",
+    "credentials": [ /* unchanged, as above */ ],
+    "keyholders": [ /* unchanged */ ],
+    "standing_cards": [
+      { "card_uid": "04A3B2C1", "user_id": 42 }
+    ]
+  }
+  ```
+  Same authoritative-full-replace rule as everything else in this response. No `valid_from`/
+  `valid_until` — a standing credential, not a per-booking one, same reasoning as `keyholders`.
+- **Device-side behaviour** (firmware spec: extend `credentialStoreSubmitCardUid()`'s matching
+  tiers with one more, checked after the attendee-credential cache and before falling through to
+  "unrecognised"): a tapped UID that doesn't match any cached attendee `card_uid` is checked against
+  the standing-cards cache; a match pulses the relay immediately, exactly like a normal attendee
+  card tap — no time window, no expiry, works at any hour. Produces an `access_event` of
+  `type=standing_access`, progressing through the full `authorized`/`door_open`/`door_closed` stage
+  sequence like `attendee_access` does (unlike `keyholder_access`, which only fires an event if the
+  door actually opens within its window — a standing card tap is itself the authorization, so it's
+  always worth logging even if the door then fails to open).
+- **Matching order at the entry reader**, now three tiers: attendee card cache → standing-cards
+  cache → unrecognised (denied). The keyholder PIN cache is a separate, keypad-only pool and isn't
+  part of this ordering.
+
 ## Exit reader (internal NFC)
 
 A second, internal NFC reader — deliberately made **more prominent than the existing manual
@@ -371,6 +424,10 @@ Returns active + near-future (e.g. next 2h) PIN/card-bearing attendees for this 
     { "user_id": 12, "pin": "913204" }   // see § Keyholder disarm PIN — no valid_from/valid_until,
                                           // a standing credential rather than a per-booking one
   ],
+  "standing_cards": [
+    { "card_uid": "04A3B2C1", "user_id": 42 }   // § All-hours cards — no valid_from/valid_until,
+                                                  // works at any hour, no booking required
+  ],
   "exit_cards": [
     { "user_id": 42, "card_uid": "04A3B2C1" }   // § Exit reader — every registered card, no
                                                   // membership/booking filtering; only present for
@@ -384,7 +441,7 @@ Support `If-None-Match` / `ETag` → `304` when unchanged.
 
 Batched, idempotent on `event_id` (client-generated UUID, not attendee.id or user.id). Each event
 maps to one `access_event` row (§ Access event log). `attendee_access`, `keyholder_access`,
-`unexpected_open`, and `member_exit` all arrive in up to three separate POSTs against the **same**
+`standing_access`, `unexpected_open`, and `member_exit` all arrive in up to three separate POSTs against the **same**
 `event_id`, one per stage, as the door-position sensor observes the physical access happen (see
 `door-access-firmware-spec.md` § Door position sensing) — this is an **upsert keyed on
 `(event_id, stage)`**, not a plain create: process a stage only if it's later than (or equal to,
@@ -406,6 +463,9 @@ sign of duplicate/confused events.
     { "event_id": "uuid", "type": "keyholder_access", "user_id": 12,        "stage": "authorized",   "authorized_at": "..." },
     { "event_id": "uuid", "type": "keyholder_access", "user_id": 12,        "stage": "door_open",    "authorized_at": "...", "door_open_at": "..." },
     { "event_id": "uuid", "type": "keyholder_access", "user_id": 12,        "stage": "door_closed",  "authorized_at": "...", "door_open_at": "...", "door_closed_at": "..." },
+    { "event_id": "uuid", "type": "standing_access",  "card_uid": "04A3B2C1", "stage": "authorized",  "authorized_at": "..." },
+    { "event_id": "uuid", "type": "standing_access",  "card_uid": "04A3B2C1", "stage": "door_open",   "authorized_at": "...", "door_open_at": "..." },
+    { "event_id": "uuid", "type": "standing_access",  "card_uid": "04A3B2C1", "stage": "door_closed", "authorized_at": "...", "door_open_at": "...", "door_closed_at": "..." },
     { "event_id": "uuid", "type": "unexpected_open",                        "stage": "door_open",    "door_open_at": "..." },
     { "event_id": "uuid", "type": "unexpected_open",                        "stage": "door_closed",  "door_open_at": "...", "door_closed_at": "..." },
     { "event_id": "uuid", "type": "member_exit",      "card_uid": "04A3B2C1", "stage": "authorized",  "authorized_at": "..." },
@@ -417,12 +477,14 @@ sign of duplicate/confused events.
 ```
 - Every event creates or updates one `access_event` row keyed on `event_id`, setting `type` and
   whichever of `attendee_id` (from `credential_id`) / `keyholder_user_id` (from `user_id`) /
+  `card_uid`+`card_user_id` (resolved server-side from `card_uid`, for `standing_access`) /
   `exit_user_id` (resolved server-side from `card_uid`, for `member_exit`) applies.
 - `channel` (`pin`/`card`) is carried on `attendee_access` and `access_denied` payloads only — it
   records which physical input produced the event, purely for reporting; it has no effect on which
-  fields get set or when. `keyholder_access`/`unexpected_open`/`member_exit` don't send it — none
-  of them are ambiguous about how they were triggered.
-- `stage=authorized` (`attendee_access`/`keyholder_access`/`member_exit` only): server sets
+  fields get set or when. `keyholder_access`/`standing_access`/`unexpected_open`/`member_exit`
+  don't send it — none of them are ambiguous about how they were triggered (`standing_access` is
+  card-only by definition, same as `member_exit`).
+- `stage=authorized` (`attendee_access`/`keyholder_access`/`standing_access`/`member_exit` only): server sets
   `authorized_at`. For `attendee_access` specifically, `pin_status` is deliberately left
   untouched — see § PIN lifecycle's "not single-use" revision — so it does **not** flip to `used`
   here, or anywhere else in this flow. Not yet "checked in." **For `member_exit` specifically,

@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\AccessCard;
 use App\Entity\AccessEvent;
 use App\Entity\Attendee;
 use App\Entity\User;
@@ -145,6 +146,14 @@ class DoorAccessService
         $event->advanceStage($stage, $timestamp);
     }
 
+    /** Applies one stage of a `standing_access` event — same upsert/stage rules as attendee_access, but keyed on the tapped card rather than a booking (§ All-hours cards). {cardUid} always resolves to a card here (the device only ever reports this type after a local all-hours match), so its user is looked up and stored the same way a denied/attendee card tap already does. */
+    public function applyStandingAccessEvent(string $eventId, string $stage, string $cardUid, \DateTimeImmutable $timestamp): void
+    {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_STANDING_ACCESS);
+        $event->setCard($cardUid, $this->accessCardRepository->findOneByUid($cardUid)?->getUser());
+        $event->advanceStage($stage, $timestamp);
+    }
+
     /**
      * Records a denied attempt — single-stage, no progression. {attendee} is null if the PIN/card
      * didn't resolve to anything at all — but a denied *card* tap still carries {cardUid}, and if
@@ -258,6 +267,26 @@ class DoorAccessService
         return array_map(
             static fn(User $user) => ['user_id' => $user->getId(), 'pin' => $user->getKeyholderPin()],
             $this->userRepository->findKeyholders(),
+        );
+    }
+
+    /**
+     * The all-hours card UIDs a door should hold right now — same "authoritative full replace"
+     * treatment as findCredentialsForDoor()/findKeyholdersForDoor() (§ All-hours cards). Unlike a
+     * keyholder PIN, tapping one of these DOES pulse the relay — it's a standing door credential,
+     * not a disarm-only one. No valid_from/valid_until, same reasoning as keyholders.
+     *
+     * @return array<int, array{card_uid: string, user_id: int}>
+     */
+    public function findStandingCardsForDoor(int $doorId): array
+    {
+        if ($doorId !== self::SUPPORTED_DOOR_ID) {
+            return [];
+        }
+
+        return array_map(
+            static fn(AccessCard $card) => ['card_uid' => $card->getUid(), 'user_id' => $card->getUser()->getId()],
+            $this->accessCardRepository->findAllHoursForDoor(),
         );
     }
 

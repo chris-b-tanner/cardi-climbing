@@ -55,7 +55,30 @@
           <div class="card__value">{{ card.replacedAt|date('j M Y H:i') }}</div>
         </div>
       {% endif %}
+      <div>
+        <div class="card__label">All-hours access</div>
+        <div class="card__value">
+          {% if card.allHours %}
+            <span class="status-pill status-pill--published">Yes</span>
+          {% else %}
+            <span class="status-pill status-pill--pending">No</span>
+          {% endif %}
+        </div>
+      </div>
     </div>
+    {% if card.allHours %}
+      <form method="post" action="{{ path('app_admin_settings_card_revoke_all_hours', {uid: uid}) }}" style="display:inline;margin-top:1rem;"
+            onsubmit="return confirm('Revoke all-hours door access for this card?');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_all_hours_' ~ uid) }}">
+        <button type="submit" class="btn btn--ghost btn--sm">Revoke all-hours access</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ path('app_admin_settings_card_grant_all_hours', {uid: uid}) }}" style="display:inline;margin-top:1rem;"
+            onsubmit="return confirm('Grant all-hours door access to this card? It will open the door at any time, with no booking required.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('card_all_hours_' ~ uid) }}">
+        <button type="submit" class="btn btn--ghost btn--sm">Grant all-hours access</button>
+      </form>
+    {% endif %}
   {% else %}
     <p style="color:var(--muted);font-size:0.875rem;">
       This UID has never been linked to a member — every appearance below came from a station scan

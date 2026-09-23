@@ -84,6 +84,23 @@ class CardService
         $this->userService->addNote($card->getUser(), 'Access card unlocked: ' . $card->getUid() . '.', $staff);
     }
 
+    /** Grants standing door access with no attendee booking required — see door-access-spec.md § All-hours cards. Only ever takes effect while the card is also active (§ AccessCard::$allHoursAccess). */
+    public function grantAllHours(AccessCard $card, User $staff): void
+    {
+        $card->grantAllHours();
+        $this->em->flush();
+
+        $this->userService->addNote($card->getUser(), 'Access card granted all-hours access: ' . $card->getUid() . '.', $staff);
+    }
+
+    public function revokeAllHours(AccessCard $card, User $staff): void
+    {
+        $card->revokeAllHours();
+        $this->em->flush();
+
+        $this->userService->addNote($card->getUser(), 'Access card\'s all-hours access revoked: ' . $card->getUid() . '.', $staff);
+    }
+
     /**
      * Arms a link/verify session for {user} — cancelling any other user's still-pending session
      * first (card-setup.md: only one pending session across the whole system at a time).

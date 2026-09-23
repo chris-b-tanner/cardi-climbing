@@ -60,6 +60,17 @@ class AccessCard
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $replacedAt = null;
 
+    /**
+     * Standing door access with no attendee booking required at all — see door-access-spec.md §
+     * All-hours cards. Deliberately just a bare flag, unlike lock/unlock: who granted/revoked it
+     * and when lives on the Note CardService writes for each change, not dedicated columns here —
+     * this is a stronger grant than locking, but no more of an audit-worthy *lifecycle state* than
+     * any other admin action already covered by the Note trail. Only takes effect while the card
+     * is also STATUS_ACTIVE — a locked card is never all-hours regardless of this flag.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $allHoursAccess = false;
+
     public function __construct(User $user, string $uid, ?User $deployedBy)
     {
         $this->user = $user;
@@ -174,5 +185,20 @@ class AccessCard
     {
         $this->status = self::STATUS_REPLACED;
         $this->replacedAt = new \DateTimeImmutable();
+    }
+
+    public function isAllHours(): bool
+    {
+        return $this->allHoursAccess;
+    }
+
+    public function grantAllHours(): void
+    {
+        $this->allHoursAccess = true;
+    }
+
+    public function revokeAllHours(): void
+    {
+        $this->allHoursAccess = false;
     }
 }

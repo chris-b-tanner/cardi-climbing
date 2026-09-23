@@ -52,6 +52,7 @@ CREATE TABLE `access_card` (
   `unlocked_at`     DATETIME DEFAULT NULL,
   `unlocked_by_id`  INT DEFAULT NULL,
   `replaced_at`     DATETIME DEFAULT NULL,        -- set for `replaced` (superseded by a newer card) AND `removed` (no replacement) alike
+  `all_hours_access` TINYINT(1) NOT NULL DEFAULT 0, -- standing door access with no booking required — see door-access-spec.md § All-hours cards. Only takes effect while status=active; who granted/revoked it and when lives on the member's Note history (CardService), not a dedicated column here.
   UNIQUE KEY `UNQ_access_card_uid` (`uid`),
   KEY `IDX_access_card_user` (`user_id`),
   CONSTRAINT `FK_access_card_user`        FOREIGN KEY (`user_id`)        REFERENCES `user` (`id`) ON DELETE CASCADE,
@@ -340,6 +341,12 @@ Clicking a UID goes to `/admin/settings/cards/{uid}` — the `access_card` regis
 any) plus every `card_link_session` row for that exact UID, most recent first. A UID with no
 `access_card` row at all still gets a page (as long as at least one session mentions it) — "this
 was scanned but never registered" is itself useful information, not a 404.
+
+The card detail page isn't purely read-only: when a registration exists, it also carries a
+Grant/Revoke button for `all_hours_access` (see door-access-spec.md § All-hours cards) — the only
+place in admin that toggles it, deliberately kept off the member's own profile page since it's a
+property of the physical card's registration, not something to manage alongside a person's other
+details.
 
 ## Door credential sync (door-access-spec.md, updated)
 

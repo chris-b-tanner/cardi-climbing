@@ -74,8 +74,9 @@ class DoorController extends AbstractController
         );
 
         $keyholders = $this->doorAccessService->findKeyholdersForDoor($doorId);
+        $standingCards = $this->doorAccessService->findStandingCardsForDoor($doorId);
 
-        $etag = '"' . md5(json_encode([$credentials, $keyholders])) . '"';
+        $etag = '"' . md5(json_encode([$credentials, $keyholders, $standingCards])) . '"';
 
         // A 304 has no body by definition, so min_firmware_version can't ride in the JSON here —
         // carried as a header instead, so an OTA update is never missed just because credentials
@@ -91,6 +92,7 @@ class DoorController extends AbstractController
             'min_firmware_version' => $this->doorMinFirmwareVersion,
             'credentials'          => $credentials,
             'keyholders'           => $keyholders,
+            'standing_cards'       => $standingCards,
         ], 200, ['ETag' => $etag] + $firmwareHeaders);
     }
 
@@ -128,6 +130,7 @@ class DoorController extends AbstractController
                 AccessEvent::TYPE_KEYHOLDER_ACCESS => $this->applyKeyholderAccess($eventId, $event),
                 AccessEvent::TYPE_UNEXPECTED_OPEN  => $this->applyUnexpectedOpen($eventId, $event),
                 AccessEvent::TYPE_ACCESS_DENIED    => $this->applyAccessDenied($eventId, $doorId, $event),
+                AccessEvent::TYPE_STANDING_ACCESS  => $this->applyStandingAccess($eventId, $event),
                 default => null,
             };
 
@@ -277,6 +280,19 @@ class DoorController extends AbstractController
 
         $timestamp = $this->timestampForStage($event, $stage);
         $this->doorAccessService->applyUnexpectedOpenEvent($eventId, $stage, $timestamp);
+    }
+
+    private function applyStandingAccess(string $eventId, array $event): void
+    {
+        $stage   = $event['stage'] ?? null;
+        $cardUid = $this->cardUidFromEvent($event);
+
+        if (!is_string($stage) || $cardUid === null) {
+            return;
+        }
+
+        $timestamp = $this->timestampForStage($event, $stage);
+        $this->doorAccessService->applyStandingAccessEvent($eventId, $stage, $cardUid, $timestamp);
     }
 
     private function applyAccessDenied(string $eventId, int $doorId, array $event): void

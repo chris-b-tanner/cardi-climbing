@@ -4,7 +4,9 @@ namespace App\Controller;
 
 use App\Repository\AccessCardRepository;
 use App\Repository\CardLinkSessionRepository;
+use App\Service\CardService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -82,5 +84,49 @@ class AdminCardController extends AbstractController
             'card'     => $card,
             'sessions' => $sessions,
         ]);
+    }
+
+    /** Grants standing all-hours door access to the card at {uid} — see door-access-spec.md § All-hours cards. */
+    #[Route('/{uid}/grant-all-hours', name: 'app_admin_settings_card_grant_all_hours', requirements: ['uid' => '[0-9A-F]{8,32}'], methods: ['POST'])]
+    public function grantAllHours(string $uid, Request $request, AccessCardRepository $accessCardRepository, CardService $cardService): Response
+    {
+        if (!$this->isCsrfTokenValid('card_all_hours_' . $uid, $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_admin_settings_card_show', ['uid' => $uid]);
+        }
+
+        $card = $accessCardRepository->findOneByUid($uid);
+        if ($card === null) {
+            throw $this->createNotFoundException('No card with that UID has ever been seen.');
+        }
+
+        /** @var \App\Entity\User $admin */
+        $admin = $this->getUser();
+        $cardService->grantAllHours($card, $admin);
+        $this->addFlash('success', 'All-hours access granted.');
+
+        return $this->redirectToRoute('app_admin_settings_card_show', ['uid' => $uid]);
+    }
+
+    /** Revokes standing all-hours door access from the card at {uid}. */
+    #[Route('/{uid}/revoke-all-hours', name: 'app_admin_settings_card_revoke_all_hours', requirements: ['uid' => '[0-9A-F]{8,32}'], methods: ['POST'])]
+    public function revokeAllHours(string $uid, Request $request, AccessCardRepository $accessCardRepository, CardService $cardService): Response
+    {
+        if (!$this->isCsrfTokenValid('card_all_hours_' . $uid, $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_admin_settings_card_show', ['uid' => $uid]);
+        }
+
+        $card = $accessCardRepository->findOneByUid($uid);
+        if ($card === null) {
+            throw $this->createNotFoundException('No card with that UID has ever been seen.');
+        }
+
+        /** @var \App\Entity\User $admin */
+        $admin = $this->getUser();
+        $cardService->revokeAllHours($card, $admin);
+        $this->addFlash('success', 'All-hours access revoked.');
+
+        return $this->redirectToRoute('app_admin_settings_card_show', ['uid' => $uid]);
     }
 }

@@ -18,6 +18,7 @@ class AccessEvent
     public const TYPE_KEYHOLDER_ACCESS = 'keyholder_access';
     public const TYPE_ACCESS_DENIED    = 'access_denied';
     public const TYPE_UNEXPECTED_OPEN  = 'unexpected_open';
+    public const TYPE_STANDING_ACCESS  = 'standing_access';
 
     public const STAGE_AUTHORIZED  = 'authorized';
     public const STAGE_DOOR_OPEN   = 'door_open';

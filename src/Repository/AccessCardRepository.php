@@ -68,4 +68,16 @@ class AccessCardRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** Cards with standing all-hours door access — see door-access-spec.md § All-hours cards. Active status only: a locked card is never all-hours regardless of the flag. */
+    public function findAllHoursForDoor(): array
+    {
+        return $this->createQueryBuilder('c')
+            ->leftJoin('c.user', 'u')->addSelect('u')
+            ->where('c.status = :status')
+            ->andWhere('c.allHoursAccess = true')
+            ->setParameter('status', AccessCard::STATUS_ACTIVE)
+            ->getQuery()
+            ->getResult();
+    }
 }
