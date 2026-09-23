@@ -89,8 +89,11 @@ class UserService
     }
 
     /** Records a Note against {$user}. Only call this once $user is guaranteed to already have an id (already flushed, or an existing record). */
-    /** @param ?Email $email Set when this note records a bulk email actually sent to {user} — links the note back to the full Email record (subject, body, audience, approval history). */
-    public function addNote(User $user, string $content, ?User $addedBy = null, ?Email $email = null): void
+    /**
+     * @param ?Email $email Set when this note records a bulk email actually sent to {user} — links the note back to the full Email record (subject, body, audience, approval history).
+     * @param ?string $emailSubject Set when this note is a turn in the ad hoc email conversation (see Note::$emailSubject / ContactQuickEmailMailer) — an inbound reply's Subject header, matching whatever the admin's side of the thread is currently using.
+     */
+    public function addNote(User $user, string $content, ?User $addedBy = null, ?Email $email = null, ?string $emailSubject = null): void
     {
         $note = new Note();
         $note->setNoteable($user);
@@ -100,6 +103,9 @@ class UserService
         }
         if ($email !== null) {
             $note->setEmail($email);
+        }
+        if ($emailSubject !== null) {
+            $note->setEmailSubject($emailSubject);
         }
 
         $this->em->persist($note);

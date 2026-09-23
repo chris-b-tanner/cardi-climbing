@@ -38,6 +38,7 @@ class AdminNoteController extends AbstractController
         private readonly EventRepository $eventRepository,
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
+        private readonly NoteRepository $noteRepository,
         private readonly NoteableResolver $noteableResolver,
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
         private readonly ContactNoteMailer $contactNoteMailer,
@@ -79,6 +80,10 @@ class AdminNoteController extends AbstractController
             return $this->redirectForNoteable($noteableType, $noteableId);
         }
 
+        // The previous turn in this thread (either side), to quote beneath the new message — see
+        // ContactQuickEmailMailer. Looked up before the new note exists, so it's never its own quote.
+        $previousThreadNote = $wantsEmail ? $this->noteRepository->findLatestEmailThreadNote($noteable) : null;
+
         if ($content !== '') {
             /** @var User $admin */
             $admin = $this->getUser();
@@ -87,6 +92,10 @@ class AdminNoteController extends AbstractController
             $note->setNoteable($noteable);
             $note->setContent($wantsEmail ? 'Emailed: ' . $content : $content);
             $note->setAddedBy($admin);
+
+            if ($wantsEmail) {
+                $note->setEmailSubject($subject);
+            }
 
             if ($request->request->getBoolean('pinned')) {
                 $note->pin($admin);
@@ -103,7 +112,7 @@ class AdminNoteController extends AbstractController
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
 
                 if ($wantsEmail) {
-                    $this->contactQuickEmailMailer->send($noteable, $subject, $content);
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote);
                     $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . '.');
                 }
             }

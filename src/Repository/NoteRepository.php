@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Note;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -64,6 +65,26 @@ class NoteRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    /**
+     * The most recent turn in {user}'s ad hoc email conversation — whichever side spoke last,
+     * admin or member (see Note::$emailSubject) — strictly by time, ignoring pinned status (unlike
+     * findForNoteable()'s display ordering, this is used to continue a subject line / find what to
+     * quote, not to decide what to show first).
+     */
+    public function findLatestEmailThreadNote(User $user): ?Note
+    {
+        return $this->createQueryBuilder('n')
+            ->where('n.noteableType = :type')
+            ->andWhere('n.noteableId = :id')
+            ->andWhere('n.emailSubject IS NOT NULL')
+            ->setParameter('type', Note::TYPE_MEMBER)
+            ->setParameter('id', $user->getId())
+            ->orderBy('n.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /** Every pinned note across the system, oldest pinned first — the shared "Actions" task list. */

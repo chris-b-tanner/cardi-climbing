@@ -64,6 +64,18 @@ class Note
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $assignedTo = null;
 
+    /**
+     * Set on a note belonging to the ad hoc email conversation ContactQuickEmailMailer/
+     * WebhookController::inbound() carry on with a member — both the admin's own outbound quick
+     * emails and the member's inbound replies. Null for every other kind of note, bulk-sent
+     * ("Emailed: ...", via Note::$email) included. This is the only piece of state that thread
+     * needs: NoteRepository::findLatestEmailThreadNote() reads it back to default the next
+     * message's subject to "Re: {this}" and to find what to quote beneath it — see
+     * ContactQuickEmailMailer's own docblock for the full design.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $emailSubject = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -203,6 +215,17 @@ class Note
     public function setAssignedTo(?User $assignedTo): static
     {
         $this->assignedTo = $assignedTo;
+        return $this;
+    }
+
+    public function getEmailSubject(): ?string
+    {
+        return $this->emailSubject;
+    }
+
+    public function setEmailSubject(?string $emailSubject): static
+    {
+        $this->emailSubject = $emailSubject;
         return $this;
     }
 }

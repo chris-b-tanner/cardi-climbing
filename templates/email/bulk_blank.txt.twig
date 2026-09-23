@@ -1,4 +1,9 @@
 {{ body|striptags }}
+{% if quote is defined and quote %}
+
+On {{ quote.date }}, {{ quote.author }} wrote:
+{% for line in quote.text|split('\n') %}> {{ line }}
+{% endfor %}{% endif %}
 {% if recipientEmail is defined and recipientEmail %}
 
 Unsubscribe: {{ unsubscribe_url(recipientEmail) }}

@@ -56,7 +56,12 @@ class WebhookController extends AbstractController
             if ($trackedUser !== null) {
                 $replyText = $this->stripForwardHeader($textBody);
                 if ($replyText !== '') {
-                    $userService->addNote($trackedUser, 'Email reply: ' . $replyText);
+                    // Stamped onto the note as Note::$emailSubject — keeps the ad hoc email
+                    // thread's subject current from whichever side spoke last, so the admin's next
+                    // reply defaults to "Re: {this}" rather than a stale one — see
+                    // ContactQuickEmailMailer / NoteRepository::findLatestEmailThreadNote().
+                    $subject = trim($payload['Subject'] ?? '') ?: null;
+                    $userService->addNote($trackedUser, 'Email reply: ' . $replyText, null, null, $subject);
                     $contactReplyMailer->sendReplyNotification($trackedUser, $replyText);
                 }
                 return new JsonResponse(['status' => 'noted', 'id' => $trackedUser->getId()]);

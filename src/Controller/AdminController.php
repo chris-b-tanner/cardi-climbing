@@ -230,13 +230,18 @@ class AdminController extends AbstractController
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
             : [];
 
+        // Prefills the add-note form's Subject field once "Email {address}" is ticked — see
+        // _notes_panel.html.twig / ContactQuickEmailMailer's thread design.
+        $lastEmailThreadNote = $noteRepository->findLatestEmailThreadNote($user);
+
         return $this->render('admin/users/show.html.twig', [
-            'user'       => $user,
-            'duplicates' => $duplicates,
-            'bookings'   => $attendeeRepository->findAllForUser($user),
-            'notes'      => $noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()),
-            'allTags'    => $tagRepository->findBy([], ['name' => 'ASC']),
-            'accessCard' => $accessCardRepository->findCurrentForUser($user),
+            'user'             => $user,
+            'duplicates'       => $duplicates,
+            'bookings'         => $attendeeRepository->findAllForUser($user),
+            'notes'            => $noteRepository->findForNoteable(Note::TYPE_MEMBER, $user->getId()),
+            'allTags'          => $tagRepository->findBy([], ['name' => 'ASC']),
+            'accessCard'       => $accessCardRepository->findCurrentForUser($user),
+            'lastEmailSubject' => $lastEmailThreadNote?->getEmailSubject(),
         ]);
     }
 

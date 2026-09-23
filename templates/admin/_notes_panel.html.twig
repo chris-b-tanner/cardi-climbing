@@ -5,15 +5,20 @@
   ticking it reveals a required Subject field above the note textarea, and sends the note straight
   to that address as a blank templated email alongside saving it, the lightweight continuation of a
   conversation that started via the full compose screen (see AdminNoteController::add() /
-  ContactQuickEmailMailer). No "insert first name" helper here — unlike the compose screen's
-  multi-recipient audience, this is always exactly one contact, already named right at the top of
-  the page, so a personalisation placeholder buys nothing.
+  ContactQuickEmailMailer). Optional `lastEmailSubject` (whatever Note::$emailSubject the most
+  recent turn in this thread carries, from either side — see
+  NoteRepository::findLatestEmailThreadNote()) prefills the Subject field with "Re: {that}" the
+  first time the checkbox is ticked, so a follow-up threads under the same subject by default. No
+  "insert first name" helper here — unlike the compose screen's multi-recipient audience, this is
+  always exactly one contact, already named right at the top of the page, so a personalisation
+  placeholder buys nothing.
 #}
 <form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate style="margin-bottom:1.25rem;">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
   {% if contactEmail is defined and contactEmail %}
     <div class="form-group note-email-subject" id="note-subject-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
-      <input type="text" name="subject" id="note-subject-{{ noteableType }}-{{ noteableId }}" class="form-control" placeholder="Subject line for this email…">
+      <input type="text" name="subject" id="note-subject-{{ noteableType }}-{{ noteableId }}" class="form-control"
+             placeholder="Subject line for this email…" data-last-subject="{{ lastEmailSubject|default('') }}">
     </div>
   {% endif %}
   <div class="form-group" style="margin-bottom:0.5rem;">
@@ -140,6 +145,11 @@
         content.rows = toggle.checked ? baseRows * 2 : baseRows;
 
         if (toggle.checked) {
+          // Defaults to "Re: {whatever the thread's last message used}" — never overwrites
+          // something already typed (e.g. toggling the checkbox off and back on).
+          if (!input.value.trim() && input.dataset.lastSubject) {
+            input.value = 'Re: ' + input.dataset.lastSubject.replace(/^(re:\s*)+/i, '');
+          }
           input.focus();
         } else {
           input.value = '';

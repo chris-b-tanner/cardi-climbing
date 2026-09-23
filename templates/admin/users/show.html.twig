@@ -641,7 +641,7 @@
 
 
   <div class="tab-panel" data-tab-panel="notes" style="display:none;">
-    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id, contactEmail: user.email} %}
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id, contactEmail: user.email, lastEmailSubject: lastEmailSubject} %}
   </div>
 </div>
 
