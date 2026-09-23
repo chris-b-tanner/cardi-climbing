@@ -1,0 +1,18 @@
+Y WAL — NEW NOTE ON A CONTACT ASSIGNED TO YOU
+==============================================
+
+{{ target.label }}
+{% if target.company is defined and target.company %}{{ target.company }}
+{% endif %}{% if target.tags is defined and target.tags is not empty %}Tags: {{ target.tags|join(', ') }}
+{% endif %}
+{{ note.content }}
+
+Added: {{ note.createdAt|date('j M Y H:i') }} by {{ addedBy.displayName }}
+{% if target.url %}
+View contact: {{ target.url }}
+{% endif %}
+You're getting this because {{ target.label }} is assigned to you.
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+cardiganclimbing@gmail.com | https://www.cardiganclimbing.org

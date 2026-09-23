@@ -13,12 +13,11 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Admin-side of card management — see card-setup.md. The station link/verify/lock/unlock actions
- * live on the contact show screen (templates/admin/users/show.html.twig); manual UID entry is the
- * one action still on the edit screen, for when the station isn't available. The `/card-scan`
- * flow is a small JSON API polled by a live modal; lock/unlock/manual-link are plain form POSTs
- * with a redirect + flash, matching the rest of this app's admin actions. Gated `ROLE_ADMIN`,
- * same as the card fields these replace.
+ * Admin-side of card management — see card-setup.md. Every card action lives on the contact show
+ * screen (templates/admin/users/show.html.twig) and goes through the card station's tap-to-link
+ * flow — there's no manual UID entry path any more. The `/card-scan` flow is a small JSON API
+ * polled by a live modal; lock/unlock are plain form POSTs with a redirect + flash, matching the
+ * rest of this app's admin actions. Gated `ROLE_ADMIN`, same as the card fields these replace.
  */
 #[Route('/admin/users/{id}')]
 #[IsGranted('ROLE_ADMIN')]
@@ -69,34 +68,6 @@ class AdminCardScanController extends AbstractController
         $this->cardService->cancel($user);
 
         return new JsonResponse(['ok' => true]);
-    }
-
-    /** Manual fallback for when the card station isn't available — synchronous, no session involved. */
-    #[Route('/card-link-manual', name: 'app_admin_user_card_link_manual', methods: ['POST'])]
-    public function linkManual(Request $request, User $user): Response
-    {
-        if (!$this->isCsrfTokenValid('card_manage_' . $user->getId(), $request->request->get('_csrf_token'))) {
-            $this->addFlash('error', 'Access denied.');
-            return $this->redirectToRoute('app_home');
-        }
-
-        $uid = $this->cardService->normalizeUid(trim($request->request->get('uid', '')));
-
-        if ($uid === null) {
-            $this->addFlash('error', 'That doesn\'t look like a card UID — enter just the hex UID (e.g. "B0A9FF5C").');
-            return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
-        }
-
-        try {
-            /** @var User $admin */
-            $admin = $this->getUser();
-            $this->cardService->link($user, $uid, $admin);
-            $this->addFlash('success', 'Card linked.');
-        } catch (\InvalidArgumentException $e) {
-            $this->addFlash('error', $e->getMessage());
-        }
-
-        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
     }
 
     #[Route('/card-lock', name: 'app_admin_user_card_lock', methods: ['POST'])]

@@ -22,14 +22,6 @@ class CardService
         private readonly UserService $userService,
     ) {}
 
-    /** A bare hex UID, normalised to uppercase — no separators, no surrounding text. Null if it isn't one. */
-    public function normalizeUid(string $raw): ?string
-    {
-        $hex = strtoupper(trim($raw));
-
-        return preg_match('/^[0-9A-F]{8,32}$/', $hex) && strlen($hex) % 2 === 0 ? $hex : null;
-    }
-
     /**
      * Links {uid} to {user} as their new active card — marking any existing active card
      * `replaced` first. Used by both manual entry and a successful station scan. Notes the

@@ -10,6 +10,7 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
+use App\Service\ContactNoteMailer;
 use App\Service\NoteableResolver;
 use App\Service\NoteAssignmentMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,6 +39,7 @@ class AdminNoteController extends AbstractController
         private readonly SalesOrderRepository $salesOrderRepository,
         private readonly NoteableResolver $noteableResolver,
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
+        private readonly ContactNoteMailer $contactNoteMailer,
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
@@ -74,6 +76,14 @@ class AdminNoteController extends AbstractController
 
             $em->persist($note);
             $em->flush();
+
+            // Keep whoever's handling this contact in the loop — see ContactNoteMailer. Only
+            // member notes carry an assignee at all; the other four noteable types have nothing
+            // to check here.
+            if ($noteableType === Note::TYPE_MEMBER) {
+                $target = $this->noteableResolver->resolve($note, absolute: true);
+                $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
+            }
         }
 
         return $this->redirectForNoteable($noteableType, $noteableId);

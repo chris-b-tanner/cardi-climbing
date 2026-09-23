@@ -122,9 +122,12 @@ CREATE TABLE `card_link_session` (
   authenticated as `ROLE_ADMIN` (same gate as the card fields it replaces), for one specific,
   already-known member. The station never lets a walk-up figure out whose card they're holding —
   see § Privacy.
-- Manual entry (typing a UID straight into the admin UI, no station involved) stays available as a
-  fallback — it's a **synchronous** action against `access_card` directly (create/replace the
-  active row immediately), not a `card_link_session` at all; there's nothing to wait for.
+- **No manual UID entry any more** — linking always goes through the station's tap-to-link flow
+  (`POST /admin/users/{id}/card-scan`, mode=link), never a typed-in value. An earlier revision kept
+  a manual-entry fallback on the edit screen (a synchronous write straight to `access_card`, no
+  `card_link_session` involved) for when the station wasn't available; it was removed to keep
+  exactly one path onto `access_card.uid` — the one that's actually verified against the reader,
+  not transcribed by hand.
 - All times UTC, consistent with the rest of the app; nothing here is date-sensitive enough for
   that to matter beyond consistency.
 
@@ -256,10 +259,6 @@ Plain form POSTs, not fetch/JSON — these are one-shot actions with a redirect-
 matching the rest of the admin app's convention (e.g. cancel-membership, delete-user), not the
 live-polling modal the station flow needs.
 
-- **`POST /admin/users/{id}/card-link-manual`** — body `uid`. Same validation
-  (`^[0-9A-F]{8,32}$`) and free-uid-conflict check as the station path, applied synchronously:
-  marks any existing active card `replaced`, inserts a new active row with
-  `deployed_by_id=<current admin>`. No session row at all — nothing to wait for.
 - **`POST /admin/users/{id}/card-lock`** — locks the user's current active card
   (`status='locked'`, `locked_at=now`, `locked_by_id=<admin>`). No-op with a flash error if there's
   no active card.
@@ -283,19 +282,18 @@ looking:
   button — the same trigger, same modal, just with no existing UID to show first.
 
 **Contact edit screen** keeps only the read-only card summary (UID, deployed date, who deployed it,
-locked-since if applicable) plus a small **manual-entry form** (its own `<form>`, independent of
-the main profile-save form) for typing a UID directly when the station isn't available — every
-other action lives on the show screen instead.
+locked-since if applicable) — no manual-entry path any more; every card action, linking included,
+lives on the show screen and goes through the station's tap-to-link flow.
 
 **People list** gets a **"Find by card"** button next to "+ New person" — arms `lookup` via the
 same shared modal, and on `found` redirects straight to `/admin/users/{userId}`. `not_found` just
 shows a message; unlike the other modes, there's no member page to reload or link update to
 reflect afterwards, so nothing else happens.
 
-None of this lives inside the big "Edit person" form — every card action (station-driven or manual)
-is its own independent POST, so saving an unrelated profile field (phone number, memo, …) can never
-touch the card record as a side effect. This was the actual bug that prompted this redesign
-(§ "Why two real tables" above).
+None of this lives inside the big "Edit person" form — every card action is its own independent
+POST, so saving an unrelated profile field (phone number, memo, …) can never touch the card record
+as a side effect. This was the actual bug that prompted this redesign (§ "Why two real tables"
+above).
 
 ## Privacy: what the station's screen shows
 
