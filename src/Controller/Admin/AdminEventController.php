@@ -1,0 +1,779 @@
+<?php
+
+namespace App\Controller\Admin;
+
+use App\Entity\Attendee;
+use App\Entity\Event;
+use App\Entity\EventStaffingRequirement;
+use App\Entity\EventTicketProduct;
+use App\Entity\Note;
+use App\Entity\User;
+use App\Repository\AttendeeRepository;
+use App\Repository\CertificationRepository;
+use App\Repository\EventRepository;
+use App\Repository\NoteRepository;
+use App\Repository\ProductRepository;
+use App\Repository\UserCertificationRepository;
+use App\Repository\UserRepository;
+use App\Service\Mailer\BookingMailer;
+use App\Service\DoorAccessService;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+#[Route('/admin/events')]
+#[IsGranted('ROLE_TEAM')]
+class AdminEventController extends AbstractController
+{
+    #[Route('', name: 'app_admin_events')]
+    public function index(Request $request, EventRepository $eventRepository): Response
+    {
+        $query  = trim($request->query->get('q', ''));
+        $access = $request->query->get('access', '');
+        if (!in_array($access, [Event::ACCESS_TICKET, Event::ACCESS_CREDIT, Event::ACCESS_MEMBERSHIP, EventRepository::ACCESS_FILTER_FREE], true)) {
+            $access = '';
+        }
+        $events = $eventRepository->search($query, $access);
+
+        if ($request->isXmlHttpRequest()) {
+            return $this->render('admin/events/_list.html.twig', [
+                'events' => $events,
+            ]);
+        }
+
+        return $this->render('admin/events/index.html.twig', [
+            'events'        => $events,
+            'currentQuery'  => $query,
+            'currentAccess' => $access,
+        ]);
+    }
+
+    #[Route('/new', name: 'app_admin_event_new', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function new(
+        Request $request,
+        EntityManagerInterface $em,
+        CertificationRepository $certificationRepository,
+    ): Response {
+        $allCertifications = $certificationRepository->findBy([], ['name' => 'ASC']);
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('admin_event_new', $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            $event = new Event();
+
+            /** @var User $admin */
+            $admin = $this->getUser();
+            $event->setAuthor($admin);
+
+            $error = $this->applyRequestToEvent($request, $event, $allCertifications);
+
+            if (!$error) {
+                $em->persist($event);
+                $this->applyStaffingRequirements($request, $event, $allCertifications, $em);
+                $em->flush();
+
+                $this->addFlash('success', 'Event created.');
+                return $this->redirectToRoute('app_admin_events');
+            }
+        }
+
+        return $this->render('admin/events/new.html.twig', [
+            'error'         => $error,
+            'certifications' => $allCertifications,
+        ]);
+    }
+
+    /**
+     * The event info screen — static details plus the attendee list. Available to team and
+     * admins alike. For a recurring event, ?date= picks which occurrence's attendees are shown.
+     */
+    #[Route('/{id}', name: 'app_admin_event_show', requirements: ['id' => '\d+'])]
+    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, NoteRepository $noteRepository): Response
+    {
+        $occurrenceDate = null;
+        $prevDate       = null;
+        $nextDate       = null;
+
+        if ($event->isRecurring()) {
+            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
+            $prevDate       = $this->adjacentOccurrence($event, $occurrenceDate, -1);
+            $nextDate       = $this->adjacentOccurrence($event, $occurrenceDate, 1);
+
+            $attendees = $attendeeRepository->findForEventOccurrence($event, $occurrenceDate);
+        } else {
+            $attendees = $attendeeRepository->findForEvent($event);
+        }
+
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+        $staffing             = $attendeeRepository->findStaffingForOccurrence($event, $storedOccurrenceDate);
+
+        $eventTicketProducts = $productRepository->findActiveEventTickets($event);
+
+        return $this->render('admin/events/show.html.twig', [
+            'event'               => $event,
+            'attendees'           => $attendees,
+            'occurrenceDate'      => $occurrenceDate,
+            'prevDate'            => $prevDate,
+            'nextDate'            => $nextDate,
+            'staffing'            => $staffing,
+            'eventTicketProducts' => $eventTicketProducts,
+            'notes'               => $noteRepository->findForNoteable(Note::TYPE_EVENT, $event->getId()),
+        ]);
+    }
+
+    /** A print-friendly page listing this occurrence's non-cancelled attendees — name, email, and membership number. */
+    #[Route('/{id}/attendees/print', name: 'app_admin_event_attendees_print', requirements: ['id' => '\d+'])]
+    public function printAttendees(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    {
+        $occurrenceDate = null;
+
+        if ($event->isRecurring()) {
+            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
+            $attendees      = $attendeeRepository->findForEventOccurrence($event, $occurrenceDate);
+        } else {
+            $attendees = $attendeeRepository->findForEvent($event);
+        }
+
+        $attendees = array_values(array_filter(
+            $attendees,
+            static fn(Attendee $attendee) => !$attendee->isCancelled(),
+        ));
+
+        usort($attendees, static function (Attendee $a, Attendee $b) {
+            $userA = $a->getUser();
+            $userB = $b->getUser();
+
+            return [strtolower($userA->getFirstName() ?? ''), strtolower($userA->getLastName() ?? '')]
+                <=> [strtolower($userB->getFirstName() ?? ''), strtolower($userB->getLastName() ?? '')];
+        });
+
+        return $this->render('admin/events/attendees_print.html.twig', [
+            'event'          => $event,
+            'attendees'      => $attendees,
+            'occurrenceDate' => $occurrenceDate,
+        ]);
+    }
+
+    /** Admin picks an already-subscribed, cert-holding attendee to put on duty for a requirement — approved immediately. */
+    #[Route('/{id}/staffing/assign', name: 'app_admin_event_staffing_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function assignStaffing(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        AttendeeRepository $attendeeRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $showParams = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->request->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->request->get('requirementId'));
+        $attendee    = $attendeeRepository->find((int) $request->request->get('attendeeId'));
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$attendee || $attendee->getEvent() !== $event) {
+            $this->addFlash('error', 'Could not find that member on this occurrence.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        if (!$attendee->getUser()->hasCertification($requirement->getCertification())) {
+            $this->addFlash('error', 'That member does not hold the required certification.');
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+
+        $attendee->setStaffingRequirement($requirement);
+        $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+        $em->flush();
+
+        $this->addFlash('success', 'Member put on duty.');
+        return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    /**
+     * Lists (and, once typed, narrows) holders of {requirementId}'s certification for the "Add
+     * {certification}" modal — everyone who isn't already attending this occurrence in any capacity
+     * (an already-booked holder is put on duty via the "eligible" dropdown next to it instead). No
+     * query returns the full holder list rather than requiring a search first, since that pool is
+     * usually short enough to just pick from directly.
+     */
+    #[Route('/{id}/staffing/search', name: 'app_admin_event_staffing_search', requirements: ['id' => '\d+'])]
+    public function staffingSearch(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserCertificationRepository $userCertificationRepository,
+        AttendeeRepository $attendeeRepository,
+    ): JsonResponse {
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find((int) $request->query->get('requirementId'));
+        if (!$requirement || $requirement->getEvent() !== $event) {
+            return $this->json([]);
+        }
+
+        $storedOccurrenceDate = $event->isRecurring() ? $this->parseOccurrenceDate($request->query->get('occurrenceDate', '')) : null;
+
+        $query      = trim($request->query->get('q', ''));
+        $candidates = $userCertificationRepository->searchHoldersForCertification($requirement->getCertification(), $query);
+
+        $candidates = array_values(array_filter(
+            $candidates,
+            static fn (User $candidate) => !$attendeeRepository->findActiveBooking($event, $candidate, $storedOccurrenceDate),
+        ));
+
+        return $this->json(array_map(static fn (User $u) => [
+            'id'    => $u->getId(),
+            'label' => $u->getEmail() ? $u->getDisplayName() . ' — ' . $u->getEmail() : $u->getDisplayName(),
+        ], $candidates));
+    }
+
+    /**
+     * Intermediate "how should this assignment start?" page — landed on after picking a candidate
+     * in the staffing search modal, before any Attendee row exists yet. Lets the admin choose
+     * between putting the candidate straight on duty (confirmed) or sending them an emailed invite
+     * to confirm or decline it themselves (pending) — see addStaffMember() for what each does.
+     */
+    #[Route('/{id}/staffing/new', name: 'app_admin_event_staffing_new', requirements: ['id' => '\d+'])]
+    public function newStaffMember(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+    ): Response {
+        $showParams        = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->query->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $candidate = $this->resolveStaffingCandidate(
+            $event,
+            (int) $request->query->get('requirementId'),
+            (int) $request->query->get('userId'),
+            $occurrenceDateRaw,
+            $em,
+            $userRepository,
+            $attendeeRepository,
+        );
+        if (!$candidate) {
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+        [$requirement, $candidateUser, $storedOccurrenceDate] = $candidate;
+
+        return $this->render('admin/events/staffing_new.html.twig', [
+            'event'             => $event,
+            'requirement'       => $requirement,
+            'candidate'         => $candidateUser,
+            'occurrenceDate'    => $storedOccurrenceDate,
+            'occurrenceDateRaw' => $occurrenceDateRaw,
+        ]);
+    }
+
+    /**
+     * Adds {userId} straight onto {requirementId}'s duty roster as a brand-new, staff-only
+     * attendee (no capacity/credit checks — those govern ordinary attendee seats, not staffing a
+     * session) — for someone who isn't already booked onto this occurrence. An already-booked
+     * holder is put on duty via assignStaffing() instead. Reached from the "choose a status" page
+     * (newStaffMember() above): {staffingStatus} 'approved' puts them straight on duty; 'pending'
+     * instead emails them a magic link to confirm or decline the assignment themselves.
+     */
+    #[Route('/{id}/staffing/add', name: 'app_admin_event_staffing_add', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function addStaffMember(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+        DoorAccessService $doorAccessService,
+        BookingMailer $bookingMailer,
+    ): Response {
+        if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $showParams        = ['id' => $event->getId()];
+        $occurrenceDateRaw = trim($request->request->get('occurrenceDate', ''));
+        if ($occurrenceDateRaw !== '') {
+            $showParams['date'] = $occurrenceDateRaw;
+        }
+
+        $candidate = $this->resolveStaffingCandidate(
+            $event,
+            (int) $request->request->get('requirementId'),
+            (int) $request->request->get('userId'),
+            $occurrenceDateRaw,
+            $em,
+            $userRepository,
+            $attendeeRepository,
+        );
+        if (!$candidate) {
+            return $this->redirectToRoute('app_admin_event_show', $showParams);
+        }
+        [$requirement, $user, $storedOccurrenceDate] = $candidate;
+
+        $staffingStatus = $request->request->get('staffingStatus', Attendee::STAFFING_APPROVED);
+        if (!in_array($staffingStatus, [Attendee::STAFFING_PENDING, Attendee::STAFFING_APPROVED], true)) {
+            $staffingStatus = Attendee::STAFFING_APPROVED;
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $attendee = new Attendee();
+        $attendee->setEvent($event);
+        $attendee->setUser($user);
+        $attendee->setOccurrenceDate($storedOccurrenceDate);
+        // A pending invite isn't a real booking yet — it only becomes one (confirmed) once the
+        // instructor accepts, or cancelled if they decline; see AccountController::respondToStaffing()
+        // and AdminBookingController::approveStaffing()/declineStaffing().
+        $attendee->setStatus($staffingStatus === Attendee::STAFFING_PENDING ? Attendee::STATUS_PENDING : Attendee::STATUS_CONFIRMED);
+        $attendee->setAddedBy($admin);
+        $attendee->setStaffingRequirement($requirement);
+        $attendee->setStaffingStatus($staffingStatus);
+
+        $em->persist($attendee);
+        // No-op while pending — generatePinIfNeeded() only issues one once status is confirmed.
+        $doorAccessService->generatePinIfNeeded($attendee);
+        $em->flush();
+
+        if ($staffingStatus === Attendee::STAFFING_PENDING) {
+            $bookingMailer->sendStaffingInvite($attendee);
+            $this->addFlash('success', $user->getDisplayName() . ' invited as ' . $requirement->getCertification()->getName() . ' — awaiting their confirmation.');
+        } else {
+            $this->addFlash('success', $user->getDisplayName() . ' added as ' . $requirement->getCertification()->getName() . '.');
+        }
+        return $this->redirectToRoute('app_admin_event_show', $showParams);
+    }
+
+    /**
+     * Shared validation for a candidate staff assignment (used by both the "choose a status" page
+     * and the actual add), so a request sent straight to the POST route without going through the
+     * intermediate page first still gets the same checks.
+     *
+     * @return array{0: EventStaffingRequirement, 1: User, 2: ?\DateTimeImmutable}|null
+     */
+    private function resolveStaffingCandidate(
+        Event $event,
+        int $requirementId,
+        int $userId,
+        string $occurrenceDateRaw,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+    ): ?array {
+        $requirement = $em->getRepository(EventStaffingRequirement::class)->find($requirementId);
+        $user        = $userRepository->find($userId);
+
+        if (!$requirement || $requirement->getEvent() !== $event || !$user) {
+            $this->addFlash('error', 'Could not find that member or staffing role.');
+            return null;
+        }
+
+        if (!$user->hasCertification($requirement->getCertification())) {
+            $this->addFlash('error', 'That member does not hold the required certification.');
+            return null;
+        }
+
+        $occurrenceDate = $this->parseOccurrenceDate($occurrenceDateRaw) ?? $event->getDate();
+        if ($event->isRecurring() && !$event->isValidForDate($occurrenceDate)) {
+            $this->addFlash('error', 'That date is not a valid occurrence of this event.');
+            return null;
+        }
+        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
+
+        if ($attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate)) {
+            $this->addFlash('error', 'That member is already attending this event.');
+            return null;
+        }
+
+        return [$requirement, $user, $storedOccurrenceDate];
+    }
+
+    private function parseOccurrenceDate(string $raw): ?\DateTimeImmutable
+    {
+        if ($raw === '') {
+            return null;
+        }
+        try {
+            return new \DateTimeImmutable($raw);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    /**
+     * A month-grid calendar of every occurrence with a staffing requirement, flagging those that
+     * are short of their minimum on-duty coverage. Reuses the same in-memory occurrence-expansion
+     * and batch-attendee-loading approach as the public events calendar.
+     */
+    #[Route('/rota/calendar', name: 'app_admin_rota')]
+    public function rota(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
+    {
+        $year  = (int) $request->query->get('year', (int) date('Y'));
+        $month = (int) $request->query->get('month', (int) date('n'));
+        $q     = trim($request->query->get('q', ''));
+
+        $year  += intdiv($month - 1, 12);
+        $month = (($month - 1) % 12 + 12) % 12 + 1;
+
+        $monthStart = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+        $monthEnd   = $monthStart->modify('last day of this month');
+
+        $gridStart = $monthStart->modify('monday this week');
+        $gridEnd   = $monthEnd->modify('sunday this week');
+
+        $today = new \DateTimeImmutable('today');
+
+        $events = $eventRepository->findWithStaffingRequirementsOverlapping($gridStart, $gridEnd);
+
+        $eventIds = array_map(static fn (Event $e) => $e->getId(), $events);
+        $staffing = $attendeeRepository->findStaffingForEventsInRange($eventIds, $gridStart, $gridEnd);
+
+        $coverageByOccurrence = [];
+        $pendingCountByOccurrence = [];
+        foreach ($staffing as $attendee) {
+            $key = $this->occurrenceKey($attendee->getEvent(), $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate());
+
+            if ($attendee->isStaffingApproved()) {
+                $requirementId = $attendee->getStaffingRequirement()->getId();
+                $coverageByOccurrence[$key][$requirementId] ??= 0;
+                $coverageByOccurrence[$key][$requirementId]++;
+            } elseif ($attendee->isStaffingPending()) {
+                $pendingCountByOccurrence[$key] ??= 0;
+                $pendingCountByOccurrence[$key]++;
+            }
+        }
+
+        $occurrencesByDay = [];
+        $period = new \DatePeriod($gridStart, new \DateInterval('P1D'), $gridEnd->modify('+1 day'));
+        foreach ($period as $day) {
+            $dayOccurrences = [];
+
+            if ($day < $today) {
+                $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
+                continue;
+            }
+
+            foreach ($events as $event) {
+                if (!$event->isValidForDate($day)) {
+                    continue;
+                }
+
+                if ($q !== '' && stripos($event->getTitle(), $q) === false) {
+                    continue;
+                }
+
+                $key = $this->occurrenceKey($event, $day);
+                $coverage   = [];
+                $shortfalls = [];
+                foreach ($event->getStaffingRequirements() as $requirement) {
+                    $have = $coverageByOccurrence[$key][$requirement->getId()] ?? 0;
+                    $coverage[] = ['requirement' => $requirement, 'have' => $have];
+                    if ($have < $requirement->getMinCount()) {
+                        $shortfalls[] = $requirement;
+                    }
+                }
+
+                $dayOccurrences[] = [
+                    'event'        => $event,
+                    'date'         => $day,
+                    'coverage'     => $coverage,
+                    'shortfalls'   => $shortfalls,
+                    'pendingCount' => $pendingCountByOccurrence[$key] ?? 0,
+                ];
+            }
+
+            usort($dayOccurrences, static fn(array $a, array $b) => $a['event']->getTimeFrom() <=> $b['event']->getTimeFrom());
+
+            $occurrencesByDay[$day->format('Y-m-d')] = $dayOccurrences;
+        }
+
+        return $this->render('admin/rota/index.html.twig', [
+            'monthStart'       => $monthStart,
+            'gridStart'        => $gridStart,
+            'gridEnd'          => $gridEnd,
+            'occurrencesByDay' => $occurrencesByDay,
+            'prevYear'         => $monthStart->modify('-1 month')->format('Y'),
+            'prevMonth'        => $monthStart->modify('-1 month')->format('n'),
+            'nextYear'         => $monthStart->modify('+1 month')->format('Y'),
+            'nextMonth'        => $monthStart->modify('+1 month')->format('n'),
+            'today'            => $today,
+            'q'                => $q,
+        ]);
+    }
+
+    private function occurrenceKey(Event $event, \DateTimeImmutable $date): string
+    {
+        return $event->getId() . ':' . $date->format('Y-m-d');
+    }
+
+    #[Route('/{id}/edit', name: 'app_admin_event_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function edit(
+        Request $request,
+        Event $event,
+        EntityManagerInterface $em,
+        CertificationRepository $certificationRepository,
+    ): Response {
+        $allCertifications = $certificationRepository->findBy([], ['name' => 'ASC']);
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('admin_event_edit_' . $event->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            $error = $this->applyRequestToEvent($request, $event, $allCertifications);
+
+            if (!$error) {
+                $this->applyStaffingRequirements($request, $event, $allCertifications, $em);
+                $em->flush();
+
+                $this->addFlash('success', 'Event updated.');
+                return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
+            }
+        }
+
+        return $this->render('admin/events/edit.html.twig', [
+            'event'          => $event,
+            'error'          => $error,
+            'certifications' => $allCertifications,
+        ]);
+    }
+
+    #[Route('/{id}/delete', name: 'app_admin_event_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(Request $request, Event $event, EntityManagerInterface $em, NoteRepository $noteRepository): Response
+    {
+        if (!$this->isCsrfTokenValid('delete_event_' . $event->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_EVENT, $event->getId());
+        if ($pinnedCount > 0) {
+            $this->addFlash('error', "Unpin {$pinnedCount} pinned note(s) before deleting this record.");
+            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
+        }
+
+        // A linked ticket product references the event with ON DELETE RESTRICT (a Product's sales
+        // history shouldn't be orphaned by deleting the event it happened to sell tickets to), so
+        // this has to be caught here with a helpful message rather than surfacing as a raw DB error.
+        $linkedTicketProducts = $em->getRepository(EventTicketProduct::class)->findBy(['event' => $event]);
+        if ($linkedTicketProducts) {
+            $names = implode(', ', array_map(static fn (EventTicketProduct $etp) => $etp->getProduct()->getName(), $linkedTicketProducts));
+            $this->addFlash('error', "Delete the linked ticket product first (Settings \u{2192} Products): {$names}.");
+            return $this->redirectToRoute('app_admin_event_show', ['id' => $event->getId()]);
+        }
+
+        foreach ($noteRepository->findForNoteable(Note::TYPE_EVENT, $event->getId()) as $note) {
+            $em->remove($note);
+        }
+
+        $em->remove($event);
+        $em->flush();
+
+        $this->addFlash('success', 'Event deleted.');
+        return $this->redirectToRoute('app_admin_events');
+    }
+
+    /** @param \App\Entity\Certification[] $allCertifications */
+    private function applyRequestToEvent(Request $request, Event $event, array $allCertifications): ?string
+    {
+        $title    = trim($request->request->get('title', ''));
+        $location = trim($request->request->get('location', ''));
+        $dateRaw  = $request->request->get('date', '');
+        $timeFrom = trim($request->request->get('timeFrom', ''));
+        $timeTo   = trim($request->request->get('timeTo', ''));
+
+        if ($title === '' || $location === '' || $dateRaw === '' || $timeFrom === '' || $timeTo === '') {
+            return 'Title, location, date, and start/end time are required.';
+        }
+
+        try {
+            $date = new \DateTimeImmutable($dateRaw);
+        } catch (\Exception) {
+            return 'Please enter a valid date.';
+        }
+
+        $isRecurring = $request->request->has('isRecurring');
+        $recurUntil  = null;
+
+        if ($isRecurring) {
+            $recurUntilRaw = $request->request->get('recurUntil', '');
+            if ($recurUntilRaw === '') {
+                return 'Please set a "recurs until" date for a recurring event.';
+            }
+            try {
+                $recurUntil = new \DateTimeImmutable($recurUntilRaw);
+            } catch (\Exception) {
+                return 'Please enter a valid "recurs until" date.';
+            }
+            if ($recurUntil < $date) {
+                return 'The "recurs until" date must be on or after the event date.';
+            }
+            if (!$request->request->all('recurDays')) {
+                return 'Please select at least one day for a recurring event.';
+            }
+        }
+
+        $maxAttendeesRaw = trim($request->request->get('maxAttendees', ''));
+
+        $allowedAccessMethods = [Event::ACCESS_TICKET, Event::ACCESS_CREDIT, Event::ACCESS_MEMBERSHIP];
+        $accessMethods        = array_values(array_intersect($request->request->all('accessMethods'), $allowedAccessMethods));
+
+        $event->setTitle($title);
+        $event->setDescription(trim($request->request->get('description', '')) ?: null);
+        $event->setAttendeeInfo(trim($request->request->get('attendeeInfo', '')) ?: null);
+        $event->setDate($date);
+        $event->setTimeFrom($timeFrom);
+        $event->setTimeTo($timeTo);
+        $event->setLocation($location);
+        $event->setExternalUrl(trim($request->request->get('externalUrl', '')) ?: null);
+        $event->setMaxAttendees($maxAttendeesRaw !== '' ? (int) $maxAttendeesRaw : null);
+        $event->setAccessMethodsArray($accessMethods);
+        $event->setStatus($request->request->has('published') ? Event::STATUS_PUBLISHED : Event::STATUS_DRAFT);
+
+        $event->setIsRecurring($isRecurring);
+        $event->setRecurUntil($isRecurring ? $recurUntil : null);
+        $event->setRecurDaysArray($isRecurring ? array_map('intval', $request->request->all('recurDays')) : []);
+        $event->setIsSelfAccess($request->request->has('isSelfAccess'));
+
+        $submittedCertIds = array_map('intval', $request->request->all('restrictions'));
+        foreach ($event->getRestrictions()->toArray() as $certification) {
+            if (!in_array($certification->getId(), $submittedCertIds, true)) {
+                $event->removeRestriction($certification);
+            }
+        }
+        foreach ($allCertifications as $certification) {
+            if (in_array($certification->getId(), $submittedCertIds, true)) {
+                $event->addRestriction($certification);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Syncs the event's staffing requirements from submitted "staffing_<certificationId>" min-count
+     * fields — 0 or blank removes the requirement, a positive number creates or updates it.
+     *
+     * @param \App\Entity\Certification[] $allCertifications
+     */
+    private function applyStaffingRequirements(Request $request, Event $event, array $allCertifications, EntityManagerInterface $em): void
+    {
+        foreach ($allCertifications as $certification) {
+            $minCountRaw = trim($request->request->get('staffing_' . $certification->getId(), ''));
+            $minCount    = $minCountRaw !== '' ? max(0, (int) $minCountRaw) : 0;
+
+            $requirement = $event->getStaffingRequirementFor($certification);
+
+            if ($minCount > 0) {
+                if (!$requirement) {
+                    $requirement = new EventStaffingRequirement();
+                    $requirement->setEvent($event);
+                    $requirement->setCertification($certification);
+                    $event->getStaffingRequirements()->add($requirement);
+                    $em->persist($requirement);
+                }
+                $requirement->setMinCount($minCount);
+            } elseif ($requirement) {
+                $event->getStaffingRequirements()->removeElement($requirement);
+                $em->remove($requirement);
+            }
+        }
+    }
+
+    /** Parses the `?date=` query param (if any) and resolves it to a real occurrence of this recurring event. */
+    private function resolveOccurrenceDateFromRequest(Request $request, Event $event): \DateTimeImmutable
+    {
+        $requestedDate = null;
+        $requestedRaw  = $request->query->get('date', '');
+        if ($requestedRaw !== '') {
+            try {
+                $requestedDate = new \DateTimeImmutable($requestedRaw);
+            } catch (\Exception) {
+                $requestedDate = null;
+            }
+        }
+
+        return $this->resolveOccurrenceDate($event, $requestedDate);
+    }
+
+    /**
+     * Which occurrence to show on the event info screen: the requested date if it's a real
+     * occurrence, otherwise the next upcoming one, falling back to the most recent past
+     * occurrence once the recurrence window has ended.
+     */
+    private function resolveOccurrenceDate(Event $event, ?\DateTimeImmutable $requested): \DateTimeImmutable
+    {
+        if ($requested !== null && $event->isValidForDate($requested)) {
+            return $requested;
+        }
+
+        $today      = new \DateTimeImmutable('today');
+        $searchFrom = max($event->getDate(), $today);
+
+        for ($i = 0; $i < 7; $i++) {
+            $candidate = $searchFrom->modify("+{$i} days");
+            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
+                break;
+            }
+            if ($event->isValidForDate($candidate)) {
+                return $candidate;
+            }
+        }
+
+        if ($event->getRecurUntil()) {
+            for ($i = 0; $i < 7; $i++) {
+                $candidate = $event->getRecurUntil()->modify("-{$i} days");
+                if ($candidate < $event->getDate()) {
+                    break;
+                }
+                if ($event->isValidForDate($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $event->getDate();
+    }
+
+    /** The previous/next valid occurrence date relative to $from, or null if there isn't one. */
+    private function adjacentOccurrence(Event $event, \DateTimeImmutable $from, int $direction): ?\DateTimeImmutable
+    {
+        $step      = $direction >= 0 ? '+1 day' : '-1 day';
+        $candidate = $from;
+
+        for ($i = 0; $i < 400; $i++) {
+            $candidate = $candidate->modify($step);
+
+            if ($candidate < $event->getDate()) {
+                return null;
+            }
+            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
+                return null;
+            }
+            if ($event->isValidForDate($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+}

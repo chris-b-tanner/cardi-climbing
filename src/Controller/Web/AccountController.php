@@ -1,0 +1,390 @@
+<?php
+
+namespace App\Controller\Web;
+
+use App\Entity\Attendee;
+use App\Entity\Tag;
+use App\Entity\User;
+use App\Entity\UserCertification;
+use App\Repository\AttendeeRepository;
+use App\Repository\TagRepository;
+use App\Repository\UserRepository;
+use App\Service\AvatarUploader;
+use App\Service\BookingService;
+use App\Service\UserService;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+#[Route('/account')]
+#[IsGranted('ROLE_USER')]
+class AccountController extends AbstractController
+{
+    #[Route('', name: 'app_account', methods: ['GET', 'POST'])]
+    public function edit(
+        Request $request,
+        EntityManagerInterface $em,
+        UserRepository $userRepository,
+        AttendeeRepository $attendeeRepository,
+        TagRepository $tagRepository,
+        UserService $userService,
+        AvatarUploader $avatarUploader,
+    ): Response {
+        /** @var User $user */
+        $user  = $this->getUser();
+        $error = null;
+
+        // Public tags double as newsletter "interest groups" offered as checkboxes below — needed
+        // for both rendering them and validating/saving a submission.
+        $publicTags = $tagRepository->findBy(['public' => true], ['name' => 'ASC']);
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('account_edit', $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            // Captured before any setters run below — see AdminController::editUser() for why.
+            $previousEmail   = $user->getEmail();
+            $previousOptIn   = $user->isOptIn();
+            $previousTagIds  = array_map(
+                static fn (Tag $t) => $t->getId(),
+                array_filter($publicTags, static fn (Tag $t) => $user->hasTag($t)),
+            );
+
+            $newEmail = strtolower(trim($request->request->get('email', '')));
+
+            if ($newEmail !== $user->getEmail()) {
+                $existing = $userRepository->findOneBy(['email' => $newEmail]);
+                if ($existing && $existing->getId() !== $user->getId()) {
+                    $error = 'That email address is already in use by another account.';
+                }
+            }
+
+            $newOptIn        = $request->request->has('optIn');
+            $submittedTagIds = array_map('intval', $request->request->all('tags'));
+            $hasSelectedTag  = (bool) array_filter(
+                $publicTags,
+                static fn (Tag $t) => in_array($t->getId(), $submittedTagIds, true),
+            );
+
+            if (!$error && $hasSelectedTag && !$newOptIn) {
+                $error = 'Please tick "Keep me updated about Y Wal news" to subscribe to any interest groups below.';
+            }
+
+            if (!$error) {
+                $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
+                $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
+                $user->setCompany(trim($request->request->get('company', '')) ?: null);
+                $user->setEmail($newEmail);
+                $user->setPhone(trim($request->request->get('phone', '')) ?: null);
+                $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
+                $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
+                $user->setTown(trim($request->request->get('town', '')) ?: null);
+                $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
+                $user->setOptIn($newOptIn);
+
+                $dob = trim($request->request->get('dateOfBirth', ''));
+                $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
+
+                $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
+                $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
+
+                // Only ever touches public tags — never removes a non-public tag staff may have
+                // assigned internally, since those never appear as a checkbox here at all.
+                foreach ($publicTags as $tag) {
+                    $selected = in_array($tag->getId(), $submittedTagIds, true);
+                    if ($selected && !$user->hasTag($tag)) {
+                        $user->addTag($tag);
+                    } elseif (!$selected && $user->hasTag($tag)) {
+                        $user->removeTag($tag);
+                    }
+                }
+
+                $em->flush();
+
+                $userService->recordEmailChangeIfNeeded($user, $previousEmail, $user);
+                $userService->recordOptInChangeIfNeeded($user, $previousOptIn, $user);
+                $userService->recordPublicTagChangesIfNeeded($user, $previousTagIds, $publicTags, $user);
+
+                $this->addFlash('success', 'Your details have been updated.');
+                return $this->redirect($this->resolveReturnTo($request));
+            }
+        }
+
+        return $this->render('account/edit.html.twig', [
+            'user'       => $user,
+            'error'      => $error,
+            'attendees'  => $attendeeRepository->findAllForUser($user),
+            'publicTags' => $publicTags,
+            'avatarUrl'  => $avatarUploader->getUrl($user),
+            'today'      => new \DateTimeImmutable('today'),
+        ]);
+    }
+
+    /** A dedicated, separate form from the main profile one — a file upload needs its own multipart encoding, and a photo change doesn't belong in the same submit/validation cycle as the rest of the profile fields. */
+    #[Route('/avatar', name: 'app_account_avatar_upload', methods: ['POST'])]
+    public function uploadAvatar(Request $request, EntityManagerInterface $em, AvatarUploader $avatarUploader): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('account_avatar', $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $file = $request->files->get('avatar');
+
+        if (!$file) {
+            $this->addFlash('error', 'Please choose a photo to upload.');
+            return $this->redirect($this->resolveReturnTo($request));
+        }
+
+        $error = $avatarUploader->upload($user, $file);
+
+        if ($error) {
+            $this->addFlash('error', $error);
+        } else {
+            $em->flush();
+            $this->addFlash('success', 'Your photo has been updated.');
+        }
+
+        return $this->redirect($this->resolveReturnTo($request));
+    }
+
+    #[Route('/avatar/remove', name: 'app_account_avatar_remove', methods: ['POST'])]
+    public function removeAvatar(Request $request, EntityManagerInterface $em, AvatarUploader $avatarUploader): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('account_avatar', $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $avatarUploader->remove($user);
+        $em->flush();
+
+        $this->addFlash('success', 'Your photo has been removed.');
+        return $this->redirect($this->resolveReturnTo($request));
+    }
+
+    /** A member's own (or one of their dependents') certification record — full detail, including agreed declarations and signature once complete. */
+    #[Route('/certifications/{recordId}', name: 'app_account_certification_view', requirements: ['recordId' => '\d+'], methods: ['GET'])]
+    public function viewCertification(int $recordId, EntityManagerInterface $em): Response
+    {
+        /** @var User $user */
+        $user   = $this->getUser();
+        $record = $this->findAccessibleCertificationRecord($em, $user, $recordId);
+
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        return $this->render('account/certification_view.html.twig', [
+            'record' => $record,
+        ]);
+    }
+
+    /**
+     * Self-service: work through declarations and sign to complete an in-progress certification —
+     * either the logged-in member's own, or one of their dependents' (who have no login of their
+     * own, so a parent completes it on their behalf).
+     */
+    #[Route('/certifications/{recordId}/complete', name: 'app_account_certification_complete', requirements: ['recordId' => '\d+'], methods: ['GET', 'POST'])]
+    public function completeCertification(
+        Request $request,
+        int $recordId,
+        EntityManagerInterface $em,
+        TokenStorageInterface $tokenStorage,
+    ): Response {
+        /** @var User $user */
+        $user   = $this->getUser();
+        $record = $this->findAccessibleCertificationRecord($em, $user, $recordId);
+
+        if (!$record) {
+            $this->addFlash('error', 'Certification record not found.');
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        if ($record->isSubmitted() || $record->isCancelled()) {
+            return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+        }
+
+        // The declarations are about the certificate holder, not necessarily the person completing
+        // them — a parent filling this in for a dependent needs the dependent's own details on file.
+        $holder = $record->getUser();
+
+        $missingProfileFields = [];
+        if (!$holder->getEmergencyContactName() || !$holder->getEmergencyContactPhone()) {
+            $missingProfileFields[] = 'emergency contact name and phone number';
+        }
+        if (!$holder->getDateOfBirth()) {
+            $missingProfileFields[] = 'date of birth';
+        }
+        if (!$holder->getPhone()) {
+            $missingProfileFields[] = 'phone number';
+        }
+        if (!$holder->getAddressLine1() || !$holder->getTown() || !$holder->getPostcode()) {
+            $missingProfileFields[] = 'address';
+        }
+
+        if ($missingProfileFields) {
+            $message = $holder === $user
+                ? 'Please add the following to your account before completing this certification: ' . implode(', ', $missingProfileFields) . '.'
+                : 'Ask an admin to add the following to ' . $holder->getDisplayName() . "'s profile before completing this certification: " . implode(', ', $missingProfileFields) . '.';
+            $this->addFlash('warning', $message);
+        }
+
+        $declarations = $record->getCertification()->getDeclarations();
+        $error = null;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('complete_certification_' . $record->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+            }
+
+            if ($missingProfileFields) {
+                return $this->redirectToRoute('app_account_certification_complete', ['recordId' => $record->getId()]);
+            }
+
+            $agreedIds = array_map('intval', $request->request->all('declarations'));
+            foreach ($declarations as $declaration) {
+                if (!in_array($declaration->getId(), $agreedIds, true)) {
+                    $error = 'Please agree to all of the declarations before completing this.';
+                    break;
+                }
+            }
+
+            if (!$error && $request->request->get('signature_consent') !== '1') {
+                $error = 'Please agree to the electronic signature declaration.';
+            }
+
+            $signature = trim($request->request->get('signature', ''));
+            if (!$error && !str_starts_with($signature, 'data:image/png;base64,')) {
+                $error = 'Please sign before completing this.';
+            }
+
+            if (!$error) {
+                foreach ($declarations as $declaration) {
+                    $record->addAgreedDeclaration($declaration);
+                }
+                $record->setSignature($signature);
+                $record->setCompletedAt(new \DateTimeImmutable());
+                $record->setCompletedBy($user);
+                $em->flush();
+
+                $followUp = $holder->getCertificationNotificationEmail()
+                    ? "you'll be emailed a copy once it's signed off."
+                    : 'check with reception once it\'s signed off.';
+                $successMessage = $record->getCertification()->getName() . ' submitted — thank you! It\'s now awaiting approval, ' . $followUp;
+
+                // A kiosk (shared/reception tablet) session must never stay signed in as whoever
+                // just used it — log straight back out rather than landing on their account.
+                if ($request->getSession()->get('kiosk_mode')) {
+                    $tokenStorage->setToken(null);
+                    $request->getSession()->invalidate();
+                    $this->addFlash('success', $successMessage);
+                    return $this->redirectToRoute('app_kiosk_certification');
+                }
+
+                $this->addFlash('success', $successMessage);
+                return $this->redirectToRoute('app_account', ['_fragment' => 'certifications']);
+            }
+        }
+
+        return $this->render('account/certification_complete.html.twig', [
+            'record'               => $record,
+            'declarations'         => $declarations,
+            'error'                => $error,
+            'missingProfileFields' => $missingProfileFields,
+        ]);
+    }
+
+    /**
+     * A staff member's own response to a pending staffing assignment an admin pre-arranged for
+     * them — reached via the tokenised link in BookingMailer::sendStaffingInvite(). Confirming sets
+     * them approved (and grants door access if the event needs it); declining just records that
+     * they said no — the same staffingStatus states an admin can set from the event page, just
+     * self-service instead.
+     */
+    #[Route('/staffing/{id}', name: 'app_account_staffing_respond', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function respondToStaffing(Request $request, Attendee $attendee, BookingService $bookingService): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if ($attendee->getUser() !== $user || !$attendee->isStaffing()) {
+            $this->addFlash('error', 'That staffing request could not be found.');
+            return $this->redirectToRoute('app_account');
+        }
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('account_staffing_' . $attendee->getId(), $request->request->get('_csrf_token'))) {
+                $this->addFlash('error', 'Access denied.');
+                return $this->redirectToRoute('app_home');
+            }
+
+            if (!$attendee->isStaffingPending()) {
+                $this->addFlash('error', 'This request has already been responded to.');
+                return $this->redirectToRoute('app_account_staffing_respond', ['id' => $attendee->getId()]);
+            }
+
+            $action = $request->request->get('action');
+            if ($action === 'confirm') {
+                $attendee->setStaffingStatus(Attendee::STAFFING_APPROVED);
+                $error = $bookingService->reinstateBooking($attendee, Attendee::STATUS_CONFIRMED, $user);
+                if ($error) {
+                    $this->addFlash('error', $error);
+                } else {
+                    $this->addFlash('success', "You're confirmed — thanks for staffing this session.");
+                }
+            } elseif ($action === 'decline') {
+                $attendee->setStaffingStatus(Attendee::STAFFING_DECLINED);
+                $bookingService->cancelBooking($attendee, $user);
+                $this->addFlash('success', "Thanks for letting us know — you've been marked as unavailable for this session.");
+            }
+
+            return $this->redirectToRoute('app_account_staffing_respond', ['id' => $attendee->getId()]);
+        }
+
+        return $this->render('account/staffing_respond.html.twig', [
+            'attendee' => $attendee,
+        ]);
+    }
+
+    /** A record belonging to $user themself, or to one of their dependents — dependents have no login of their own, so the parent acts on their behalf. */
+    private function findAccessibleCertificationRecord(EntityManagerInterface $em, User $user, int $recordId): ?UserCertification
+    {
+        $record = $em->getRepository(UserCertification::class)->find($recordId);
+        if (!$record) {
+            return null;
+        }
+
+        $holder = $record->getUser();
+
+        return ($holder === $user || $user->getDependents()->contains($holder)) ? $record : null;
+    }
+
+    /**
+     * Where to send the member after saving their profile — normally back to the account page, but
+     * the certification wizard's step 1 reuses this same form/endpoint and wants them back on the
+     * wizard instead. Only ever a local path (never a full URL) so this can't become an open redirect.
+     */
+    private function resolveReturnTo(Request $request): string
+    {
+        $returnTo = $request->request->get('returnTo', '');
+
+        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
+            ? $returnTo
+            : $this->generateUrl('app_account');
+    }
+}

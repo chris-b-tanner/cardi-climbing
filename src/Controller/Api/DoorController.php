@@ -10,7 +10,7 @@ use App\Repository\AttendeeRepository;
 use App\Repository\DoorLogRepository;
 use App\Repository\UserRepository;
 use App\Service\DoorAccessService;
-use App\Service\DoorAlertMailer;
+use App\Service\Mailer\DoorAlertMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

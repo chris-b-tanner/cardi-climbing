@@ -6,7 +6,7 @@ use App\Entity\Email;
 use App\Entity\User;
 use App\Message\SendBulkEmailMessage;
 use App\Repository\UserRepository;
-use App\Service\EmailPlaceholders;
+use App\Service\Mailer\EmailPlaceholders;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
