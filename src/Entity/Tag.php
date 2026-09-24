@@ -26,6 +26,10 @@ class Tag
     #[ORM\Column(options: ['default' => false])]
     private bool $public = false;
 
+    /** Badge colour as a hex string (e.g. "#0369a1"), chosen by an admin on the tag edit page. Null for a tag never re-saved since this existed — see getEffectiveColor(). */
+    #[ORM\Column(length: 7, nullable: true)]
+    private ?string $color = null;
+
     #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'tags')]
     private Collection $users;
 
@@ -75,5 +79,22 @@ class Tag
     public function getUsers(): Collection
     {
         return $this->users;
+    }
+
+    public function getColor(): ?string
+    {
+        return $this->color;
+    }
+
+    public function setColor(?string $color): static
+    {
+        $this->color = $color;
+        return $this;
+    }
+
+    /** The colour actually used to render this tag's badge — its own if set, else the original default every tag used before colours existed. */
+    public function getEffectiveColor(): string
+    {
+        return $this->color ?? '#0369a1';
     }
 }

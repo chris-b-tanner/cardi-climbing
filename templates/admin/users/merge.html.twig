@@ -47,7 +47,7 @@
           {% if user.tags is not empty %}
             <div class="merge-card__detail" style="margin-top:0.5rem;">
               {% for tag in user.tags %}
-                <span class="tag-badge">{{ tag.name }}</span>
+                <span class="tag-badge" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">{{ tag.name }}</span>
               {% endfor %}
             </div>
           {% endif %}

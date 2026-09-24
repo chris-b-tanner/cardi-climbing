@@ -70,7 +70,7 @@
             </td>
             <td>
               {% for tag in user.tags %}
-                <span class="tag-badge">{{ tag.name }}</span>
+                <span class="tag-badge" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">{{ tag.name }}</span>
               {% else %}
                 <span class="admin-table__muted">—</span>
               {% endfor %}

@@ -46,7 +46,7 @@
       <div id="tag-list" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.3rem;">
         <span class="tag-badge--none" id="tag-list-empty"{% if user.tags is not empty %} style="display:none;"{% endif %}>No tags assigned</span>
         {% for tag in user.tags %}
-          <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}">
+          <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">
             {{ tag.name }}
             <button type="button" class="tag-badge__remove" data-tag-id="{{ tag.id }}" aria-label="Remove tag {{ tag.name }}">&times;</button>
           </span>
@@ -64,7 +64,9 @@
               <input type="text" id="tag-picker-search" class="tag-picker__search" placeholder="Search tags…" autocomplete="off">
               <div id="tag-picker-list" class="tag-picker__list">
                 {% for tag in allTags %}
-                  <button type="button" class="tag-picker__item{% if user.hasTag(tag) %} is-added is-hidden{% endif %}" data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name|lower }}" role="option">{{ tag.name }}</button>
+                  <button type="button" class="tag-picker__item{% if user.hasTag(tag) %} is-added is-hidden{% endif %}" data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name|lower }}" role="option">
+                    <span style="display:inline-block;width:0.6rem;height:0.6rem;border-radius:50%;background:{{ tag.effectiveColor }};margin-right:0.4rem;flex-shrink:0;"></span>{{ tag.name }}
+                  </button>
                 {% endfor %}
               </div>
               <p class="tag-picker__empty" id="tag-picker-empty" style="display:none;">No matching tags.</p>
@@ -862,6 +864,8 @@
           const chip = document.createElement('span');
           chip.className = 'tag-badge tag-badge--removable';
           chip.dataset.tagId = data.id;
+          chip.style.background = 'color-mix(in srgb, ' + data.color + ' 15%, white)';
+          chip.style.color      = data.color;
           chip.innerHTML = data.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))
             + ' <button type="button" class="tag-badge__remove" data-tag-id="' + data.id + '" aria-label="Remove tag ' + data.name.replace(/"/g, '&quot;') + '">&times;</button>';
           tagList.insertBefore(chip, picker);

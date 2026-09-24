@@ -35,17 +35,21 @@ class AdminTagController extends AbstractController
                 return $this->redirectToRoute('app_home');
             }
 
-            $name = trim($request->request->get('name', ''));
+            $name  = trim($request->request->get('name', ''));
+            $color = trim($request->request->get('color', ''));
 
             if ($name === '') {
                 $error = 'Name is required.';
             } elseif ($tagRepository->findOneBy(['name' => $name])) {
                 $error = 'A tag with that name already exists.';
+            } elseif ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                $error = 'Colour must be a valid hex value.';
             } else {
                 $tag = new Tag();
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
                 $tag->setPublic($request->request->has('public'));
+                $tag->setColor($color ?: null);
 
                 $em->persist($tag);
                 $em->flush();
@@ -72,16 +76,20 @@ class AdminTagController extends AbstractController
             }
 
             $name      = trim($request->request->get('name', ''));
+            $color     = trim($request->request->get('color', ''));
             $duplicate = $tagRepository->findOneBy(['name' => $name]);
 
             if ($name === '') {
                 $error = 'Name is required.';
             } elseif ($duplicate && $duplicate->getId() !== $tag->getId()) {
                 $error = 'A tag with that name already exists.';
+            } elseif ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                $error = 'Colour must be a valid hex value.';
             } else {
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
                 $tag->setPublic($request->request->has('public'));
+                $tag->setColor($color ?: null);
 
                 $em->flush();
 

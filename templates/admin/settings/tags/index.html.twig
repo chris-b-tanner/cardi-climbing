@@ -28,7 +28,8 @@
         {% for tag in tags %}
           <tr>
             <td>
-              <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">
+              <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link" style="display:inline-flex;align-items:center;gap:0.5rem;">
+                <span style="display:inline-block;width:0.7rem;height:0.7rem;border-radius:50%;background:{{ tag.effectiveColor }};flex-shrink:0;"></span>
                 {{ tag.name }}
               </a>
             </td>

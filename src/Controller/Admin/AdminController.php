@@ -342,7 +342,7 @@ class AdminController extends AbstractController
         $user->addTag($tag);
         $em->flush();
 
-        return new JsonResponse(['id' => $tag->getId(), 'name' => $tag->getName()]);
+        return new JsonResponse(['id' => $tag->getId(), 'name' => $tag->getName(), 'color' => $tag->getEffectiveColor()]);
     }
 
     /** Quick-remove a tag from the contact view screen, without dropping into the full edit form. */

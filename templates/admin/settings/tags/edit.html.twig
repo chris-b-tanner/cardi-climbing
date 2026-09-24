@@ -26,6 +26,16 @@
                 placeholder="What this tag is for — shown to staff when they filter by it, and to members if it's public."
                 style="resize:vertical;">{{ tag.description }}</textarea>
     </div>
+    <div class="form-group">
+      <label for="color">Colour</label>
+      <div style="display:flex;align-items:center;gap:0.6rem;">
+        <input type="color" id="color" name="color" value="{{ tag.effectiveColor }}"
+               style="width:2.75rem;height:2.25rem;padding:0.15rem;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:none;">
+        <input type="text" id="color-hex" class="form-control" style="max-width:9rem;"
+               value="{{ tag.effectiveColor }}" pattern="^#[0-9a-fA-F]{6}$" maxlength="7" autocomplete="off">
+        <span class="tag-badge" id="color-preview" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">{{ tag.name }}</span>
+      </div>
+    </div>
     <div class="form-group" style="margin-bottom:0;">
       <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
         <input type="checkbox" name="public" value="1"{% if tag.public %} checked{% endif %}
@@ -52,4 +62,31 @@
     <button type="submit" class="btn btn--danger btn--sm">Delete tag</button>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const colorInput = document.getElementById('color');
+    const hexInput    = document.getElementById('color-hex');
+    const preview     = document.getElementById('color-preview');
+
+    function applyColor(hex) {
+      preview.style.color      = hex;
+      preview.style.background = 'color-mix(in srgb, ' + hex + ' 15%, white)';
+    }
+
+    colorInput.addEventListener('input', () => {
+      hexInput.value = colorInput.value;
+      applyColor(colorInput.value);
+    });
+
+    hexInput.addEventListener('input', () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value)) {
+        colorInput.value = hexInput.value;
+        applyColor(hexInput.value);
+      }
+    });
+  })();
+</script>
 {% endblock %}
