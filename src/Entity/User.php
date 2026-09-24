@@ -116,6 +116,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
     private Collection $payments;
 
+    /** Admin-uploaded documents on this member's profile — qualifications, quotes, etc. Never certification PDFs; those live on UserCertification instead. */
+    #[ORM\OneToMany(targetEntity: UserFile::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['uploadedAt' => 'DESC'])]
+    private Collection $files;
+
     /** This member's memberships — a full history, since changing membership is a cancel-and-create process rather than an edit. */
     #[ORM\OneToMany(targetEntity: Membership::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['createdAt' => 'DESC'])]
@@ -166,6 +171,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->tags           = new ArrayCollection();
         $this->certifications = new ArrayCollection();
         $this->payments       = new ArrayCollection();
+        $this->files          = new ArrayCollection();
         $this->memberships    = new ArrayCollection();
         $this->salesOrders    = new ArrayCollection();
         $this->creditLedgerEntries = new ArrayCollection();
@@ -430,6 +436,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /** This member's payments, most recent first. */
     public function getPayments(): Collection { return $this->payments; }
+
+    /** This member's admin-uploaded documents, most recently uploaded first. Never includes certification PDFs. */
+    public function getFiles(): Collection { return $this->files; }
 
     /** This member's memberships, most recent first. */
     public function getMemberships(): Collection { return $this->memberships; }

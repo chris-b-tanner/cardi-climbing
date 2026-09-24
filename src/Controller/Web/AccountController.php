@@ -11,6 +11,7 @@ use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use App\Service\AvatarUploader;
 use App\Service\BookingService;
+use App\Service\CertificationPdfStorage;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -191,6 +192,23 @@ class AccountController extends AbstractController
         return $this->render('account/certification_view.html.twig', [
             'record' => $record,
         ]);
+    }
+
+    /** Redirect to a short-lived signed S3 URL for a held certification's stored completion PDF — the member's own, or one of their dependents'. */
+    #[Route('/certifications/{recordId}/pdf', name: 'app_account_certification_pdf', requirements: ['recordId' => '\d+'], methods: ['GET'])]
+    public function downloadCertificationPdf(int $recordId, EntityManagerInterface $em, CertificationPdfStorage $pdfStorage): Response
+    {
+        /** @var User $user */
+        $user   = $this->getUser();
+        $record = $this->findAccessibleCertificationRecord($em, $user, $recordId);
+        $url    = $record ? $pdfStorage->getDownloadUrl($record) : null;
+
+        if (!$url) {
+            $this->addFlash('error', 'No certificate is available for this record.');
+            return $this->redirectToRoute('app_account_certification_view', ['recordId' => $recordId]);
+        }
+
+        return $this->redirect($url);
     }
 
     /**

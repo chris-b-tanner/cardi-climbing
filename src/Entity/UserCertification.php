@@ -72,6 +72,13 @@ class UserCertification
     #[ORM\OrderBy(['sortOrder' => 'ASC'])]
     private Collection $agreedDeclarations;
 
+    /** S3 object key (not a full URL) of the completion certificate PDF generated at approval — see CertificationPdfStorage. Null for records approved before this existed, or if storage failed. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $pdfS3Key = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $pdfGeneratedAt = null;
+
     public function __construct()
     {
         $this->startedAt          = new \DateTimeImmutable();
@@ -267,5 +274,32 @@ class UserCertification
     {
         $this->agreedDeclarations->removeElement($declaration);
         return $this;
+    }
+
+    public function getPdfS3Key(): ?string
+    {
+        return $this->pdfS3Key;
+    }
+
+    public function setPdfS3Key(?string $pdfS3Key): static
+    {
+        $this->pdfS3Key = $pdfS3Key;
+        return $this;
+    }
+
+    public function getPdfGeneratedAt(): ?\DateTimeImmutable
+    {
+        return $this->pdfGeneratedAt;
+    }
+
+    public function setPdfGeneratedAt(?\DateTimeImmutable $pdfGeneratedAt): static
+    {
+        $this->pdfGeneratedAt = $pdfGeneratedAt;
+        return $this;
+    }
+
+    public function hasPdf(): bool
+    {
+        return $this->pdfS3Key !== null;
     }
 }

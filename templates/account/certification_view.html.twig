@@ -89,6 +89,15 @@
       {% endif %}
     </div>
 
+    {% if record.hasPdf %}
+      <div class="account-card">
+        <div class="account-card__title">Certificate</div>
+        <div class="account-actions">
+          <a href="{{ path('app_account_certification_pdf', {recordId: record.id}) }}" class="btn btn--teal">Download PDF</a>
+        </div>
+      </div>
+    {% endif %}
+
     {% if record.submitted %}
       {% if record.agreedDeclarations|length > 0 %}
         <div class="account-card">

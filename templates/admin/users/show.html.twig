@@ -295,6 +295,7 @@
 {% set hasSales = user.salesOrders is not empty %}
 {% set hasCredits = user.creditLedgerEntries is not empty %}
 {% set hasNotes = notes is not empty %}
+{% set hasFiles = files is not empty %}
 
 {% set ownMembership = user.currentMembership %}
 <div class="member-columns member-columns--halves" style="margin-bottom:1rem;">
@@ -454,6 +455,7 @@
     <button type="button" class="pos-tab" data-tab="payments" data-has-content="{{ hasPayments ? '1' : '0' }}">Payments</button>
     <button type="button" class="pos-tab" data-tab="credits" data-has-content="{{ hasCredits ? '1' : '0' }}">Credit transactions</button>
     <button type="button" class="pos-tab" data-tab="notes" data-has-content="{{ hasNotes ? '1' : '0' }}" data-has-pinned="{{ notes|filter(n => n.pinned) is not empty ? '1' : '0' }}">Notes / Email</button>
+    <button type="button" class="pos-tab" data-tab="files" data-has-content="{{ hasFiles ? '1' : '0' }}">Files</button>
   </div>
 
   <div class="tab-panel" data-tab-panel="bookings">
@@ -643,6 +645,56 @@
   <div class="tab-panel" data-tab-panel="notes" style="display:none;">
     {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'member', noteableId: user.id, contactEmail: user.email, lastEmailSubject: lastEmailSubject} %}
   </div>
+
+  <div class="tab-panel" data-tab-panel="files" style="display:none;">
+    {% if is_granted('ROLE_ADMIN') %}
+      <form method="post" action="{{ path('app_admin_user_file_upload', {id: user.id}) }}" enctype="multipart/form-data" id="file-upload-form" style="margin-bottom:1rem;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('upload_user_file_' ~ user.id) }}">
+        <div id="file-dropzone" style="border:2px dashed var(--border); border-radius:10px; padding:1.5rem; text-align:center; cursor:pointer;">
+          <p style="margin:0;color:var(--muted);font-size:0.875rem;">Drag a file here, or click to choose one</p>
+          <p style="margin:0.3rem 0 0;color:var(--muted);font-size:0.75rem;">PDF, Word, Excel, or image &middot; up to 15MB</p>
+        </div>
+        <input type="file" name="file" id="file-upload-input" style="display:none;">
+      </form>
+    {% endif %}
+
+    {% if files is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No files uploaded yet.</p>
+    {% else %}
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+              <tr>
+                <td><a href="{{ path('app_admin_user_file_download', {id: user.id, fileId: file.id}) }}" class="admin-table__link">{{ file.originalFilename }}</a></td>
+                <td class="admin-table__muted">{{ file.formattedSize }}</td>
+                <td class="admin-table__muted">
+                  {{ file.uploadedAt|date('d M Y') }}
+                  {% if file.uploadedBy %} &middot; {{ file.uploadedBy.displayName }}{% endif %}
+                </td>
+                <td>
+                  {% if is_granted('ROLE_ADMIN') %}
+                    <form method="post" action="{{ path('app_admin_user_file_delete', {id: user.id, fileId: file.id}) }}" onsubmit="return confirm('Remove this file?');" style="display:inline;">
+                      <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_user_file_' ~ file.id) }}">
+                      <button type="submit" class="btn btn--ghost btn--sm">Delete</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 {% include 'admin/_assign_modal.html.twig' with {prefix: 'contact-assign'} %}
@@ -688,6 +740,34 @@
       }
     }
     if (defaultTab) selectTab(defaultTab);
+  })();
+
+  // ── File upload dropzone ─────────────────────────────────────────────
+  (function () {
+    const dropzone = document.getElementById('file-dropzone');
+    const input     = document.getElementById('file-upload-input');
+    const form      = document.getElementById('file-upload-form');
+    if (!dropzone || !input || !form) return; // not rendered for a non-admin viewer
+
+    dropzone.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => { if (input.files.length) form.submit(); });
+
+    ['dragenter', 'dragover'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--teal)';
+      dropzone.style.background  = 'var(--teal-lt, #f0fdfa)';
+    }));
+    ['dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '';
+      dropzone.style.background  = '';
+    }));
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        form.submit();
+      }
+    });
   })();
 
   // ── Quick tag add/remove from the contact view ──────────────────────────

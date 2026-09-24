@@ -9,16 +9,20 @@ use App\Entity\Payment;
 use App\Entity\Refund;
 use App\Entity\User;
 use App\Entity\UserCertification;
+use App\Entity\UserFile;
 use App\Repository\AccessCardRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\NoteRepository;
 use App\Repository\TagRepository;
+use App\Repository\UserFileRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\CertificationMailer;
 use App\Service\CertificationPdfGenerator;
+use App\Service\CertificationPdfStorage;
 use App\Service\DoorAccessService;
 use App\Service\UkPhoneFormatter;
+use App\Service\UserFileUploader;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Exception\ApiErrorException;
@@ -224,7 +228,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository, AccessCardRepository $accessCardRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository, AccessCardRepository $accessCardRepository, UserFileRepository $userFileRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -242,7 +246,84 @@ class AdminController extends AbstractController
             'allTags'          => $tagRepository->findBy([], ['name' => 'ASC']),
             'accessCard'       => $accessCardRepository->findCurrentForUser($user),
             'lastEmailSubject' => $lastEmailThreadNote?->getEmailSubject(),
+            'files'            => $userFileRepository->findForUser($user),
         ]);
+    }
+
+    /** Upload an admin-supplied document (qualification, quote, etc.) to a member's profile. Admin only. */
+    #[Route('/users/{id}/files/upload', name: 'app_admin_user_file_upload', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function uploadUserFile(Request $request, User $user, EntityManagerInterface $em, UserFileUploader $userFileUploader): Response
+    {
+        if (!$this->isCsrfTokenValid('upload_user_file_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $file = $request->files->get('file');
+        if (!$file) {
+            $this->addFlash('error', 'Please choose a file to upload.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId(), '_fragment' => 'files']);
+        }
+
+        /** @var User $admin */
+        $admin  = $this->getUser();
+        $result = $userFileUploader->upload($user, $file, $admin);
+
+        if (is_string($result)) {
+            $this->addFlash('error', $result);
+        } else {
+            $em->persist($result);
+            $em->flush();
+            $this->addFlash('success', 'File uploaded.');
+        }
+
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId(), '_fragment' => 'files']);
+    }
+
+    /** Redirect to a short-lived signed S3 URL for one of a member's uploaded documents. Admin only. */
+    #[Route('/users/{id}/files/{fileId}/download', name: 'app_admin_user_file_download', requirements: ['id' => '\d+', 'fileId' => '\d+'], methods: ['GET'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function downloadUserFile(User $user, int $fileId, EntityManagerInterface $em, UserFileUploader $userFileUploader): Response
+    {
+        $file = $this->findUserFile($em, $user, $fileId);
+        if (!$file) {
+            $this->addFlash('error', 'File not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId(), '_fragment' => 'files']);
+        }
+
+        return $this->redirect($userFileUploader->getDownloadUrl($file));
+    }
+
+    /** Remove an uploaded document from a member's profile. Admin only. */
+    #[Route('/users/{id}/files/{fileId}/delete', name: 'app_admin_user_file_delete', requirements: ['id' => '\d+', 'fileId' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function deleteUserFile(Request $request, User $user, int $fileId, EntityManagerInterface $em, UserFileUploader $userFileUploader): Response
+    {
+        $file = $this->findUserFile($em, $user, $fileId);
+        if (!$file) {
+            $this->addFlash('error', 'File not found.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId(), '_fragment' => 'files']);
+        }
+
+        if (!$this->isCsrfTokenValid('delete_user_file_' . $file->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $userFileUploader->remove($file);
+        $em->remove($file);
+        $em->flush();
+
+        $this->addFlash('success', 'File removed.');
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId(), '_fragment' => 'files']);
+    }
+
+    private function findUserFile(EntityManagerInterface $em, User $user, int $fileId): ?UserFile
+    {
+        $file = $em->getRepository(UserFile::class)->find($fileId);
+
+        return ($file && $file->getUser() === $user) ? $file : null;
     }
 
     /** Quick-add a tag from the contact view screen, without dropping into the full edit form. */
@@ -977,6 +1058,7 @@ class AdminController extends AbstractController
         int $recordId,
         EntityManagerInterface $em,
         CertificationPdfGenerator $pdfGenerator,
+        CertificationPdfStorage $pdfStorage,
         CertificationMailer $certificationMailer,
     ): Response {
         $record = $this->findCertificationRecord($em, $user, $recordId);
@@ -1006,6 +1088,16 @@ class AdminController extends AbstractController
 
         try {
             $pdf = $pdfGenerator->generate($record);
+
+            try {
+                $pdfStorage->store($record, $pdf);
+                $em->flush();
+            } catch (\Throwable $e) {
+                // Not fatal to the approval or the email below — the member still gets their PDF
+                // as an attachment even if S3 storage (and so the later download link) failed.
+                error_log('Certification PDF storage failed for record ' . $record->getId() . ': ' . $e->getMessage());
+            }
+
             $certificationMailer->sendCompletion($record, $pdf);
         } catch (\Throwable $e) {
             // The record is already saved as approved at this point — a PDF/email failure
@@ -1016,6 +1108,22 @@ class AdminController extends AbstractController
 
         $this->addFlash('success', $message);
         return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $record->getId()]);
+    }
+
+    /** Redirect to a short-lived signed S3 URL for a held certification's stored completion PDF. Admin only. */
+    #[Route('/users/{id}/certifications/{recordId}/pdf', name: 'app_admin_user_certification_pdf', requirements: ['id' => '\d+', 'recordId' => '\d+'], methods: ['GET'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function downloadCertificationPdf(User $user, int $recordId, EntityManagerInterface $em, CertificationPdfStorage $pdfStorage): Response
+    {
+        $record = $this->findCertificationRecord($em, $user, $recordId);
+        $url    = $record ? $pdfStorage->getDownloadUrl($record) : null;
+
+        if (!$url) {
+            $this->addFlash('error', 'No certificate is available for this record.');
+            return $this->redirectToRoute('app_admin_user_certification_edit', ['id' => $user->getId(), 'recordId' => $recordId]);
+        }
+
+        return $this->redirect($url);
     }
 
     /** Hide/void a certification record — e.g. a bad actor or an expired certification. Admin only. */

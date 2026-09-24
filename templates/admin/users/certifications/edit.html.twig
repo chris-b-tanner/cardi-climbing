@@ -76,6 +76,14 @@
         </div>
       </div>
     {% endif %}
+    {% if record.hasPdf %}
+      <div>
+        <div class="card__label">Certificate</div>
+        <div class="card__value">
+          <a href="{{ path('app_admin_user_certification_pdf', {id: user.id, recordId: record.id}) }}" style="color:var(--teal-dk);font-weight:600;">Download PDF</a>
+        </div>
+      </div>
+    {% endif %}
   </div>
 </div>
 
