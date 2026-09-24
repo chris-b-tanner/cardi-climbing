@@ -2,22 +2,26 @@
 
 namespace App\Tests\Functional;
 
-use App\Entity\Certification;
 use App\Entity\User;
 use App\Entity\UserCertification;
 use App\Tests\Support\CreatesTestAdmin;
+use App\Tests\Support\CreatesTestCertification;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
  * The walk-in kiosk flow: a contact with no email/password gets into the certification wizard by
  * entering the record ID + their surname on a shared tablet, instead of logging in. See
- * KioskController and AdminController::confirmCertification() (where the ID is generated).
+ * KioskController and AdminController::confirmCertification() (where the ID is generated). See
+ * CertificationLifecycleTest for the "has an email, gets a magic link" variant of this same wizard.
  */
 class KioskCertificationTest extends WebTestCase
 {
     use CreatesTestAdmin;
+    use CreatesTestCertification;
+    use MailerAssertionsTrait;
 
     private ?int $userId = null;
     private ?int $certificationId = null;
@@ -82,27 +86,16 @@ class KioskCertificationTest extends WebTestCase
         self::assertStringContainsString("match an induction awaiting completion", $client->getResponse()->getContent());
     }
 
-    public function testCompletingViaKioskLogsBackOutAfterwards(): void
+    public function testCompletingViaKioskLogsBackOutAfterwardsAndCapturesDeclarationsAndSignature(): void
     {
         $client = static::createClient();
         [$user, $record] = $this->createWalkInWithInProgressRecord();
-        $user->setEmergencyContactName('Someone');
-        $user->setEmergencyContactPhone('01234 567890');
-        $user->setDateOfBirth(new \DateTimeImmutable('1990-01-01'));
-        $user->setPhone('01234 000000');
-        $user->setAddressLine1('1 Test Street');
-        $user->setTown('Cardigan');
-        $user->setPostcode('SA43 1AA');
-        static::getContainer()->get('doctrine')->getManager()->flush();
+        $this->fillRequiredProfileFields($user);
 
         $this->submitKioskForm($client, $record->getId(), $user->getLastName());
         $client->followRedirect();
 
-        $crawler = $client->getCrawler();
-        $form    = $crawler->selectButton('Complete ' . $record->getCertification()->getName())->form();
-        $form['signature_consent']->tick();
-        $form['signature']->setValue('data:image/png;base64,iVBORw0KGgo=');
-        $client->submit($form);
+        $this->completeCurrentWizard($client, $record);
 
         self::assertResponseRedirects('/kiosk/certification');
         $client->followRedirect();
@@ -112,6 +105,56 @@ class KioskCertificationTest extends WebTestCase
         // Session must no longer be authenticated as the walk-in user.
         $client->request('GET', '/account');
         self::assertResponseRedirects('/login');
+
+        $em = static::getContainer()->get('doctrine')->getManager();
+        $em->clear();
+        /** @var UserCertification $refreshed */
+        $refreshed = $em->getRepository(UserCertification::class)->find($record->getId());
+        self::assertTrue($refreshed->isSubmitted());
+        self::assertSame('data:image/png;base64,iVBORw0KGgo=', $refreshed->getSignature());
+        self::assertCount(1, $refreshed->getAgreedDeclarations());
+        self::assertSame(
+            $refreshed->getCertification()->getDeclarations()->first()->getText(),
+            $refreshed->getAgreedDeclarations()->first()->getText(),
+        );
+    }
+
+    /** Approving still works — and doesn't 500 — for a record with no email on file at all; CertificationMailer::sendCompletion() has nowhere to send to, so AdminController::approveCertification() must swallow that failure rather than lose the approval itself. */
+    public function testApprovingAKioskCompletedRecordWithNoEmailStillSucceedsDespiteHavingNowhereToEmail(): void
+    {
+        $client = static::createClient();
+        $client->disableReboot();
+        [$user, $record] = $this->createWalkInWithInProgressRecord();
+        $this->fillRequiredProfileFields($user);
+
+        $this->submitKioskForm($client, $record->getId(), $user->getLastName());
+        $client->followRedirect();
+        $this->completeCurrentWizard($client, $record);
+        $client->followRedirect(); // back to /kiosk/certification, logged out
+
+        $client->loginUser($this->findOrCreateAdmin());
+        $crawler = $client->request('GET', '/admin/users/' . $user->getId() . '/certifications/' . $record->getId() . '/edit');
+        self::assertStringContainsString('Awaiting approval', $client->getResponse()->getContent());
+
+        $form = $crawler->selectButton('Approve')->form();
+        $client->submit($form);
+
+        self::assertResponseRedirects();
+        // No email address on file at all (not even a parent's) — sendCompletion() never reaches
+        // the transport, so nothing should be logged here, unlike CertificationLifecycleTest's
+        // equivalent step.
+        self::assertEmailCount(0);
+
+        $client->followRedirect();
+        self::assertStringContainsString('Certification approved', $client->getResponse()->getContent());
+        self::assertStringContainsString('trouble emailing', $client->getResponse()->getContent());
+
+        $em = static::getContainer()->get('doctrine')->getManager();
+        $em->clear();
+        /** @var UserCertification $refreshed */
+        $refreshed = $em->getRepository(UserCertification::class)->find($record->getId());
+        self::assertTrue($refreshed->isApproved());
+        self::assertTrue($refreshed->isHeld());
     }
 
     public function testResendingTheInvitationResetsTheKioskWindowForAnExpiredRecord(): void
@@ -152,10 +195,9 @@ class KioskCertificationTest extends WebTestCase
         $user->setPassword('unused — kiosk auth bypasses password checking entirely');
         $user->setRoles([]);
         $em->persist($user);
+        $em->flush();
 
-        $certification = new Certification();
-        $certification->setName(sprintf('TEMP Kiosk Cert %s', bin2hex(random_bytes(3))));
-        $em->persist($certification);
+        $certification = $this->createCertification(['I confirm I have read and understood the safety briefing.']);
 
         $record = new UserCertification();
         $record->setUser($user);
@@ -182,6 +224,42 @@ class KioskCertificationTest extends WebTestCase
         $client->submit($form);
     }
 
+    /** Satisfies completeCertification()'s "missing profile fields" gate so the wizard goes straight to declarations/signature — see CertificationLifecycleTest's identical need for the emailed-magic-link variant. */
+    private function fillRequiredProfileFields(User $user): void
+    {
+        $user->setEmergencyContactName('Someone');
+        $user->setEmergencyContactPhone('01234 567890');
+        $user->setDateOfBirth(new \DateTimeImmutable('1990-01-01'));
+        $user->setPhone('01234 000000');
+        $user->setAddressLine1('1 Test Street');
+        $user->setTown('Cardigan');
+        $user->setPostcode('SA43 1AA');
+        static::getContainer()->get('doctrine')->getManager()->flush();
+    }
+
+    /**
+     * Ticks every declaration, agrees to the signature consent, and submits a signature — assumes
+     * the client is already on (or has just been redirected to) the completion wizard. Posted
+     * directly rather than via a scraped Form object: several `declarations[]` checkboxes sharing
+     * one name don't collapse into a single settable multi-value field the way DomCrawler handles
+     * a real `<select multiple>` — see CertificationLifecycleTest for the same workaround.
+     */
+    private function completeCurrentWizard(KernelBrowser $client, UserCertification $record): void
+    {
+        $crawler   = $client->getCrawler();
+        $csrfToken = $crawler->filter('#complete-form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/account/certifications/' . $record->getId() . '/complete', [
+            '_csrf_token'        => $csrfToken,
+            'declarations'       => array_map(
+                static fn($d) => (string) $d->getId(),
+                $record->getCertification()->getDeclarations()->toArray(),
+            ),
+            'signature_consent'  => '1',
+            'signature'          => 'data:image/png;base64,iVBORw0KGgo=',
+        ]);
+    }
+
     protected function tearDown(): void
     {
         /** @var EntityManagerInterface $em */
@@ -199,13 +277,11 @@ class KioskCertificationTest extends WebTestCase
                 $em->remove($user);
             }
         }
-        if ($this->certificationId !== null) {
-            $certification = $em->getRepository(Certification::class)->find($this->certificationId);
-            if ($certification) {
-                $em->remove($certification);
-            }
-        }
         $em->flush();
+
+        if ($this->certificationId !== null) {
+            $this->removeCertification($this->certificationId);
+        }
 
         parent::tearDown();
     }
