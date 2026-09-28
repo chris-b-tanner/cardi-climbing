@@ -60,6 +60,10 @@ class Product
     #[ORM\Column(options: ['default' => true])]
     private bool $isActive = true;
 
+    /** S3 object key (not a full URL) for this product's photo — see ProductImageUploader. Null until an admin assigns one. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $imageS3Key = null;
+
     #[ORM\OneToOne(mappedBy: 'product', targetEntity: StockProduct::class, cascade: ['persist', 'remove'])]
     private ?StockProduct $stockProduct = null;
 
@@ -212,5 +216,16 @@ class Product
     public function getEventTicketProduct(): ?EventTicketProduct
     {
         return $this->eventTicketProduct;
+    }
+
+    public function getImageS3Key(): ?string
+    {
+        return $this->imageS3Key;
+    }
+
+    public function setImageS3Key(?string $imageS3Key): static
+    {
+        $this->imageS3Key = $imageS3Key;
+        return $this;
     }
 }

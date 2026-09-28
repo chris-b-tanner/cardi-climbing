@@ -16,6 +16,34 @@
 <div class="member-columns member-columns--halves">
 <div>
 
+{% set imageUrl = product_image_url(product) %}
+<div class="card product-photo-card">
+  <div class="product-photo-card__photo">
+    {% if imageUrl %}
+      <img src="{{ imageUrl }}" alt="" class="product-photo-card__img">
+    {% else %}
+      <span class="product-photo-card__placeholder">No photo</span>
+    {% endif %}
+  </div>
+  <div>
+    <div class="card__label" style="margin-bottom:0.3rem;">Photo</div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.6rem;">Shown on the products list, the online shop, and POS. JPEG, PNG, WebP, or GIF — up to 5MB.</p>
+    <div style="display:flex;gap:0.5rem;">
+      <form method="post" action="{{ path('app_admin_settings_product_image_upload', {id: product.id}) }}" enctype="multipart/form-data" id="product-image-upload-form">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_image_' ~ product.id) }}">
+        <input type="file" name="image" id="product-image-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;">
+        <button type="button" class="btn btn--ghost btn--sm" id="product-image-choose-btn">{{ imageUrl ? 'Change photo' : 'Upload photo' }}</button>
+      </form>
+      {% if imageUrl %}
+        <form method="post" action="{{ path('app_admin_settings_product_image_remove', {id: product.id}) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_image_' ~ product.id) }}">
+          <button type="submit" class="btn btn--ghost btn--sm">Remove</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <form method="post" action="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" novalidate>
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_product_edit_' ~ product.id) }}">
 
@@ -219,4 +247,29 @@
   </div>
 </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .product-photo-card { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.25rem; }
+  .product-photo-card__photo { flex-shrink: 0; width: 88px; height: 88px; }
+  .product-photo-card__img, .product-photo-card__placeholder {
+    width: 88px; height: 88px; border-radius: var(--radius); object-fit: cover;
+    background: var(--bg); display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; color: var(--muted); border: 1px solid var(--border);
+  }
+</style>
+<script>
+  (function () {
+    const chooseBtn  = document.getElementById('product-image-choose-btn');
+    const fileInput  = document.getElementById('product-image-file-input');
+    const uploadForm = document.getElementById('product-image-upload-form');
+    if (!chooseBtn) return;
+
+    chooseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) uploadForm.submit();
+    });
+  })();
+</script>
 {% endblock %}

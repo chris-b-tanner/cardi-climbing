@@ -48,6 +48,12 @@
             <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
             <input type="hidden" name="productId" value="{{ product.id }}">
             <button type="submit" class="product-tile">
+              {% if product.productType == 'stock' %}
+                {% set imageUrl = product_image_url(product) %}
+                {% if imageUrl %}
+                  <img src="{{ imageUrl }}" alt="" class="product-tile__img">
+                {% endif %}
+              {% endif %}
               <span class="product-tile__name">
                 {{ product.name }}{% if product.variantValue %}<br><small>{{ product.variantValue }}</small>{% endif %}
                 {% if isRecurringEvent %}<br><small>Multiple dates</small>{% elseif eventTicketProduct %}<br><small>{{ eventTicketProduct.event.date|date('d M Y') }}</small>{% endif %}
@@ -387,6 +393,7 @@
   }
   .product-tile:hover { border-color: var(--teal); background: #f0fdfa; }
   .product-tile:disabled { opacity: 0.55; cursor: default; pointer-events: none; }
+  .product-tile__img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; }
   .product-tile__name { font-size: 0.85rem; font-weight: 500; color: var(--black); }
   .product-tile__name small { font-weight: 400; color: var(--muted); }
   .product-tile__price { font-size: 0.8rem; color: var(--teal-dk); font-weight: 600; }

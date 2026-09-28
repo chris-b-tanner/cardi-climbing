@@ -47,7 +47,7 @@
         <span class="tag-badge--none" id="tag-list-empty"{% if user.tags is not empty %} style="display:none;"{% endif %}>No tags assigned</span>
         {% for tag in user.tags %}
           <span class="tag-badge tag-badge--removable" data-tag-id="{{ tag.id }}" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">
-            {{ tag.name }}
+            <a href="{{ path('app_admin_users', {tag: tag.id}) }}" class="tag-badge__link" title="View all members tagged {{ tag.name }}">{{ tag.name }}</a>
             <button type="button" class="tag-badge__remove" data-tag-id="{{ tag.id }}" aria-label="Remove tag {{ tag.name }}">&times;</button>
           </span>
         {% endfor %}
@@ -788,6 +788,7 @@
     const addUrl     = {{ path('app_admin_user_tag_add', {id: user.id})|json_encode|raw }};
     const removeUrl  = {{ path('app_admin_user_tag_remove', {id: user.id})|json_encode|raw }};
     const csrfToken  = {{ csrf_token('admin_user_tags_' ~ user.id)|json_encode|raw }};
+    const tagFilterUrl = {{ path('app_admin_users')|json_encode|raw }};
 
     function showError(message) {
       errorBox.textContent = message;
@@ -866,7 +867,8 @@
           chip.dataset.tagId = data.id;
           chip.style.background = 'color-mix(in srgb, ' + data.color + ' 15%, white)';
           chip.style.color      = data.color;
-          chip.innerHTML = data.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))
+          const escapedName = data.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+          chip.innerHTML = '<a href="' + tagFilterUrl + '?tag=' + encodeURIComponent(data.id) + '" class="tag-badge__link" title="View all members tagged ' + data.name.replace(/"/g, '&quot;') + '">' + escapedName + '</a>'
             + ' <button type="button" class="tag-badge__remove" data-tag-id="' + data.id + '" aria-label="Remove tag ' + data.name.replace(/"/g, '&quot;') + '">&times;</button>';
           tagList.insertBefore(chip, picker);
           tagListEmpty.style.display = 'none';

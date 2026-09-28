@@ -21,12 +21,20 @@
         {% for product in products %}
           <tr>
             <td>
-              <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="admin-table__link">
-                {{ product.name }}
-              </a>
-              {% if product.variantName or product.variantValue %}
-                <div style="font-size:0.72rem;color:var(--muted);">{{ product.variantName ?: 'Variant' }}: {{ product.variantValue ?: '—' }}</div>
-              {% endif %}
+              {% set imageUrl = product_image_url(product) %}
+              <div style="display:flex;align-items:flex-start;gap:0.5rem;">
+                {% if imageUrl %}
+                  <img src="{{ imageUrl }}" alt="" style="width:2rem;height:2rem;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;">
+                {% endif %}
+                <div>
+                  <a href="{{ path('app_admin_settings_product_edit', {id: product.id}) }}" class="admin-table__link">
+                    {{ product.name }}
+                  </a>
+                  {% if product.variantName or product.variantValue %}
+                    <div style="font-size:0.72rem;color:var(--muted);">{{ product.variantName ?: 'Variant' }}: {{ product.variantValue ?: '—' }}</div>
+                  {% endif %}
+                </div>
+              </div>
             </td>
             <td class="admin-table__muted">{{ product.productTypeLabel }}</td>
             <td class="admin-table__muted">

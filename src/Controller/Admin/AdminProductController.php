@@ -17,6 +17,7 @@ use App\Repository\MembershipTypeRepository;
 use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\StockProductRepository;
+use App\Service\ProductImageUploader;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -165,6 +166,60 @@ class AdminProductController extends AbstractController
             'events'          => $eventRepository->findAllOrdered(),
             'notes'           => $noteRepository->findForNoteable(Note::TYPE_PRODUCT, $product->getId()),
         ]);
+    }
+
+    /** A dedicated, separate action from the main edit form — a file upload needs its own multipart encoding, and a photo change doesn't belong in the same submit/validation cycle as the rest of the product's fields. */
+    #[Route('/{id}/image', name: 'app_admin_settings_product_image_upload', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function uploadImage(Request $request, Product $product, EntityManagerInterface $em, ProductImageUploader $productImageUploader, ProductRepository $productRepository): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_product_image_' . $product->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $file = $request->files->get('image');
+        if (!$file) {
+            $this->addFlash('error', 'Please choose a photo to upload.');
+            return $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $product->getId()]);
+        }
+
+        $error = $productImageUploader->upload($product, $file);
+
+        if ($error) {
+            $this->addFlash('error', $error);
+        } else {
+            $this->applyImageToVariantGroup($productRepository, $product);
+            $em->flush();
+            $this->addFlash('success', 'Product photo updated.');
+        }
+
+        return $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $product->getId()]);
+    }
+
+    #[Route('/{id}/image/remove', name: 'app_admin_settings_product_image_remove', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function removeImage(Request $request, Product $product, EntityManagerInterface $em, ProductImageUploader $productImageUploader, ProductRepository $productRepository): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_product_image_' . $product->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        $productImageUploader->remove($product);
+        $this->applyImageToVariantGroup($productRepository, $product);
+        $em->flush();
+
+        $this->addFlash('success', 'Product photo removed.');
+        return $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $product->getId()]);
+    }
+
+    /** Products sharing a name form a variant group (see buildProduct()) — a photo change applies to the whole group, not just the one edited. */
+    private function applyImageToVariantGroup(ProductRepository $productRepository, Product $product): void
+    {
+        foreach ($productRepository->findBy(['name' => $product->getName()]) as $sibling) {
+            if ($sibling !== $product) {
+                $sibling->setImageS3Key($product->getImageS3Key());
+            }
+        }
     }
 
     #[Route('/{id}/delete', name: 'app_admin_settings_product_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
