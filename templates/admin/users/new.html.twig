@@ -31,24 +31,28 @@
           <label for="company">Company</label>
           <input type="text" id="company" name="company" class="form-control dup-check" autocomplete="off">
         </div>
+        <div class="form-group" id="website-group" style="display:none;">
+          <label for="website">Website</label>
+          <input type="text" id="website" name="website" class="form-control" placeholder="example.com" autocomplete="url">
+        </div>
         <div class="form-group">
           <label for="email">Email</label>
           <input type="email" id="email" name="email" class="form-control dup-check" autocomplete="off">
         </div>
         <div class="form-group">
-          <label for="phone">Phone</label>
-          <input type="tel" id="phone" name="phone" class="form-control dup-check" autocomplete="off">
-        </div>
-        <div class="form-group">
-          <label for="dateOfBirth">Date of birth</label>
-          <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" autocomplete="off">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
           <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
             <input type="checkbox" name="optIn" value="1" checked
                    style="width:1rem;height:1rem;accent-color:var(--teal);">
             Opted in to mailing list
           </label>
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" class="form-control dup-check" autocomplete="off">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="dateOfBirth">Date of birth</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" autocomplete="off">
         </div>
       </div>
 
@@ -159,5 +163,15 @@
   }
 
   dupFields.forEach(field => field.addEventListener('blur', checkForDuplicates));
+
+  const companyField = document.getElementById('company');
+  const websiteGroup = document.getElementById('website-group');
+
+  function toggleWebsiteGroup() {
+    websiteGroup.style.display = companyField.value.trim() !== '' ? '' : 'none';
+  }
+
+  companyField.addEventListener('input', toggleWebsiteGroup);
+  toggleWebsiteGroup();
 </script>
 {% endblock %}

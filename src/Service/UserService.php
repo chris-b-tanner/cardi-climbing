@@ -58,6 +58,7 @@ class UserService
         ?string $phone = null,
         bool $optIn = false,
         ?string $company = null,
+        ?string $website = null,
     ): User {
         $user = new User();
         $user->setEmail($email);
@@ -65,8 +66,10 @@ class UserService
         $user->setLastName($lastName ?: null);
         $user->setDateOfBirth($dateOfBirth);
         $user->setPhone($phone ?: null);
-        $user->setOptIn($optIn);
+        // Opting in makes no sense with no address to send anything to.
+        $user->setOptIn($optIn && $email !== null);
         $user->setCompany($company ?: null);
+        $user->setWebsite($website ?: null);
         // No login for this contact until they set a password via "forgot password" — requires an email on file.
         $user->setPassword($this->hasher->hashPassword($user, bin2hex(random_bytes(32))));
 

@@ -37,17 +37,19 @@
             {% endif %}
             <td>
               {% set avatarUrl = avatar_url(user) %}
+              {% set hasName = user.firstName or user.lastName %}
+              {% set primaryName = hasName ? displayName : (user.company ?: displayName) %}
               <div style="display:flex;align-items:center;gap:0.5rem;">
                 {% if avatarUrl %}
                   <img src="{{ avatarUrl }}" alt="" style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;object-fit:cover;">
                 {% else %}
                   <span style="flex-shrink:0;width:1.75rem;height:1.75rem;border-radius:50%;background:#eef2f1;color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">
-                    {{ (displayName ?: user.email)|slice(0, 1)|upper }}
+                    {{ (primaryName ?: user.email)|slice(0, 1)|upper }}
                   </span>
                 {% endif %}
                 <div>
                   <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="admin-table__link">
-                    {{ displayName ?: '—' }}
+                    {{ primaryName ?: '—' }}
                   </a>
                   {% if user.parent %}
                     <a href="{{ path('app_admin_user_show', {id: user.parent.id}) }}#family" class="family-icon"
@@ -56,7 +58,7 @@
                     <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
                        title="Has dependents"><i class="bi bi-people-fill"></i></a>
                   {% endif %}
-                  {% if user.company %}
+                  {% if hasName and user.company %}
                     <div class="admin-table__muted" style="font-size:0.78rem;">{{ user.company }}</div>
                   {% endif %}
                 </div>

@@ -187,6 +187,7 @@ class AdminController extends AbstractController
                     phone: trim($request->request->get('phone', '')),
                     optIn: $request->request->has('optIn'),
                     company: trim($request->request->get('company', '')),
+                    website: trim($request->request->get('website', '')),
                 );
 
                 $memo = trim($request->request->get('memo', ''));
