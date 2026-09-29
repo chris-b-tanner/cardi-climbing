@@ -1,7 +1,9 @@
 {% extends 'admin/base.html.twig' %}
 
-{% set displayName = (user.firstName or user.lastName) ? user.displayName : (user.company ?: user.displayName) %}
-{% block title %}#{{ user.id }} {{ displayName ?: user.email }}{% endblock %}
+{% set hasName = user.firstName or user.lastName %}
+{% set displayName = hasName ? user.displayName : (user.company ?: user.displayName) %}
+{% set titleName = displayName ~ (hasName and user.company ? ' (' ~ user.company ~ ')' : '') %}
+{% block title %}#{{ user.id }} {{ titleName ?: user.email }}{% endblock %}
 {% block og_title %}{{ displayName ?: user.email }} — Y Wal{% endblock %}
 {% block og_description %}{{ displayName ?: user.email }}{% if user.email %} · {{ user.email }}{% endif %}{% endblock %}
 
@@ -23,7 +25,7 @@
       <h1>
         <span class="member-id">#{{ user.id }}</span>
         <a href="{{ path('app_admin_users') }}" class="page-header__crumb">People</a> &raquo;
-        {{ displayName ?: user.email }}
+        {{ titleName ?: user.email }}
         {% if activeMembership %}
           <span class="status-pill status-pill--published" style="margin-left:0.5rem;font-size:0.7rem;vertical-align:middle;">{{ activeMembership.membershipType.name }}</span>
         {% elseif user.creditBalance > 0 %}
