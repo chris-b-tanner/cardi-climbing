@@ -441,13 +441,10 @@ class AdminController extends AbstractController
         Request $request,
         User $user,
         EntityManagerInterface $em,
-        TagRepository $tagRepository,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
         UserService $userService,
-        AccessCardRepository $accessCardRepository,
     ): Response {
-        $allTags = $tagRepository->findBy([], ['name' => 'ASC']);
         $canHaveDependents = $user->getParent() === null && $user->getEmail() !== null;
 
         if ($request->isMethod('POST')) {
@@ -517,23 +514,6 @@ class AdminController extends AbstractController
                 } else {
                     $user->setKeyholderPin($keyholderPin);
                 }
-
-                // Card linking/locking is handled by its own dedicated actions (AdminCardScanController)
-                // — deliberately not part of this form, so saving an unrelated field here can never
-                // touch the card record as a side effect. See card-setup.md's "Why two real tables".
-            }
-
-            $submittedTagIds = array_map('intval', $request->request->all('tags'));
-
-            foreach ($user->getTags() as $tag) {
-                if (!in_array($tag->getId(), $submittedTagIds, true)) {
-                    $user->removeTag($tag);
-                }
-            }
-            foreach ($allTags as $tag) {
-                if (in_array($tag->getId(), $submittedTagIds, true) && !$user->hasTag($tag)) {
-                    $user->addTag($tag);
-                }
             }
 
             if ($canHaveDependents) {
@@ -566,10 +546,8 @@ class AdminController extends AbstractController
 
         return $this->render('admin/users/edit.html.twig', [
             'user'              => $user,
-            'allTags'           => $allTags,
             'canHaveDependents' => $canHaveDependents,
             'bookings'          => $attendeeRepository->findAllForUser($user),
-            'accessCard'        => $accessCardRepository->findCurrentForUser($user),
         ]);
     }
 

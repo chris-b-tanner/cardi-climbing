@@ -3,10 +3,3 @@ controllers:
         path: ../src/Controller/
         namespace: App\Controller
     type: attribute
-
-crowdfunder_redirect:
-    path: /cf
-    controller: Symfony\Bundle\FrameworkBundle\Controller\RedirectController
-    defaults:
-        path: 'https://www.crowdfunder.co.uk/p/cardigan-climbing-and-bouldering?tk=MTc5MDk3MTM2NDgxNWRhNDhmZmIzZDEyYjcwZmNhODM5Y2NmMmQ5NTE4YmFmODMyMmQ%3D'
-        permanent: false

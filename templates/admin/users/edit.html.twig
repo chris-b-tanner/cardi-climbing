@@ -105,30 +105,6 @@
           alarm for a few seconds. Leave blank for everyone else.
         </p>
       </div>
-      <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
-        <label>Access card</label>
-        {% if accessCard %}
-          <p style="font-size:0.9375rem;margin-bottom:0.35rem;">
-            <span style="font-family:'Courier New', monospace;letter-spacing:0.08em;">{{ accessCard.uid }}</span>
-            {% if accessCard.isLocked %}
-              <span class="status-pill status-pill--cancelled" style="margin-left:0.4rem;">Locked</span>
-            {% endif %}
-          </p>
-          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;">
-            Deployed {{ accessCard.deployedAt|date('j M Y') }}{% if accessCard.deployedBy %} by {{ accessCard.deployedBy.displayName }}{% endif %}
-            {%- if accessCard.isLocked and accessCard.lockedAt %}
-              &middot; Locked {{ accessCard.lockedAt|date('j M Y') }}{% if accessCard.lockedBy %} by {{ accessCard.lockedBy.displayName }}{% endif %}
-            {% endif %}
-          </p>
-        {% else %}
-          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.6rem;">No card registered.</p>
-        {% endif %}
-        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;margin-bottom:0;">
-          Use the "Scan card" button on this member's own contact page (which also has lock/unlock)
-          to link a new card — it replaces whatever card this member had before. Not part of this
-          form, so saving other changes here can never touch the card record as a side effect.
-        </p>
-      </div>
     {% endif %}
   </div>
 
@@ -172,29 +148,6 @@
                value="{{ user.emergencyContactPhone }}" autocomplete="off">
       </div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card__label" style="margin-bottom:0.75rem;">Tags</div>
-    {% if allTags is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;">
-        No tags exist yet —
-        {% if is_granted('ROLE_ADMIN') %}
-          <a href="{{ path('app_admin_settings_tag_new') }}">create one</a> to start categorising members.
-        {% else %}
-          ask an admin to set one up to start categorising members.
-        {% endif %}
-      </p>
-    {% else %}
-      <div class="tag-grid">
-        {% for tag in allTags %}
-          <input type="checkbox" id="tag_{{ tag.id }}" name="tags[]"
-                 value="{{ tag.id }}" class="tag-check"
-                 {% if user.hasTag(tag) %}checked{% endif %}>
-          <label for="tag_{{ tag.id }}" class="tag-check-label">{{ tag.name }}</label>
-        {% endfor %}
-      </div>
-    {% endif %}
   </div>
 
   <div class="card">
