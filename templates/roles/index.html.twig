@@ -17,6 +17,13 @@
     <p>{{ 'job_cm_intro_1'|trans }}</p>
     <p>{{ 'job_cm_intro_2'|trans }}</p>
 
+    <h3>{{ 'job_cm_prelaunch_h'|trans }}</h3>
+    <ul>
+      {% for i in 1..5 %}
+        <li>{{ ('job_cm_prelaunch_' ~ i)|trans }}</li>
+      {% endfor %}
+    </ul>
+
     <h3>{{ 'job_cm_doing_h'|trans }}</h3>
     <ul>
       {% for i in 1..5 %}
