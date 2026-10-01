@@ -28,7 +28,7 @@
               placeholder="Add a note…" style="resize:vertical;"></textarea>
   </div>
   <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-    <button type="submit" class="btn btn--teal btn--sm">Add note</button>
+    <button type="submit" id="note-submit-{{ noteableType }}-{{ noteableId }}" class="btn btn--teal btn--sm">Add note</button>
     <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
       <input type="checkbox" name="pinned" value="1" style="width:1rem;height:1rem;accent-color:var(--teal);">
       Pinned
@@ -133,8 +133,8 @@
 
 <script>
   (function () {
-    // Shows/requires the Subject field, and doubles the note textarea's row count, only while
-    // "Email {address}" is ticked — a plain note never needs either, but a note that's actually
+    // Shows/requires the Subject field, doubles the note textarea's row count, and relabels the
+    // submit button "Send email", only while "Email {address}" is ticked — a plain note never needs either, but a note that's actually
     // going out as an email always needs a subject (enforced again server-side — see
     // AdminNoteController::add()) and tends to run longer than a quick internal note.
     document.querySelectorAll('.note-email-subject').forEach((wrap) => {
@@ -142,14 +142,17 @@
       const toggle  = document.getElementById('note-email-toggle-' + suffix);
       const input   = wrap.querySelector('input[name="subject"]');
       const content = document.getElementById('note-content-' + suffix);
-      if (!toggle || !input || !content) return;
+      const submit  = document.getElementById('note-submit-' + suffix);
+      if (!toggle || !input || !content || !submit) return;
 
-      const baseRows = content.rows;
+      const baseRows  = content.rows;
+      const baseLabel = submit.textContent;
 
       toggle.addEventListener('change', () => {
         wrap.style.display = toggle.checked ? 'block' : 'none';
         input.required = toggle.checked;
         content.rows = toggle.checked ? baseRows * 2 : baseRows;
+        submit.textContent = toggle.checked ? 'Send email' : baseLabel;
 
         if (toggle.checked) {
           // Defaults to "Re: {whatever the thread's last message used}" — never overwrites

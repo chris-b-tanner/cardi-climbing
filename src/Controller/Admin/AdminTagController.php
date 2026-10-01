@@ -37,6 +37,7 @@ class AdminTagController extends AbstractController
 
             $name  = trim($request->request->get('name', ''));
             $color = trim($request->request->get('color', ''));
+            $remindAfterDays = trim($request->request->get('remindAfterDays', ''));
 
             if ($name === '') {
                 $error = 'Name is required.';
@@ -44,12 +45,15 @@ class AdminTagController extends AbstractController
                 $error = 'A tag with that name already exists.';
             } elseif ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
                 $error = 'Colour must be a valid hex value.';
+            } elseif ($remindAfterDays !== '' && (!ctype_digit($remindAfterDays) || (int) $remindAfterDays < 1)) {
+                $error = 'Remind after must be a whole number of days, 1 or more.';
             } else {
                 $tag = new Tag();
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
                 $tag->setPublic($request->request->has('public'));
                 $tag->setColor($color ?: null);
+                $tag->setRemindAfterDays($remindAfterDays !== '' ? (int) $remindAfterDays : null);
 
                 $em->persist($tag);
                 $em->flush();
@@ -77,6 +81,7 @@ class AdminTagController extends AbstractController
 
             $name      = trim($request->request->get('name', ''));
             $color     = trim($request->request->get('color', ''));
+            $remindAfterDays = trim($request->request->get('remindAfterDays', ''));
             $duplicate = $tagRepository->findOneBy(['name' => $name]);
 
             if ($name === '') {
@@ -85,11 +90,14 @@ class AdminTagController extends AbstractController
                 $error = 'A tag with that name already exists.';
             } elseif ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
                 $error = 'Colour must be a valid hex value.';
+            } elseif ($remindAfterDays !== '' && (!ctype_digit($remindAfterDays) || (int) $remindAfterDays < 1)) {
+                $error = 'Remind after must be a whole number of days, 1 or more.';
             } else {
                 $tag->setName($name);
                 $tag->setDescription(trim($request->request->get('description', '')) ?: null);
                 $tag->setPublic($request->request->has('public'));
                 $tag->setColor($color ?: null);
+                $tag->setRemindAfterDays($remindAfterDays !== '' ? (int) $remindAfterDays : null);
 
                 $em->flush();
 

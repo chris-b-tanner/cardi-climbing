@@ -1,4 +1,8 @@
-<div class="result-count">{{ users|length }} {{ users|length == 1 ? 'member' : 'members' }}</div>
+{% set staleIds = staleIds|default([]) %}
+<div class="result-count">
+  {{ users|length }} {{ users|length == 1 ? 'member' : 'members' }}
+  {%- if staleIds is not empty %} &middot; {{ staleIds|length }} not contacted in {{ filterTag.remindAfterDays }}+ days{% endif %}
+</div>
 
 {% if users is empty %}
   <div class="empty">
@@ -28,7 +32,9 @@
       <tbody>
         {% for user in users %}
           {% set displayName = user.displayName %}
-          <tr>
+          {% set isStale = user.id in staleIds %}
+          {% set lastTouched = user.lastActivityAt %}
+          <tr{% if isStale %} class="is-stale" title="Due a contact — {{ lastTouched ? 'last contacted ' ~ lastTouched|date('j M Y') : 'no contact recorded' }}"{% endif %}>
             {% if context != 'new_sale' and is_granted('ROLE_ADMIN') %}
               <td class="admin-table__check">
                 <label title="Select for merge">
@@ -73,7 +79,7 @@
             </td>
             <td>
               {% for tag in user.tags %}
-                <span class="tag-badge" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};">{{ tag.name }}</span>
+                <span class="tag-badge" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};"><a href="{{ path('app_admin_users', {tag: tag.id}) }}" class="tag-badge__link" title="View all members tagged {{ tag.name }}">{{ tag.name }}</a></span>
               {% else %}
                 <span class="admin-table__muted">—</span>
               {% endfor %}

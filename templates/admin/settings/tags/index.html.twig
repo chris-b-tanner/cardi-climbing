@@ -20,6 +20,7 @@
           <th>Name</th>
           <th>Description</th>
           <th>Public</th>
+          <th>Remind after</th>
           <th>Used by</th>
           <th></th>
         </tr>
@@ -41,6 +42,7 @@
                 <span class="admin-table__muted">—</span>
               {% endif %}
             </td>
+            <td class="admin-table__muted">{{ tag.remindAfterDays ? tag.remindAfterDays ~ (tag.remindAfterDays == 1 ? ' day' : ' days') : '—' }}</td>
             <td class="admin-table__muted">{{ tag.users|length }}</td>
             <td>
               <a href="{{ path('app_admin_settings_tag_edit', {id: tag.id}) }}" class="admin-table__link">Edit</a>

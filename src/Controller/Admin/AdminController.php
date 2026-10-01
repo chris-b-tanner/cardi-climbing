@@ -51,10 +51,23 @@ class AdminController extends AbstractController
         $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId);
         $parentIds = $userRepository->findParentIds();
 
+        // Filtered by a tag with a reminder interval: anyone overdue a contact under it is pinned to
+        // the top (keeping the chosen sort within each group) and highlighted — see Tag::isStale().
+        $staleIds  = [];
+        $filterTag = $tagId !== null ? $tagRepository->find($tagId) : null;
+        if ($filterTag?->getRemindAfterDays() !== null) {
+            $now   = new \DateTimeImmutable();
+            $stale = array_filter($users, static fn (User $u) => $filterTag->isStale($u, $now));
+            $users = [...array_values($stale), ...array_values(array_diff_key($users, $stale))];
+            $staleIds = array_map(static fn (User $u) => $u->getId(), $stale);
+        }
+
         if ($request->isXmlHttpRequest()) {
             return $this->render('admin/users/_list.html.twig', [
                 'users'          => $users,
                 'parentIds'      => $parentIds,
+                'staleIds'       => $staleIds,
+                'filterTag'      => $filterTag,
                 'currentSort'    => $sort,
                 'currentDir'     => $dir,
                 'context'        => $context,
@@ -68,6 +81,8 @@ class AdminController extends AbstractController
         return $this->render('admin/users/index.html.twig', [
             'users'           => $users,
             'parentIds'       => $parentIds,
+            'staleIds'        => $staleIds,
+            'filterTag'       => $filterTag,
             'tags'            => $tags,
             'tagDescriptions' => array_combine(
                 array_map(static fn ($t) => $t->getId(), $tags),

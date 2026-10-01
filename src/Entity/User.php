@@ -49,6 +49,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastLoginAt = null;
 
+    /** When we last interacted with this contact (note, payment, booking, sale, membership, certification) — kept up to date by LastActivityListener. Null = no recorded interaction; see Tag::isStale(). */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastActivityAt = null;
+
     #[ORM\Column(options: ['default' => true])]
     private bool $optIn = true;
 
@@ -284,6 +288,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setLastLoginAt(\DateTimeImmutable $lastLoginAt): static
     {
         $this->lastLoginAt = $lastLoginAt;
+        return $this;
+    }
+
+    public function getLastActivityAt(): ?\DateTimeImmutable
+    {
+        return $this->lastActivityAt;
+    }
+
+    public function setLastActivityAt(?\DateTimeImmutable $lastActivityAt): static
+    {
+        $this->lastActivityAt = $lastActivityAt;
         return $this;
     }
 

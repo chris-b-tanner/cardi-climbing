@@ -37,6 +37,15 @@
         <span class="tag-badge" id="color-preview" style="background:color-mix(in srgb, {{ defaultColor }} 15%, white); color:{{ defaultColor }};">Preview</span>
       </div>
     </div>
+    <div class="form-group">
+      <label for="remindAfterDays">Remind after (days)</label>
+      <input type="number" id="remindAfterDays" name="remindAfterDays" class="form-control" style="max-width:9rem;"
+             min="1" step="1" value="{{ app.request.request.get('remindAfterDays') }}" placeholder="Never" autocomplete="off">
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">
+        Members with this tag who haven't been contacted (note, payment, booking, sale…) in this many days
+        are pinned to the top of the members list and highlighted when you filter by this tag. Leave blank for no reminder.
+      </p>
+    </div>
     <div class="form-group" style="margin-bottom:0;">
       <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
         <input type="checkbox" name="public" value="1"{% if app.request.request.get('public') %} checked{% endif %}

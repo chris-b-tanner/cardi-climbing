@@ -1,23 +1,46 @@
 {% extends 'base.html.twig' %}
 
 {% block title %}{{ 'roles_meta_title'|trans }}{% endblock %}
-{% block og_title %}{{ 'roles_h1'|trans }} — Y Wal{% endblock %}
+{% block og_title %}{{ 'job_cm_title'|trans }} — Y Wal{% endblock %}
 
 {% block content %}
 <section class="section page-hero">
   <div class="wrap">
-    <h1 class="page-hero__h1">{{ 'roles_h1'|trans }}</h1>
-    <p class="page-hero__sub">{{ 'roles_intro'|trans }}</p>
+    <span class="job__badge">{{ 'job_cm_badge'|trans }}</span>
+    <h1 class="page-hero__h1">{{ 'job_cm_title'|trans }}</h1>
+    <p class="job__meta">{{ 'job_cm_meta'|trans }}</p>
   </div>
 </section>
 
-<section class="section section--off">
+<section class="section job">
   <div class="wrap">
+    <p>{{ 'job_cm_intro_1'|trans }}</p>
+    <p>{{ 'job_cm_intro_2'|trans }}</p>
+
+    <h3>{{ 'job_cm_doing_h'|trans }}</h3>
+    <ul>
+      {% for i in 1..5 %}
+        <li>{{ ('job_cm_doing_' ~ i)|trans }}</li>
+      {% endfor %}
+    </ul>
+
+    <h3>{{ 'job_cm_looking_h'|trans }}</h3>
+    <p>{{ 'job_cm_essential'|trans|raw }}</p>
+    <p>{{ 'job_cm_bonus'|trans }}</p>
+    <p>{{ 'job_cm_hours'|trans|raw }}</p>
+
+    <div class="adv__cta-block job__apply">
+      <p>{{ 'job_cm_apply'|trans }}</p>
+      <a href="mailto:hello@cardiganclimbing.org?subject={{ 'job_cm_apply_subject'|trans|url_encode }}" class="btn btn--teal">{{ 'job_cm_apply_btn'|trans }}</a>
+    </div>
+  </div>
+</section>
+
+<section class="section section--off" id="volunteer">
+  <div class="wrap">
+    <h2>{{ 'roles_h1'|trans }}</h2>
+    <p class="roles__intro">{{ 'roles_intro'|trans }}</p>
     <div class="involved__ways">
-      <div class="way">
-        <h3>{{ 'roles_smm_title'|trans }}</h3>
-        <p>{{ 'roles_smm_body'|trans }}</p>
-      </div>
       <div class="way">
         <h3>{{ 'roles_building_title'|trans }}</h3>
         <p>{{ 'roles_building_body'|trans }}</p>
@@ -25,6 +48,10 @@
       <div class="way">
         <h3>{{ 'roles_event_managers_title'|trans }}</h3>
         <p>{{ 'roles_event_managers_body'|trans }}</p>
+      </div>
+      <div class="way way--filled">
+        <h3>{{ 'roles_smm_title'|trans }}<span class="way__badge">{{ 'roles_filled_badge'|trans }}</span></h3>
+        <p>{{ 'roles_smm_body'|trans }}</p>
       </div>
       <div class="way way--filled">
         <h3>{{ 'roles_grants_title'|trans }}<span class="way__badge">{{ 'roles_filled_badge'|trans }}</span></h3>
@@ -37,7 +64,7 @@
 <section class="section">
   <div class="wrap adv__cta-block">
     <p>{{ 'roles_cta'|trans }}</p>
-    <a href="mailto:cardiganclimbing@gmail.com" class="btn btn--teal">{{ 'adv_cta_btn'|trans }}</a>
+    <a href="mailto:hello@cardiganclimbing.org" class="btn btn--teal">{{ 'adv_cta_btn'|trans }}</a>
   </div>
 </section>
 {% endblock %}
