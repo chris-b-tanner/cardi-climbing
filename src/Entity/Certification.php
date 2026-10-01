@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\CertificationRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CertificationRepository::class)]
@@ -18,7 +19,7 @@ class Certification
     #[ORM\Column(length: 100, unique: true)]
     private string $name;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
     #[ORM\OneToMany(targetEntity: UserCertification::class, mappedBy: 'certification')]
