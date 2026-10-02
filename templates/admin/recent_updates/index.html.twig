@@ -1,0 +1,115 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Recent updates{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_users') }}" class="page-header__crumb">People</a> &raquo; Recent updates</h1>
+</div>
+
+<div class="filter-form">
+  <input type="search" id="updates-q" placeholder="Search notes…" style="flex:0 0 22rem;"
+         value="{{ currentQuery }}" aria-label="Search note text" autocomplete="off" autofocus>
+  <select id="updates-tag" aria-label="Filter by tag">
+    <option value="">All tags</option>
+    {% for tag in tags %}
+      <option value="{{ tag.id }}"{% if currentTagId == tag.id %} selected{% endif %}>{{ tag.name }}</option>
+    {% endfor %}
+  </select>
+  <select id="updates-assigned-to" aria-label="Filter by the person's assignee">
+    <option value="">Assigned to anyone</option>
+    <option value="unassigned"{% if currentAssignedToId is same as(0) %} selected{% endif %}>Unassigned</option>
+    {% for member in staff %}
+      <option value="{{ member.id }}"{% if currentAssignedToId == member.id %} selected{% endif %}>{{ member.displayName }}</option>
+    {% endfor %}
+  </select>
+</div>
+<p class="admin-table__muted" style="font-size:0.78rem;margin-top:-0.5rem;margin-bottom:1rem;">
+  Tag and assignee filters apply to the person each note is about, so event and product notes only show when neither is set.
+</p>
+
+<div id="results">
+  {% include 'admin/recent_updates/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<style>
+  .updates-feed { display: flex; flex-direction: column; gap: 0.75rem; max-width: 52rem; }
+  .update-card { margin-bottom: 0; }
+  .update-card--pinned { background: #fefce8; border-color: #fde047; }
+  .update-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+  .update-card__target { display: flex; align-items: baseline; gap: 0.45rem; font-weight: 600; min-width: 0; }
+  .update-card__target .bi { color: var(--muted); }
+  .update-card__date { font-size: 0.78rem; white-space: nowrap; }
+  .update-card__tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+  .update-card__subject { font-size: 0.78rem; color: var(--teal-dk); margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.35rem; }
+  .update-card__content {
+    font-size: 0.9rem; white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 0.4rem;
+    display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .update-card__content.is-expanded { display: block; overflow: visible; }
+  .update-card__more {
+    border: none; background: none; padding: 0; font: inherit; font-size: 0.75rem;
+    color: var(--teal-dk); text-decoration: underline; cursor: pointer; margin-bottom: 0.4rem;
+  }
+  .update-card__meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 0; }
+</style>
+<script>
+  (function () {
+    const endpoint         = {{ path('app_admin_recent_updates')|json_encode|raw }};
+    const searchInput      = document.getElementById('updates-q');
+    const tagSelect        = document.getElementById('updates-tag');
+    const assignedToSelect = document.getElementById('updates-assigned-to');
+    const results          = document.getElementById('results');
+    let debounce = null;
+    let requestToken = 0;
+
+    // Only offer "Show more" on notes actually cut off by the 6-line clamp.
+    function setUpShowMore() {
+      results.querySelectorAll('.update-card__content').forEach((content) => {
+        const toggle = content.nextElementSibling;
+        if (toggle && content.scrollHeight > content.clientHeight + 1) {
+          toggle.hidden = false;
+        }
+      });
+    }
+
+    results.addEventListener('click', (e) => {
+      const toggle = e.target.closest('.update-card__more');
+      if (!toggle) return;
+      const content = toggle.previousElementSibling;
+      const expanded = content.classList.toggle('is-expanded');
+      toggle.textContent = expanded ? 'Show less' : 'Show more';
+    });
+
+    function fetchResults() {
+      const params = new URLSearchParams();
+      if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
+      if (tagSelect.value)          params.set('tag', tagSelect.value);
+      if (assignedToSelect.value)   params.set('assignedTo', assignedToSelect.value);
+
+      const qs = params.toString();
+      history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+
+      const thisToken = ++requestToken;
+      fetch(`${endpoint}${qs ? '?' + qs : ''}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.text())
+        .then(html => {
+          if (thisToken !== requestToken) return; // a newer request has already been sent
+          results.innerHTML = html;
+          setUpShowMore();
+        });
+    }
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(fetchResults, 300);
+    });
+    tagSelect.addEventListener('change', fetchResults);
+    assignedToSelect.addEventListener('change', fetchResults);
+
+    setUpShowMore();
+  })();
+</script>
+{% endblock %}

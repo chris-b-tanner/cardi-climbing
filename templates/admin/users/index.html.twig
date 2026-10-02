@@ -8,6 +8,7 @@
     <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Cancel</a>
   {% else %}
     <div class="btn-row">
+      <a href="{{ path('app_admin_recent_updates') }}" class="btn btn--ghost btn--sm">Recent updates</a>
       <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Send bulk email</a>
       <button type="button" class="card-scan-trigger btn btn--ghost btn--sm"
               data-url="{{ path('app_admin_card_lookup_start') }}"

@@ -2,7 +2,9 @@
 
 namespace App\Repository;
 
+use App\Entity\Attendee;
 use App\Entity\Note;
+use App\Entity\SalesOrder;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -95,5 +97,73 @@ class NoteRepository extends ServiceEntityRepository
             ->orderBy('n.pinnedAt', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * The most recent notes across the system, newest first — the "Recent updates" feed. $query
+     * matches the note's own text (and email subject). $tagId/$assignedToId filter on the person
+     * the note is about: the member for a member note, the booker for a booking note, the customer
+     * for a sale note. Event and product notes aren't about a person, so either filter excludes
+     * them. $assignedToId 0 = people with no assignee, same convention as UserRepository::search().
+     *
+     * @return Note[]
+     */
+    public function findRecent(string $query = '', ?int $tagId = null, ?int $assignedToId = null, int $limit = 100): array
+    {
+        $qb = $this->createQueryBuilder('n')
+            ->leftJoin('n.addedBy', 'ab')->addSelect('ab')
+            ->leftJoin('n.assignedTo', 'at')->addSelect('at')
+            ->orderBy('n.createdAt', 'DESC')
+            ->addOrderBy('n.id', 'DESC')
+            ->setMaxResults($limit);
+
+        if ($query !== '') {
+            $qb->andWhere('n.content LIKE :q OR n.emailSubject LIKE :q')
+               ->setParameter('q', '%' . $query . '%');
+        }
+
+        if ($tagId !== null || $assignedToId !== null) {
+            // The same "people matching the filters" subquery, once per note type that points at a
+            // person — each needs its own aliases, since DQL aliases are shared across subqueries.
+            $people = function (string $alias) use ($tagId, $assignedToId): string {
+                $sub = $this->getEntityManager()->createQueryBuilder()
+                    ->select($alias . '.id')
+                    ->from(User::class, $alias);
+                if ($tagId !== null) {
+                    $sub->join($alias . '.tags', $alias . 't')->andWhere($alias . 't.id = :tagId');
+                }
+                if ($assignedToId === 0) {
+                    $sub->andWhere($alias . '.assignedTo IS NULL');
+                } elseif ($assignedToId !== null) {
+                    $sub->andWhere($alias . '.assignedTo = :assignedToId');
+                }
+                return $sub->getDQL();
+            };
+
+            $attendees = $this->getEntityManager()->createQueryBuilder()
+                ->select('a.id')->from(Attendee::class, 'a')
+                ->where('a.user IN (' . $people('pa') . ')')->getDQL();
+            $orders = $this->getEntityManager()->createQueryBuilder()
+                ->select('o.id')->from(SalesOrder::class, 'o')
+                ->where('o.user IN (' . $people('po') . ')')->getDQL();
+
+            $qb->andWhere(
+                '(n.noteableType = :typeMember AND n.noteableId IN (' . $people('pm') . '))'
+                . ' OR (n.noteableType = :typeAttendee AND n.noteableId IN (' . $attendees . '))'
+                . ' OR (n.noteableType = :typeOrder AND n.noteableId IN (' . $orders . '))'
+            )
+                ->setParameter('typeMember', Note::TYPE_MEMBER)
+                ->setParameter('typeAttendee', Note::TYPE_ATTENDEE)
+                ->setParameter('typeOrder', Note::TYPE_ORDER);
+
+            if ($tagId !== null) {
+                $qb->setParameter('tagId', $tagId);
+            }
+            if ($assignedToId !== null && $assignedToId !== 0) {
+                $qb->setParameter('assignedToId', $assignedToId);
+            }
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

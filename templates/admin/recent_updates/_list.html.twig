@@ -1,0 +1,60 @@
+{% set noteTypes = {
+  member:   {singular: 'Member',  icon: 'bi-person-badge'},
+  attendee: {singular: 'Booking', icon: 'bi-calendar-check'},
+  event:    {singular: 'Event',   icon: 'bi-calendar3'},
+  product:  {singular: 'Product', icon: 'bi-tag'},
+  order:    {singular: 'Sale',    icon: 'bi-receipt'},
+} %}
+
+<div class="result-count">
+  {{ items|length }} {{ items|length == 1 ? 'update' : 'updates' }}{% if items|length >= limit %} (most recent {{ limit }}){% endif %}
+</div>
+
+{% if items is empty %}
+  <div class="empty">
+    <strong>No updates found</strong>
+    Try adjusting your search or filters.
+  </div>
+{% else %}
+  <div class="updates-feed">
+    {% for item in items %}
+      {% set note = item.note %}
+      {% set type = noteTypes[note.noteableType]|default({singular: 'Record', icon: 'bi-journal'}) %}
+      <div class="card update-card{{ note.pinned ? ' update-card--pinned' : '' }}">
+        <div class="update-card__head">
+          <div class="update-card__target">
+            <i class="bi {{ type.icon }}" title="{{ type.singular }} note"></i>
+            {% if item.target.url %}
+              <a href="{{ item.target.url }}" class="admin-table__link">{{ item.target.label }}</a>
+            {% else %}
+              <span>{{ item.target.label }}</span>
+            {% endif %}
+          </div>
+          <span class="admin-table__muted update-card__date" title="{{ note.createdAt|date('j M Y, H:i') }}">{{ note.createdAt|date('j M Y, H:i') }}</span>
+        </div>
+
+        {% if item.target.tags is defined and item.target.tags is not empty %}
+          <div class="update-card__tags">
+            {% for tagName in item.target.tags %}
+              <span class="tag-badge">{{ tagName }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if note.emailSubject %}
+          <p class="update-card__subject"><i class="bi bi-envelope" title="Sent by email"></i> {{ note.emailSubject }}</p>
+        {% endif %}
+
+        <p class="update-card__content">{{ note.content }}</p>
+        <button type="button" class="update-card__more" hidden>Show more</button>
+
+        <p class="update-card__meta">
+          {{ note.addedBy ? note.addedBy.displayName : 'System' }}
+          {% if note.pinned %} · <span class="status-pill status-pill--pinned">Pinned</span>{% endif %}
+          {% if note.completed %} · Completed{% endif %}
+          {% if note.assignedTo %} · Assigned to {{ note.assignedTo.displayName }}{% endif %}
+        </p>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
