@@ -105,10 +105,11 @@ class NoteRepository extends ServiceEntityRepository
      * the note is about: the member for a member note, the booker for a booking note, the customer
      * for a sale note. Event and product notes aren't about a person, so either filter excludes
      * them. $assignedToId 0 = people with no assignee, same convention as UserRepository::search().
+     * $addedById filters on who wrote the note itself; 0 = system-generated notes (no author).
      *
      * @return Note[]
      */
-    public function findRecent(string $query = '', ?int $tagId = null, ?int $assignedToId = null, int $limit = 100): array
+    public function findRecent(string $query = '', ?int $tagId = null, ?int $assignedToId = null, int $limit = 100, ?int $addedById = null): array
     {
         $qb = $this->createQueryBuilder('n')
             ->leftJoin('n.addedBy', 'ab')->addSelect('ab')
@@ -120,6 +121,13 @@ class NoteRepository extends ServiceEntityRepository
         if ($query !== '') {
             $qb->andWhere('n.content LIKE :q OR n.emailSubject LIKE :q')
                ->setParameter('q', '%' . $query . '%');
+        }
+
+        if ($addedById === 0) {
+            $qb->andWhere('n.addedBy IS NULL');
+        } elseif ($addedById !== null) {
+            $qb->andWhere('n.addedBy = :addedById')
+               ->setParameter('addedById', $addedById);
         }
 
         if ($tagId !== null || $assignedToId !== null) {

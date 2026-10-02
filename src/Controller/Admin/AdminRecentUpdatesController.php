@@ -35,10 +35,16 @@ class AdminRecentUpdatesController extends AbstractController
             $assignedToRaw === 'unassigned' => 0,
             default => (int) $assignedToRaw,
         };
+        $addedByRaw = $request->query->get('addedBy', '');
+        $addedById = match (true) {
+            $addedByRaw === '' => null,
+            $addedByRaw === 'system' => 0,
+            default => (int) $addedByRaw,
+        };
 
         $items = array_map(
             static fn ($note) => ['note' => $note, 'target' => $resolver->resolve($note)],
-            $noteRepository->findRecent($query, $tagId, $assignedToId, self::LIMIT),
+            $noteRepository->findRecent($query, $tagId, $assignedToId, self::LIMIT, $addedById),
         );
 
         $params = ['items' => $items, 'limit' => self::LIMIT];
@@ -53,6 +59,7 @@ class AdminRecentUpdatesController extends AbstractController
             'currentQuery'        => $query,
             'currentTagId'        => $tagId,
             'currentAssignedToId' => $assignedToId,
+            'currentAddedById'    => $addedById,
         ]);
     }
 }
