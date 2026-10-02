@@ -4,6 +4,8 @@ namespace App\Controller\Admin;
 
 use App\Entity\Certification;
 use App\Entity\Declaration;
+use App\Entity\User;
+use App\Entity\UserCertification;
 use App\Repository\CertificationRepository;
 use App\Repository\DeclarationRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +25,30 @@ class AdminCertificationTypeController extends AbstractController
     {
         return $this->render('admin/settings/certifications/index.html.twig', [
             'certifications' => $certificationRepository->findBy([], ['name' => 'ASC']),
+        ]);
+    }
+
+    /**
+     * Shows the member-facing declaration page (account/certification_complete.html.twig) exactly as
+     * a member would see it, without starting a real certification for anyone. Renders the page
+     * against a throwaway UserCertification that is never persisted, with the signed-in admin as
+     * the holder. The template's `preview` flag stops it from saving or linking anywhere.
+     */
+    #[Route('/{id}/preview', name: 'app_admin_settings_certification_preview', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function preview(Certification $certification): Response
+    {
+        /** @var User $admin */
+        $admin  = $this->getUser();
+        $record = (new UserCertification())
+            ->setCertification($certification)
+            ->setUser($admin);
+
+        return $this->render('account/certification_complete.html.twig', [
+            'record'               => $record,
+            'declarations'         => $certification->getDeclarations(),
+            'error'                => null,
+            'missingProfileFields' => [],
+            'preview'              => true,
         ]);
     }
 

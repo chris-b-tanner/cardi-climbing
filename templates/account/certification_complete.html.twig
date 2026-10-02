@@ -50,6 +50,10 @@
     background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0;
     border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
   }
+  .alert--preview {
+    background: #fef9c3; color: #854d0e; border: 1px solid #fde68a;
+    border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.875rem;
+  }
   .alert--error {
     background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
     border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem;
@@ -103,8 +107,15 @@
 {% endblock %}
 
 {% block content %}
+{% set preview = preview|default(false) %}
 <div class="account-page">
   <div class="account-wrap">
+    {% if preview %}
+      <div class="alert--preview">
+        <strong>Preview</strong> — this is what members see when completing this certification.
+        The details below are your own, as a sample. Nothing you do here is saved.
+      </div>
+    {% endif %}
     <h1>{{ record.certification.name }}</h1>
     <p class="subtitle">
       {% if record.user != app.user %}
@@ -121,7 +132,7 @@
     {% endif %}
 
     {% set step1Done = missingProfileFields is empty %}
-    {% set canEditProfile = record.user == app.user %}
+    {% set canEditProfile = record.user == app.user and not preview %}
 
     {# ── Step 1: personal information ──────────────────────────────── #}
     <div class="wizard-step {{ step1Done ? 'wizard-step--done' : 'wizard-step--current' }}">
@@ -186,8 +197,10 @@
         <div class="wizard-step__title">Complete the declaration</div>
 
         {% if step1Done %}
-          <form method="post" action="{{ path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate style="margin-top:0.75rem;">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
+          <form method="post" action="{{ preview ? '' : path('app_account_certification_complete', {recordId: record.id}) }}" id="complete-form" novalidate style="margin-top:0.75rem;"{% if preview %} data-preview="1"{% endif %}>
+            {% if not preview %}
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('complete_certification_' ~ record.id) }}">
+            {% endif %}
             <input type="hidden" name="signature" id="signature-input">
 
             {% if declarations|length > 0 %}
@@ -221,7 +234,11 @@
 
             <div class="account-actions">
               <button type="submit" class="btn btn--teal">Complete {{ record.certification.name }}</button>
-              <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" class="btn btn--outline">Cancel</a>
+              {% if preview %}
+                <button type="button" class="btn btn--outline" onclick="window.close()">Close preview</button>
+              {% else %}
+                <a href="{{ path('app_account', {_fragment: 'certifications'}) }}" class="btn btn--outline">Cancel</a>
+              {% endif %}
             </div>
           </form>
         {% else %}
@@ -327,6 +344,11 @@
     resize();
 
     form.addEventListener('submit', function (e) {
+      if (form.dataset.preview) {
+        e.preventDefault();
+        alert('This is a preview — nothing has been saved.');
+        return;
+      }
       if (!hasSignature) {
         e.preventDefault();
         alert('Please sign before completing this.');

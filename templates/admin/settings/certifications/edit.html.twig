@@ -4,7 +4,10 @@
 {% block content %}
 <div class="page-header">
   <h1><a href="{{ path('app_admin_settings_certifications') }}" class="page-header__crumb">Certifications</a> &raquo; {{ certification.name }}</h1>
-  <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+  <div class="btn-row">
+    <a href="{{ path('app_admin_settings_certification_preview', {id: certification.id}) }}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener">Preview ↗</a>
+    <a href="{{ path('app_admin_settings_certifications') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+  </div>
 </div>
 
 {% if error %}

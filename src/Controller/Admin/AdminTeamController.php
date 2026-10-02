@@ -16,10 +16,20 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AdminTeamController extends AbstractController
 {
     #[Route('', name: 'app_admin_settings_team')]
-    public function index(UserRepository $userRepository): Response
+    public function index(Request $request, UserRepository $userRepository): Response
     {
+        // One tab per role — everyone findTeam() returns is either an admin or plain team.
+        $byRole = ['admin' => [], 'team' => []];
+        foreach ($userRepository->findTeam() as $member) {
+            $byRole[in_array(User::ROLE_ADMIN, $member->getRoles(), true) ? 'admin' : 'team'][] = $member;
+        }
+
+        $role = $request->query->get('role') === 'team' ? 'team' : 'admin';
+
         return $this->render('admin/settings/team/index.html.twig', [
-            'team' => $userRepository->findTeam(),
+            'byRole'      => $byRole,
+            'currentRole' => $role,
+            'team'        => $byRole[$role],
         ]);
     }
 
@@ -41,6 +51,6 @@ class AdminTeamController extends AbstractController
 
         $this->addFlash('success', $user->getDisplayName() . ' is no longer on the team. They can still sign in as a member.');
 
-        return $this->redirectToRoute('app_admin_settings_team');
+        return $this->redirectToRoute('app_admin_settings_team', ['role' => 'team']);
     }
 }

@@ -7,13 +7,21 @@
   <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
 </div>
 
+{% set roleLabels = {admin: 'Admins', team: 'Team'} %}
+<div class="pos-tabs">
+  {% for role, label in roleLabels %}
+    <a href="{{ path('app_admin_settings_team', {role: role}) }}" class="pos-tab{{ currentRole == role ? ' is-active' : '' }}">
+      {{ label }} ({{ byRole[role]|length }})
+    </a>
+  {% endfor %}
+</div>
+
 <div class="card">
-  <div class="card__label" style="margin-bottom:0.75rem;">Admins &amp; team ({{ team|length }})</div>
   <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
     To give someone team access, open their member profile, click Edit, and change their role.
   </p>
   {% if team is empty %}
-    <p class="tag-badge--none">No admins or team members yet.</p>
+    <p class="tag-badge--none">No {{ currentRole == 'admin' ? 'admins' : 'team members' }} yet.</p>
   {% else %}
     <div class="table-scroll">
       <table class="admin-table">
