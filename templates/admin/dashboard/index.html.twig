@@ -66,4 +66,44 @@
     </svg>
   </div>
 </div>
+
+{% if tagCounts is not empty %}
+  <div class="card__label" style="margin:1.75rem 0 0.75rem;">Contacts by tag</div>
+  <div class="tag-stat-grid">
+    {% for row in tagCounts %}
+      {% set tag = row.tag %}
+      <a href="{{ path('app_admin_users', {tag: tag.id}) }}" class="card tag-stat{{ row.stale ? ' tag-stat--stale' : '' }}"
+         style="border-top:4px solid {{ tag.effectiveColor }};" title="View the {{ row.count }} {{ row.count == 1 ? 'contact' : 'contacts' }} tagged {{ tag.name }}">
+        <span class="tag-stat__name" style="color:{{ tag.effectiveColor }};">{{ tag.name }}</span>
+        <span class="tag-stat__count">{{ row.count }}</span>
+        <span class="tag-stat__sub">
+          {% if row.stale %}
+            <strong>{{ row.stale }} due a contact</strong> ({{ tag.remindAfterDays }}+ days)
+          {% elseif row.stale is same as(0) and row.count > 0 %}
+            All contacted within {{ tag.remindAfterDays }} days
+          {% else %}
+            {{ row.count == 1 ? 'contact' : 'contacts' }}
+          {% endif %}
+        </span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<style>
+  .tag-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.75rem; }
+  .tag-stat {
+    margin-bottom: 0; display: flex; flex-direction: column; gap: 0.15rem;
+    text-decoration: none; color: inherit; transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .tag-stat:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); transform: translateY(-1px); }
+  .tag-stat__name { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+  .tag-stat__count { font-size: 2.25rem; font-weight: 700; line-height: 1.1; color: var(--black); font-variant-numeric: tabular-nums; }
+  .tag-stat__sub { font-size: 0.78rem; color: var(--muted); }
+  .tag-stat--stale { background: #fefce8; }
+  .tag-stat--stale .tag-stat__sub strong { color: #854d0e; }
+</style>
 {% endblock %}

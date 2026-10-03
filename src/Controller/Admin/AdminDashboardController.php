@@ -2,6 +2,7 @@
 
 namespace App\Controller\Admin;
 
+use App\Repository\TagRepository;
 use App\Repository\UserRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,7 +36,7 @@ class AdminDashboardController extends AbstractController
     private const PAD_BOTTOM    = 28;
 
     #[Route('', name: 'app_admin_dashboard')]
-    public function index(UserRepository $userRepository): Response
+    public function index(UserRepository $userRepository, TagRepository $tagRepository): Response
     {
         $optedInDates = $userRepository->findOptedInCreatedDates();
         $optedInDaily = $this->dailyCounts($optedInDates);
@@ -55,6 +56,7 @@ class AdminDashboardController extends AbstractController
             'totalOptedIn' => $optedInDaily[array_key_last($optedInDaily)]['count'],
             'startCount'   => $optedInDaily[0]['count'],
             'totalMembers' => $allDaily[array_key_last($allDaily)]['count'],
+            'tagCounts'    => $tagRepository->findWithContactCounts(),
         ]);
     }
 
