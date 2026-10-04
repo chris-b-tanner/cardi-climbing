@@ -9,7 +9,7 @@
   <a href="{{ path('app_admin_user_show', {id: user.id}) }}" class="btn btn--ghost btn--sm">← Cancel</a>
 </div>
 
-<form method="post" action="{{ path('app_admin_user_edit', {id: user.id}) }}" novalidate>
+<form method="post" action="{{ path('app_admin_user_edit', {id: user.id}) }}" novalidate id="edit-member-form">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_edit_' ~ user.id) }}">
 
   <div class="card">
@@ -235,6 +235,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% include 'admin/users/_contact_validation.html.twig' with {formId: 'edit-member-form'} %}
 <script>
   (function () {
     const input   = document.getElementById('keyholderPin');

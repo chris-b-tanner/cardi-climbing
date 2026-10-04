@@ -83,6 +83,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% include 'admin/users/_contact_validation.html.twig' with {formId: 'new-member-form'} %}
 <style>
   .new-member-wrap {
     display: grid;

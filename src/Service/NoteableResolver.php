@@ -23,14 +23,24 @@ class NoteableResolver
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {}
 
-    /** @return array{label: string, url: ?string, company?: ?string, tags?: string[]} */
-    public function resolve(Note $note, bool $absolute = false): array
+    /**
+     * $withCompany names people as User::getDisplayNameWithCompany() in the label — for callers
+     * that show only the label (Recent updates). Off by default because the Actions page and the
+     * note emails already print `company` on its own line beneath the label.
+     *
+     * `person` is the User the note is about — the member, the booker, or the sale's customer — for
+     * callers that need more than their name (e.g. their Tag entities, for coloured badges); absent
+     * for event/product notes and deleted records.
+     *
+     * @return array{label: string, url: ?string, company?: ?string, tags?: string[], person?: User}
+     */
+    public function resolve(Note $note, bool $absolute = false, bool $withCompany = false): array
     {
         $id = $note->getNoteableId();
 
         return match ($note->getNoteableType()) {
-            Note::TYPE_MEMBER => $this->resolveMember($id, $absolute),
-            Note::TYPE_ATTENDEE => $this->resolveAttendee($id, $absolute),
+            Note::TYPE_MEMBER => $this->resolveMember($id, $absolute, $withCompany),
+            Note::TYPE_ATTENDEE => $this->resolveAttendee($id, $absolute, $withCompany),
             Note::TYPE_EVENT => $this->resolveEvent($id, $absolute),
             Note::TYPE_PRODUCT => $this->resolveProduct($id, $absolute),
             Note::TYPE_ORDER => $this->resolveOrder($id, $absolute),
@@ -38,7 +48,7 @@ class NoteableResolver
         };
     }
 
-    private function resolveMember(int $id, bool $absolute): array
+    private function resolveMember(int $id, bool $absolute, bool $withCompany): array
     {
         $user = $this->userRepository->find($id);
         if (!$user) {
@@ -46,24 +56,28 @@ class NoteableResolver
         }
 
         return [
-            'label'   => $user->getDisplayName(),
+            'label'   => $withCompany ? $user->getDisplayNameWithCompany() : $user->getDisplayName(),
             'url'     => $this->url('app_admin_user_show', ['id' => $id], $absolute),
             'company' => $user->getCompany(),
             'tags'    => $this->tagNames($user),
+            'person'  => $user,
         ];
     }
 
-    private function resolveAttendee(int $id, bool $absolute): array
+    private function resolveAttendee(int $id, bool $absolute, bool $withCompany): array
     {
         $attendee = $this->attendeeRepository->find($id);
         if (!$attendee) {
             return ['label' => 'Booking #' . $id . ' (deleted)', 'url' => null];
         }
 
+        $person = $attendee->getUser();
+
         return [
-            'label' => $attendee->getUser()->getDisplayName() . ' — ' . $attendee->getEvent()->getTitle(),
+            'label' => ($withCompany ? $person->getDisplayNameWithCompany() : $person->getDisplayName()) . ' — ' . $attendee->getEvent()->getTitle(),
             'url'   => $this->url('app_admin_booking_edit', ['id' => $id], $absolute),
-            'tags'  => $this->tagNames($attendee->getUser()),
+            'tags'   => $this->tagNames($person),
+            'person' => $person,
         ];
     }
 
@@ -103,7 +117,8 @@ class NoteableResolver
         return [
             'label' => 'Sale #' . $id,
             'url'   => $this->url('app_admin_sale_show', ['id' => $id], $absolute),
-            'tags'  => $this->tagNames($order->getUser()),
+            'tags'   => $this->tagNames($order->getUser()),
+            'person' => $order->getUser(),
         ];
     }
 

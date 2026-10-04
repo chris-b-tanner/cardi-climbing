@@ -263,6 +263,21 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             ?: ($this->email ?: 'Member #' . $this->id);
     }
 
+    /**
+     * The name to head this contact with wherever their company matters too: "First Last (Company)"
+     * when they have both, just the company for a company-only contact, otherwise getDisplayName().
+     */
+    public function getDisplayNameWithCompany(): string
+    {
+        if (!$this->company) {
+            return $this->getDisplayName();
+        }
+
+        $hasName = trim(($this->firstName ?? '') . ($this->lastName ?? '')) !== '';
+
+        return $hasName ? $this->getDisplayName() . ' (' . $this->company . ')' : $this->company;
+    }
+
     public function getCompany(): ?string
     {
         return $this->company;

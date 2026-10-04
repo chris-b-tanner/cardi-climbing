@@ -33,10 +33,10 @@
           <span class="admin-table__muted update-card__date" title="{{ note.createdAt|date('j M Y, H:i') }}">{{ note.createdAt|date('j M Y, H:i') }}</span>
         </div>
 
-        {% if item.target.tags is defined and item.target.tags is not empty %}
+        {% if item.target.person is defined and item.target.person.tags is not empty %}
           <div class="update-card__tags">
-            {% for tagName in item.target.tags %}
-              <span class="tag-badge">{{ tagName }}</span>
+            {% for tag in item.target.person.tags %}
+              <span class="tag-badge" style="background:color-mix(in srgb, {{ tag.effectiveColor }} 15%, white); color:{{ tag.effectiveColor }};"><a href="{{ path('app_admin_users', {tag: tag.id}) }}" class="tag-badge__link" title="View all members tagged {{ tag.name }}">{{ tag.name }}</a></span>
             {% endfor %}
           </div>
         {% endif %}

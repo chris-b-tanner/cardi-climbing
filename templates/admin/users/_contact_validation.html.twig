@@ -1,0 +1,96 @@
+{#
+  Client-side sanity check for the admin new/edit contact forms — catches malformed email
+  addresses and websites before submit, and in particular the common slip of typing a website
+  into an email field or vice versa. Expects `formId`. Checks every input[type=email] in the form,
+  plus #website. Hidden fields (e.g. the new-contact form's website box before a company is
+  entered) are skipped. The server still normalises the website (adds https://) as before.
+#}
+<script>
+  (function () {
+    const form = document.getElementById({{ formId|json_encode|raw }});
+    if (!form) return;
+
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function looksLikeWebsite(value) {
+      return !value.includes('@') && (/^(https?:\/\/|www\.)/i.test(value) || /^[^\s]+\.[a-z]{2,}(\/.*)?$/i.test(value));
+    }
+
+    function emailError(value) {
+      if (EMAIL_RE.test(value)) return null;
+      if (looksLikeWebsite(value)) return 'This looks like a website, not an email address — should it go in the Website field?';
+      if (/\s/.test(value)) return 'Email addresses can\'t contain spaces.';
+      if (!value.includes('@')) return 'Email addresses need an @ — e.g. name@example.com.';
+      return 'This doesn\'t look like a valid email address — e.g. name@example.com.';
+    }
+
+    function websiteError(value) {
+      if (EMAIL_RE.test(value) || (value.includes('@') && !/^https?:\/\//i.test(value))) {
+        return 'This looks like an email address, not a website — should it go in an Email field?';
+      }
+      if (/\s/.test(value)) return 'Websites can\'t contain spaces.';
+      try {
+        const url = new URL(/^https?:\/\//i.test(value) ? value : 'https://' + value);
+        if (!url.hostname.includes('.') || url.hostname.startsWith('.') || url.hostname.endsWith('.')) throw new Error();
+      } catch (e) {
+        return 'This doesn\'t look like a valid website — e.g. example.com.';
+      }
+      return null;
+    }
+
+    function setError(input, message) {
+      const group = input.closest('.form-group') || input.parentElement;
+      let errorEl = group.querySelector('.contact-field-error');
+      if (message) {
+        if (!errorEl) {
+          errorEl = document.createElement('p');
+          errorEl.className = 'contact-field-error';
+          errorEl.style.cssText = 'color:var(--red);font-size:0.78rem;margin-top:0.3rem;margin-bottom:0;';
+          input.insertAdjacentElement('afterend', errorEl);
+        }
+        errorEl.textContent = message;
+        input.style.borderColor = 'var(--red)';
+        input.setAttribute('aria-invalid', 'true');
+      } else {
+        if (errorEl) errorEl.remove();
+        input.style.borderColor = '';
+        input.removeAttribute('aria-invalid');
+      }
+    }
+
+    function fields() {
+      const list = [];
+      form.querySelectorAll('input[type="email"]').forEach((input) => list.push({ input, check: emailError }));
+      const website = form.querySelector('#website');
+      if (website) list.push({ input: website, check: websiteError });
+      // Skip anything not currently shown — there's no way to see or fix an error on it.
+      return list.filter(({ input }) => input.offsetParent !== null);
+    }
+
+    function validate(input, check) {
+      const value = input.value.trim();
+      const message = value === '' ? null : check(value);
+      setError(input, message);
+      return !message;
+    }
+
+    form.addEventListener('submit', (e) => {
+      let firstInvalid = null;
+      fields().forEach(({ input, check }) => {
+        if (!validate(input, check) && !firstInvalid) firstInvalid = input;
+      });
+      if (firstInvalid) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        firstInvalid.focus();
+      }
+    });
+
+    // Once a field has been flagged, re-check it as it's corrected so the message clears promptly.
+    form.addEventListener('input', (e) => {
+      if (e.target.getAttribute('aria-invalid') !== 'true') return;
+      const match = fields().find(({ input }) => input === e.target);
+      if (match) validate(match.input, match.check);
+    });
+  })();
+</script>

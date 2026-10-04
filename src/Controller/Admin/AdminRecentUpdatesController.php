@@ -43,7 +43,7 @@ class AdminRecentUpdatesController extends AbstractController
         };
 
         $items = array_map(
-            static fn ($note) => ['note' => $note, 'target' => $resolver->resolve($note)],
+            static fn ($note) => ['note' => $note, 'target' => $resolver->resolve($note, withCompany: true)],
             $noteRepository->findRecent($query, $tagId, $assignedToId, self::LIMIT, $addedById),
         );
 

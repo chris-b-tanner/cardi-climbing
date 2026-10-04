@@ -35,7 +35,7 @@ class NoteAssignmentMailer
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
 
-    /** @param array{label: string, url: ?string, company?: ?string, tags?: string[]} $target Resolved via NoteableResolver::resolve($note, absolute: true). */
+    /** @param array{label: string, url: ?string, company?: ?string, tags?: string[], person?: User} $target Resolved via NoteableResolver::resolve($note, absolute: true). */
     public function sendAssigned(Note $note, array $target, User $assignedBy): void
     {
         $assignee = $note->getAssignedTo();

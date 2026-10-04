@@ -20,7 +20,7 @@ class TagRepository extends ServiceEntityRepository
     /**
      * Every tag with how many contacts carry it, and — for tags with a reminder interval — how many
      * of those are overdue a contact (same rule as Tag::isStale(), so the figure matches the yellow
-     * rows on the members list filtered by that tag). Most-used tags first. For the dashboard.
+     * rows on the members list filtered by that tag). Alphabetical by name. For the dashboard.
      *
      * @return array<int, array{tag: Tag, count: int, stale: ?int}>
      */
@@ -30,8 +30,7 @@ class TagRepository extends ServiceEntityRepository
             ->select('t AS tag', 'COUNT(u.id) AS userCount')
             ->leftJoin('t.users', 'u')
             ->groupBy('t.id')
-            ->orderBy('userCount', 'DESC')
-            ->addOrderBy('t.name', 'ASC')
+            ->orderBy('t.name', 'ASC')
             ->getQuery()
             ->getResult();
 

@@ -23,7 +23,7 @@ class ContactNoteMailer
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
 
-    /** @param array{label: string, url: ?string, company?: ?string, tags?: string[]} $target Resolved via NoteableResolver::resolve($note, absolute: true). */
+    /** @param array{label: string, url: ?string, company?: ?string, tags?: string[], person?: User} $target Resolved via NoteableResolver::resolve($note, absolute: true). */
     public function sendNoteAdded(Note $note, User $contact, array $target, User $addedBy): void
     {
         $assignee = $contact->getAssignedTo();
