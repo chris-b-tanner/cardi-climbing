@@ -13,9 +13,11 @@
   reply, see WebhookController::inbound()) shows it with a small envelope icon above the note's own
   content, rather than a text prefix baked into that content. No "insert first name" helper here —
   unlike the compose screen's multi-recipient audience, this is always exactly one contact, already
-  named right at the top of the page, so a personalisation placeholder buys nothing.
+  named right at the top of the page, so a personalisation placeholder buys nothing. Ticking the
+  checkbox also reveals a file picker: picked files are attached to the email and not stored (see
+  ContactQuickEmailMailer). Their names are appended to the note's text as "Attachments: …".
 #}
-<form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" novalidate style="margin-bottom:1.25rem;">
+<form method="post" action="{{ path('app_admin_note_add', {noteableType: noteableType, noteableId: noteableId}) }}" enctype="multipart/form-data" novalidate style="margin-bottom:1.25rem;">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
   {% if contactEmail is defined and contactEmail %}
     <div class="form-group note-email-subject" id="note-subject-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
@@ -27,6 +29,21 @@
     <textarea id="note-content-{{ noteableType }}-{{ noteableId }}" name="content" class="form-control" rows="3"
               placeholder="Add a note…" style="resize:vertical;"></textarea>
   </div>
+  {% if contactEmail is defined and contactEmail %}
+    {% set attachmentExtensions = constant('App\\Service\\Mailer\\ContactQuickEmailMailer::ATTACHMENT_EXTENSIONS') %}
+    {% set maxAttachmentBytes = constant('App\\Service\\Mailer\\ContactQuickEmailMailer::MAX_ATTACHMENT_BYTES') %}
+    <div class="form-group note-email-attachments" id="note-attachments-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
+      <label for="note-attachments-{{ noteableType }}-{{ noteableId }}" style="text-transform:none;font-size:0.8rem;color:var(--black);">
+        <i class="bi bi-paperclip"></i> Attachments <span style="color:var(--muted);font-weight:400;">(optional, up to {{ (maxAttachmentBytes / 1048576)|round }} MB in total, not stored)</span>
+      </label>
+      <input type="file" name="attachments[]" id="note-attachments-{{ noteableType }}-{{ noteableId }}" multiple
+             accept="{{ attachmentExtensions|map(ext => '.' ~ ext)|join(',') }}"
+             data-max-bytes="{{ maxAttachmentBytes }}" data-extensions="{{ attachmentExtensions|join(',') }}"
+             style="font-size:0.8rem;">
+      <ul class="note-attachments-list" style="list-style:none;padding:0;margin:0.4rem 0 0;font-size:0.8rem;"></ul>
+      <p class="note-attachments-summary" style="font-size:0.75rem;color:var(--muted);margin:0.3rem 0 0;"></p>
+    </div>
+  {% endif %}
   <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
     <button type="submit" id="note-submit-{{ noteableType }}-{{ noteableId }}" class="btn btn--teal btn--sm">Add note</button>
     <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
@@ -143,7 +160,99 @@
       const input   = wrap.querySelector('input[name="subject"]');
       const content = document.getElementById('note-content-' + suffix);
       const submit  = document.getElementById('note-submit-' + suffix);
+      const attachWrap = document.getElementById('note-attachments-wrap-' + suffix);
+      const fileInput  = attachWrap ? attachWrap.querySelector('input[type="file"]') : null;
+      const fileSummary = attachWrap ? attachWrap.querySelector('.note-attachments-summary') : null;
+      const fileList    = attachWrap ? attachWrap.querySelector('.note-attachments-list') : null;
       if (!toggle || !input || !content || !submit) return;
+
+      // A file input's own selection is replaced, not added to, each time the picker is reopened,
+      // so files picked one at a time would leave only the last. Keep every pick here instead, and
+      // write the combined list back into the input so it's what the form submits.
+      let picked = [];
+
+      function syncInput() {
+        const transfer = new DataTransfer();
+        picked.forEach((file) => transfer.items.add(file));
+        fileInput.files = transfer.files;
+      }
+
+      function formatSize(bytes) {
+        return bytes < 1048576 ? Math.max(1, Math.round(bytes / 1024)) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB';
+      }
+
+      // Checked again server-side (ContactQuickEmailMailer::attachmentError()), but catching it here
+      // saves uploading several MB only to have it bounced, or tripping PHP's post_max_size.
+      function attachmentProblem() {
+        if (!picked.length) return null;
+        const allowed = fileInput.dataset.extensions.split(',');
+        let total = 0;
+        for (const file of picked) {
+          const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+          if (!allowed.includes(ext)) return file.name + ' can\'t be attached — allowed: ' + allowed.join(', ') + '.';
+          total += file.size;
+        }
+        const max = Number(fileInput.dataset.maxBytes);
+        if (total > max) return 'Attachments add up to ' + (total / 1048576).toFixed(1) + ' MB — the limit is ' + Math.round(max / 1048576) + ' MB.';
+        return null;
+      }
+
+      function updateFileSummary() {
+        if (!fileSummary) return;
+
+        fileList.replaceChildren(...picked.map((file, index) => {
+          const item = document.createElement('li');
+          item.style.cssText = 'display:flex;align-items:center;gap:0.4rem;padding:0.15rem 0;';
+          const name = document.createElement('span');
+          name.textContent = file.name + ' (' + formatSize(file.size) + ')';
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.textContent = '×';
+          remove.title = 'Remove ' + file.name;
+          remove.setAttribute('aria-label', 'Remove ' + file.name);
+          remove.style.cssText = 'border:none;background:none;padding:0 0.2rem;font-size:1rem;line-height:1;color:var(--muted);cursor:pointer;';
+          remove.addEventListener('click', () => {
+            picked.splice(index, 1);
+            syncInput();
+            updateFileSummary();
+          });
+          item.append(name, remove);
+          return item;
+        }));
+
+        const problem = attachmentProblem();
+        if (problem) {
+          fileSummary.textContent = problem;
+          fileSummary.style.color = 'var(--red)';
+        } else if (picked.length) {
+          const total = picked.reduce((sum, file) => sum + file.size, 0);
+          fileSummary.textContent = picked.length + (picked.length === 1 ? ' file, ' : ' files, ') + formatSize(total) + ' in total';
+          fileSummary.style.color = 'var(--muted)';
+        } else {
+          fileSummary.textContent = '';
+        }
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener('change', () => {
+          // Add the new picks to what's already chosen, skipping exact repeats of the same file.
+          for (const file of fileInput.files) {
+            const duplicate = picked.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
+            if (!duplicate) picked.push(file);
+          }
+          syncInput();
+          updateFileSummary();
+        });
+        toggle.form.addEventListener('submit', (e) => {
+          if (!toggle.checked) return;
+          const problem = attachmentProblem();
+          if (problem) {
+            e.preventDefault();
+            updateFileSummary();
+            fileInput.focus();
+          }
+        });
+      }
 
       const baseRows  = content.rows;
       const baseLabel = submit.textContent;
@@ -153,6 +262,14 @@
         input.required = toggle.checked;
         content.rows = toggle.checked ? baseRows * 2 : baseRows;
         submit.textContent = toggle.checked ? 'Send email' : baseLabel;
+        if (attachWrap) {
+          attachWrap.style.display = toggle.checked ? 'block' : 'none';
+          if (!toggle.checked) {
+            picked = []; // a plain note never carries attachments
+            syncInput();
+            updateFileSummary();
+          }
+        }
 
         if (toggle.checked) {
           // Defaults to "Re: {whatever the thread's last message used}" — never overwrites

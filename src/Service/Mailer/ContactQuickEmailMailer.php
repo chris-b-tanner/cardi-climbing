@@ -6,8 +6,10 @@ use App\Entity\Note;
 use App\Entity\User;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\MimeTypes;
 
 /**
  * Sends a note straight to its member as a plain, blank-templated email — the lightweight
@@ -30,6 +32,12 @@ use Symfony\Component\Mime\Address;
  * email only, never written back into the new Note — that stays exactly what the admin typed, so
  * the notes trail doesn't accumulate a duplicate copy of every prior message.
  *
+ * Files the admin picks on the add-note form are attached straight from the upload. PHP's
+ * temporary copies are deleted when the request ends. AdminNoteController::add() appends their
+ * names and sizes to the note's text as the record of what was sent. ATTACHMENT_EXTENSIONS and MAX_ATTACHMENT_BYTES keep a send within what
+ * Postmark accepts: it rejects executables and caps a whole message at 10 MB including attachments,
+ * which grow by about a third when encoded for email.
+ *
  * No `recipientEmail` in the context (unlike a bulk send), so no unsubscribe link — this is 1:1
  * correspondence, not marketing mail. Doesn't create a separate Email row or a bulk-style
  * "Emailed: ..." note — the note the admin just typed (see AdminNoteController::add()) is already
@@ -45,6 +53,14 @@ class ContactQuickEmailMailer
      */
     private const SENT_PREFIX = 'Emailed: ';
 
+    /** Total size allowed across all of one email's attachments, before email encoding. */
+    public const MAX_ATTACHMENT_BYTES = 7 * 1024 * 1024;
+
+    public const ATTACHMENT_EXTENSIONS = [
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'txt', 'csv',
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic',
+    ];
+
     public function __construct(
         private readonly MailerInterface $mailer,
         private readonly EmailPlaceholders $emailPlaceholders,
@@ -52,7 +68,8 @@ class ContactQuickEmailMailer
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
 
-    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null): void
+    /** @param UploadedFile[] $attachments Already checked by AdminNoteController::add() — see attachmentError(). */
+    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = []): void
     {
         if (!$contact->getEmail()) {
             return;
@@ -76,7 +93,49 @@ class ContactQuickEmailMailer
             ->textTemplate('email/bulk_blank.txt.twig')
             ->context($context);
 
+        foreach ($attachments as $file) {
+            // Typed from the (already allow-listed) extension rather than by sniffing the content,
+            // which can label Office files as plain application/zip.
+            $extension = strtolower($file->getClientOriginalExtension());
+            $email->attachFromPath(
+                $file->getPathname(),
+                $file->getClientOriginalName(),
+                MimeTypes::getDefault()->getMimeTypes($extension)[0] ?? 'application/octet-stream',
+            );
+        }
+
         $this->mailer->send($email);
+    }
+
+    /**
+     * Why these uploads can't be sent, or null if they can: a failed upload, a file type outside
+     * ATTACHMENT_EXTENSIONS, or a combined size over MAX_ATTACHMENT_BYTES.
+     *
+     * @param UploadedFile[] $attachments
+     */
+    public function attachmentError(array $attachments): ?string
+    {
+        $total = 0;
+
+        foreach ($attachments as $file) {
+            $name = $file->getClientOriginalName();
+
+            if (!$file->isValid()) {
+                return 'Couldn\'t upload ' . $name . ': ' . $file->getErrorMessage();
+            }
+
+            if (!in_array(strtolower($file->getClientOriginalExtension()), self::ATTACHMENT_EXTENSIONS, true)) {
+                return $name . ' can\'t be attached. Allowed file types: ' . implode(', ', self::ATTACHMENT_EXTENSIONS) . '.';
+            }
+
+            $total += (int) $file->getSize();
+        }
+
+        if ($total > self::MAX_ATTACHMENT_BYTES) {
+            return sprintf('Attachments add up to %.1f MB. The limit is %d MB per email.', $total / 1048576, self::MAX_ATTACHMENT_BYTES / 1048576);
+        }
+
+        return null;
     }
 
     /** @return array{author: string, date: string, text: string} */

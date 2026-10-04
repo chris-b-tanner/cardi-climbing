@@ -81,6 +81,15 @@ class AdminNoteController extends AbstractController
             return $this->redirectForNoteable($noteableType, $noteableId);
         }
 
+        // Files picked on the add-note form go straight into the email (see
+        // ContactQuickEmailMailer) and are never stored. Ignored unless the note is being emailed.
+        $attachments = $wantsEmail ? array_values(array_filter($request->files->all('attachments'))) : [];
+
+        if ($attachments && ($attachmentError = $this->contactQuickEmailMailer->attachmentError($attachments))) {
+            $this->addFlash('error', $attachmentError . ' Nothing was saved or sent.');
+            return $this->redirectForNoteable($noteableType, $noteableId);
+        }
+
         // The previous turn in this thread (either side), to quote beneath the new message — see
         // ContactQuickEmailMailer. Looked up before the new note exists, so it's never its own quote.
         $previousThreadNote = $wantsEmail ? $this->noteRepository->findLatestEmailThreadNote($noteable) : null;
@@ -89,9 +98,20 @@ class AdminNoteController extends AbstractController
             /** @var User $admin */
             $admin = $this->getUser();
 
+            // The files themselves aren't kept, so the note ends with a line listing what was
+            // attached as the record of it. Added to the stored note only; the email itself goes
+            // out with exactly what the admin typed.
+            $noteContent = $content;
+            if ($attachments) {
+                $noteContent .= "\n\nAttachments: " . implode(', ', array_map(
+                    static fn ($file) => $file->getClientOriginalName() . ' (' . self::formatSize((int) $file->getSize()) . ')',
+                    $attachments,
+                ));
+            }
+
             $note = new Note();
             $note->setNoteable($noteable);
-            $note->setContent($content);
+            $note->setContent($noteContent);
             $note->setAddedBy($admin);
 
             if ($wantsEmail) {
@@ -113,13 +133,21 @@ class AdminNoteController extends AbstractController
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
 
                 if ($wantsEmail) {
-                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote);
-                    $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . '.');
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments);
+                    $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
+                    $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');
                 }
             }
         }
 
         return $this->redirectForNoteable($noteableType, $noteableId);
+    }
+
+    private static function formatSize(int $bytes): string
+    {
+        return $bytes < 1048576
+            ? max(1, (int) round($bytes / 1024)) . ' KB'
+            : number_format($bytes / 1048576, 1) . ' MB';
     }
 
     /** Only the note's own author can delete it. */
