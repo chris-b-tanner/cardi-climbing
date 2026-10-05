@@ -112,6 +112,11 @@
           {% if note.completed %}
             · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ note.completedBy.displayName }}{% endif %}
           {% endif %}
+          {% if note.emailOpenedAt %}
+            · <span style="color:var(--teal-dk);" title="Opened {{ note.emailOpenCount }} time{{ note.emailOpenCount == 1 ? '' : 's' }}, per Postmark — Apple Mail can report an open the recipient never made"><i class="bi bi-envelope-open"></i> Opened {{ note.emailOpenedAt|date('j M Y, H:i') }}{% if note.emailOpenCount > 1 %} ({{ note.emailOpenCount }}×){% endif %}</span>
+          {% elseif note.emailRef %}
+            · Not opened yet
+          {% endif %}
           {% if note.email %}
             · <a href="{{ path('app_admin_email_compose_edit', {id: note.email.id}) }}" style="color:var(--teal-dk);">View email</a>
           {% else %}

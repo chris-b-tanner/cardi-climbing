@@ -4,11 +4,14 @@
 
 {% block head %}
 <style>
+  /* Styled as the published heading, so the dashed underline is what marks it as a field to fill in. */
   .news-editor__title-input {
-    display: block; width: 100%; border: none; outline: none; background: transparent;
-    padding: 0; font: inherit; text-transform: inherit; letter-spacing: inherit;
+    display: block; width: 100%; border: none; border-bottom: 2px dashed var(--border); outline: none; background: transparent;
+    padding: 0 0 0.25rem; font: inherit; text-transform: inherit; letter-spacing: inherit;
     color: var(--black);
   }
+  .news-editor__title-input:hover { border-bottom-color: var(--muted); }
+  .news-editor__title-input:focus { border-bottom-style: solid; border-bottom-color: var(--teal-dk); }
   .news-editor__title-input::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; }
 
   .news-editor__slug-group { max-width: 26rem; }
@@ -71,12 +74,12 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token(post ? 'news_edit_' ~ post.id : 'news_new') }}">
 
       <input type="text" name="title" id="title" class="news-post__h1 news-editor__title-input"
-             placeholder="Post title" value="{{ post ? post.title : '' }}" autocomplete="off" required>
+             placeholder="Post title" value="{{ submitted ? submitted.title : (post ? post.title : '') }}" autocomplete="off" required>
 
       <div class="form-group news-editor__slug-group">
         <label for="slug">URL slug</label>
         <input type="text" name="slug" id="slug" class="form-control"
-               value="{{ post ? post.slug : '' }}" placeholder="Leave blank to generate from the title" autocomplete="off">
+               value="{{ submitted ? submitted.slug : (post ? post.slug : '') }}" placeholder="Leave blank to generate from the title" autocomplete="off">
       </div>
 
       <div class="wysiwyg" id="body-wysiwyg">
@@ -98,7 +101,7 @@
         </div>
         <div class="wysiwyg__editor news-post__body" id="body-editor" contenteditable="true"></div>
       </div>
-      <textarea id="body" name="body" class="wysiwyg__html-textarea" style="display:none;" required>{{ post ? post.body : '' }}</textarea>
+      <textarea id="body" name="body" class="wysiwyg__html-textarea" style="display:none;" required>{{ submitted ? submitted.body : (post ? post.body : '') }}</textarea>
 
       <p class="news-editor__html-toggle-row">
         <button type="button" class="wysiwyg__btn" id="html-toggle-btn" title="Edit the raw HTML directly — useful if the visual editor gets confused, or to add a specific CSS class">View HTML</button>
@@ -109,7 +112,7 @@
 
       <div class="news-editor__actions">
         <label class="news-editor__publish-label">
-          <input type="checkbox" name="published" value="1"{% if post and post.isPublished %} checked{% endif %}>
+          <input type="checkbox" name="published" value="1"{% if submitted ? submitted.published : (post and post.isPublished) %} checked{% endif %}>
           Published
         </label>
         <div class="news-editor__buttons">

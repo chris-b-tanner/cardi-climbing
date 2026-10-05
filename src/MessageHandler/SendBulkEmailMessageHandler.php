@@ -6,6 +6,7 @@ use App\Entity\Email;
 use App\Entity\User;
 use App\Message\SendBulkEmailMessage;
 use App\Repository\UserRepository;
+use App\Service\Mailer\EmailOpenTracking;
 use App\Service\Mailer\EmailPlaceholders;
 use App\Service\UserService;
 use App\Twig\AppExtension;
@@ -88,11 +89,14 @@ final class SendBulkEmailMessageHandler
                 ->add(new MessageStreamHeader($this->broadcastStream));
         }
 
+        $emailRef = EmailOpenTracking::newRef();
+        EmailOpenTracking::tag($mimeMessage, $emailRef);
+
         try {
             $this->mailer->send($mimeMessage);
             // Per-recipient audit trail — "who was sent what" — linked back to the full
             // Email record (subject, body, audience) via Note::$email.
-            $this->userService->addNote($user, 'Emailed: ' . $email->getSubject(), $sender, $email);
+            $this->userService->addNote($user, 'Emailed: ' . $email->getSubject(), $sender, $email, emailRef: $emailRef);
         } catch (\Throwable $e) {
             error_log('Email #' . $email->getId() . ' failed for user ' . $user->getId() . ': ' . $e->getMessage());
         }

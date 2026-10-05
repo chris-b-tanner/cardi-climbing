@@ -95,8 +95,9 @@ class UserService
     /**
      * @param ?Email $email Set when this note records a bulk email actually sent to {user} — links the note back to the full Email record (subject, body, audience, approval history).
      * @param ?string $emailSubject Set when this note is a turn in the ad hoc email conversation (see Note::$emailSubject / ContactQuickEmailMailer) — an inbound reply's Subject header, matching whatever the admin's side of the thread is currently using.
+     * @param ?string $emailRef Set when this note records an outbound email tagged for Postmark open tracking — see EmailOpenTracking.
      */
-    public function addNote(User $user, string $content, ?User $addedBy = null, ?Email $email = null, ?string $emailSubject = null): void
+    public function addNote(User $user, string $content, ?User $addedBy = null, ?Email $email = null, ?string $emailSubject = null, ?string $emailRef = null): void
     {
         $note = new Note();
         $note->setNoteable($user);
@@ -110,6 +111,7 @@ class UserService
         if ($emailSubject !== null) {
             $note->setEmailSubject($emailSubject);
         }
+        $note->setEmailRef($emailRef);
 
         $this->em->persist($note);
         $this->em->flush();
@@ -119,15 +121,16 @@ class UserService
      * GDPR paper trail: records a Note if {user}'s primary email actually changed from
      * {previousEmail} to whatever is currently set on it — call this after setEmail() (so it logs
      * the real new value) but works from either of the two places a contact can change their own
-     * details: the admin contact edit screen, and the member's own account page.
+     * details: the admin contact edit screen, and the member's own account page. Adding an email
+     * to a contact who had none isn't logged — there's no previous address to keep a trail of.
      */
     public function recordEmailChangeIfNeeded(User $user, ?string $previousEmail, ?User $actor = null): void
     {
-        if ($user->getEmail() === $previousEmail) {
+        if ($user->getEmail() === $previousEmail || $previousEmail === null || $previousEmail === '') {
             return;
         }
 
-        $from = $previousEmail !== null && $previousEmail !== '' ? $previousEmail : '(none)';
+        $from = $previousEmail;
         $to   = $user->getEmail() !== null && $user->getEmail() !== '' ? $user->getEmail() : '(none)';
         $this->addNote($user, "Primary email changed from {$from} to {$to}.", $actor);
     }

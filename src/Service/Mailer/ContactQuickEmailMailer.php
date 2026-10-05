@@ -68,8 +68,11 @@ class ContactQuickEmailMailer
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
 
-    /** @param UploadedFile[] $attachments Already checked by AdminNoteController::add() — see attachmentError(). */
-    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = []): void
+    /**
+     * @param UploadedFile[] $attachments Already checked by AdminNoteController::add() — see attachmentError().
+     * @param string|null $emailRef The ref already stored on this email's note — see EmailOpenTracking.
+     */
+    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = [], ?string $emailRef = null): void
     {
         if (!$contact->getEmail()) {
             return;
@@ -92,6 +95,10 @@ class ContactQuickEmailMailer
             ->htmlTemplate('email/bulk_blank.html.twig')
             ->textTemplate('email/bulk_blank.txt.twig')
             ->context($context);
+
+        if ($emailRef !== null) {
+            EmailOpenTracking::tag($email, $emailRef);
+        }
 
         foreach ($attachments as $file) {
             // Typed from the (already allow-listed) extension rather than by sniffing the content,

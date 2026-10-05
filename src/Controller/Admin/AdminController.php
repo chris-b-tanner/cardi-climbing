@@ -38,6 +38,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_TEAM')]
 class AdminController extends AbstractController
 {
+    #[Route('', name: 'app_admin')]
+    public function index(): Response
+    {
+        return $this->redirectToRoute('app_admin_dashboard');
+    }
+
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {

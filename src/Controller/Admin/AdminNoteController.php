@@ -12,6 +12,7 @@ use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\ContactNoteMailer;
 use App\Service\Mailer\ContactQuickEmailMailer;
+use App\Service\Mailer\EmailOpenTracking;
 use App\Service\NoteableResolver;
 use App\Service\Mailer\NoteAssignmentMailer;
 use Doctrine\ORM\EntityManagerInterface;
@@ -116,6 +117,7 @@ class AdminNoteController extends AbstractController
 
             if ($wantsEmail) {
                 $note->setEmailSubject($subject);
+                $note->setEmailRef(EmailOpenTracking::newRef());
             }
 
             if ($request->request->getBoolean('pinned')) {
@@ -133,7 +135,7 @@ class AdminNoteController extends AbstractController
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
 
                 if ($wantsEmail) {
-                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments);
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef());
                     $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
                     $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');
                 }

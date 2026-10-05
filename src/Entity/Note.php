@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 /** A note attachable to any of five record types (see TYPE_* below), identified by noteableType + noteableId rather than a Doctrine association — there's no single target entity to point a ManyToOne at. */
 #[ORM\Entity(repositoryClass: NoteRepository::class)]
+#[ORM\Index(name: 'idx_note_email_ref', columns: ['email_ref'])]
 class Note
 {
     public const TYPE_MEMBER   = 'member';
@@ -75,6 +76,23 @@ class Note
      */
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $emailSubject = null;
+
+    /**
+     * Postmark open tracking — see EmailOpenTracking. Set on the note recording an outbound email
+     * (a quick email or a bulk "Emailed: ..." note), sent to Postmark as message metadata and
+     * handed back on its open webhook (WebhookController::postmarkOpen()), which stamps the two
+     * fields below. Null on every other note, and on emails sent before tracking existed.
+     */
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $emailRef = null;
+
+    /** When the recipient first opened the email, per Postmark. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $emailOpenedAt = null;
+
+    /** Every open Postmark reported, the first included. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $emailOpenCount = 0;
 
     public function __construct()
     {
@@ -226,6 +244,37 @@ class Note
     public function setEmailSubject(?string $emailSubject): static
     {
         $this->emailSubject = $emailSubject;
+        return $this;
+    }
+
+    public function getEmailRef(): ?string
+    {
+        return $this->emailRef;
+    }
+
+    public function setEmailRef(?string $emailRef): static
+    {
+        $this->emailRef = $emailRef;
+        return $this;
+    }
+
+    public function getEmailOpenedAt(): ?\DateTimeImmutable
+    {
+        return $this->emailOpenedAt;
+    }
+
+    public function getEmailOpenCount(): int
+    {
+        return $this->emailOpenCount;
+    }
+
+    /** Records one open reported by Postmark — keeps the earliest as the first-opened time, since webhooks can arrive out of order. */
+    public function recordEmailOpen(\DateTimeImmutable $openedAt): static
+    {
+        if ($this->emailOpenedAt === null || $openedAt < $this->emailOpenedAt) {
+            $this->emailOpenedAt = $openedAt;
+        }
+        $this->emailOpenCount++;
         return $this;
     }
 }

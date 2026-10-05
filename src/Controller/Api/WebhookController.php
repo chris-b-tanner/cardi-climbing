@@ -2,9 +2,12 @@
 
 namespace App\Controller\Api;
 
+use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
+use App\Service\Mailer\EmailOpenTracking;
 use App\Service\Mailer\ContactReplyMailer;
 use App\Service\UserService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -113,6 +116,45 @@ class WebhookController extends AbstractController
         }
 
         return new JsonResponse(['status' => 'created', 'id' => $user->getId()]);
+    }
+
+    /**
+     * Postmark's open-tracking webhook — set it up on each message stream (transactional and
+     * broadcast) pointing at this URL, with open tracking switched on for the stream. Finds the
+     * note the email was recorded on by the ref sent as metadata (see EmailOpenTracking) and
+     * marks it opened. Anything it can't match — an email sent before tracking existed, or one
+     * that was never recorded on a note — gets a 200 anyway, so Postmark doesn't keep retrying it.
+     */
+    #[Route('/webhook/postmark-open/{secret}', name: 'app_webhook_postmark_open', methods: ['POST'])]
+    public function postmarkOpen(Request $request, string $secret, NoteRepository $noteRepository, EntityManagerInterface $em): JsonResponse
+    {
+        if (!hash_equals($this->webhookSecret, $secret)) {
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $payload = json_decode($request->getContent(), true);
+
+        if (!is_array($payload) || ($payload['RecordType'] ?? null) !== 'Open') {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $ref  = $payload['Metadata'][EmailOpenTracking::METADATA_KEY] ?? null;
+        $note = is_string($ref) && $ref !== '' ? $noteRepository->findOneBy(['emailRef' => $ref]) : null;
+
+        if ($note === null) {
+            return new JsonResponse(['status' => 'unmatched']);
+        }
+
+        try {
+            $openedAt = (new \DateTimeImmutable($payload['ReceivedAt'] ?? 'now'))->setTimezone(new \DateTimeZone('UTC'));
+        } catch (\Exception) {
+            $openedAt = new \DateTimeImmutable();
+        }
+
+        $note->recordEmailOpen($openedAt);
+        $em->flush();
+
+        return new JsonResponse(['status' => 'recorded', 'id' => $note->getId()]);
     }
 
     private function parseForwardedSender(string $text): ?array

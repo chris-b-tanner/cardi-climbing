@@ -41,7 +41,7 @@ class NewsEditorController extends AbstractController
             $body  = trim($request->request->get('body', ''));
 
             if ($title === '' || $body === '') {
-                $error = 'Title and body are required.';
+                $error = $this->missingFieldsError($title, $body);
             } else {
                 $slug = $this->resolveSlug($request->request->get('slug', ''), $title);
 
@@ -68,8 +68,9 @@ class NewsEditorController extends AbstractController
         }
 
         return $this->render('news/_editor.html.twig', [
-            'post'  => null,
-            'error' => $error,
+            'post'      => null,
+            'error'     => $error,
+            'submitted' => $request->isMethod('POST') ? $this->submittedValues($request) : null,
         ]);
     }
 
@@ -92,7 +93,7 @@ class NewsEditorController extends AbstractController
             $body  = trim($request->request->get('body', ''));
 
             if ($title === '' || $body === '') {
-                $error = 'Title and body are required.';
+                $error = $this->missingFieldsError($title, $body);
             } else {
                 $slug = $this->resolveSlug($request->request->get('slug', ''), $title);
 
@@ -120,9 +121,36 @@ class NewsEditorController extends AbstractController
         }
 
         return $this->render('news/_editor.html.twig', [
-            'post'  => $post,
-            'error' => $error,
+            'post'      => $post,
+            'error'     => $error,
+            'submitted' => $request->isMethod('POST') ? $this->submittedValues($request) : null,
         ]);
+    }
+
+    /** Names exactly which field arrived empty, so a body lost before submit (the editor's JS never copying it into the hidden textarea) is told apart from a missing title. */
+    private function missingFieldsError(string $title, string $body): string
+    {
+        return match (true) {
+            $title === '' && $body === '' => 'Title and body are required.',
+            $title === ''                 => 'Title is required.',
+            default                       => 'Body is required — the post text didn\'t reach the server.',
+        };
+    }
+
+    /**
+     * What was just POSTed, so a failed save re-renders the editor with the admin's work intact
+     * instead of a blank form (a new post) or the last saved version (an edit).
+     *
+     * @return array{title: string, slug: string, body: string, published: bool}
+     */
+    private function submittedValues(Request $request): array
+    {
+        return [
+            'title'     => (string) $request->request->get('title', ''),
+            'slug'      => (string) $request->request->get('slug', ''),
+            'body'      => (string) $request->request->get('body', ''),
+            'published' => $request->request->has('published'),
+        ];
     }
 
     private function resolveSlug(string $requestedSlug, string $title): string
