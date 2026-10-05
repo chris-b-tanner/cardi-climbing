@@ -39,7 +39,7 @@ class DoorController extends AbstractController
     /** Per-door cooldown between alert emails — a stuck sensor generating repeat alert-worthy entries shouldn't flood an inbox (see § Server-side alerting). */
     private const ALERT_COOLDOWN_MINUTES = 10;
 
-    /** Active + near-future (next 2h) PIN (and, where registered, card) credentials, plus keyholder disarm PINs, for this door — an authoritative full replace of the device's local cache on every poll. */
+    /** Active + near-future (next 2h) PIN (and, where registered, card) credentials, plus keyholder disarm PINs, all-hours cards and exit-reader cards, for this door — an authoritative full replace of the device's local cache on every poll. */
     #[Route('/credentials', name: 'app_api_door_credentials', requirements: ['doorId' => '\d+'], methods: ['GET'])]
     public function credentials(Request $request, int $doorId): Response
     {
@@ -75,8 +75,9 @@ class DoorController extends AbstractController
 
         $keyholders = $this->doorAccessService->findKeyholdersForDoor($doorId);
         $standingCards = $this->doorAccessService->findStandingCardsForDoor($doorId);
+        $exitCards = $this->doorAccessService->findExitCardsForDoor($doorId, $now);
 
-        $etag = '"' . md5(json_encode([$credentials, $keyholders, $standingCards])) . '"';
+        $etag = '"' . md5(json_encode([$credentials, $keyholders, $standingCards, $exitCards])) . '"';
 
         // A 304 has no body by definition, so min_firmware_version can't ride in the JSON here —
         // carried as a header instead, so an OTA update is never missed just because credentials
@@ -93,11 +94,12 @@ class DoorController extends AbstractController
             'credentials'          => $credentials,
             'keyholders'           => $keyholders,
             'standing_cards'       => $standingCards,
+            'exit_cards'           => $exitCards,
         ], 200, ['ETag' => $etag] + $firmwareHeaders);
     }
 
     /**
-     * Batched, idempotent door events — attendee_access/keyholder_access/unexpected_open arrive in
+     * Batched, idempotent door events — attendee_access/keyholder_access/unexpected_open/standing_access/member_exit arrive in
      * up to three POSTs per event_id (one per stage), upserted onto one AccessEvent row each;
      * access_denied is a single-stage write. See door-access-spec.md § Access event log.
      */
@@ -131,6 +133,7 @@ class DoorController extends AbstractController
                 AccessEvent::TYPE_UNEXPECTED_OPEN  => $this->applyUnexpectedOpen($eventId, $event),
                 AccessEvent::TYPE_ACCESS_DENIED    => $this->applyAccessDenied($eventId, $doorId, $event),
                 AccessEvent::TYPE_STANDING_ACCESS  => $this->applyStandingAccess($eventId, $event),
+                AccessEvent::TYPE_MEMBER_EXIT      => $this->applyMemberExit($eventId, $event),
                 default => null,
             };
 
@@ -293,6 +296,21 @@ class DoorController extends AbstractController
 
         $timestamp = $this->timestampForStage($event, $stage);
         $this->doorAccessService->applyStandingAccessEvent($eventId, $stage, $cardUid, $timestamp);
+    }
+
+    private function applyMemberExit(string $eventId, array $event): void
+    {
+        $stage   = $event['stage'] ?? null;
+        $cardUid = $this->cardUidFromEvent($event);
+
+        if (!is_string($stage) || $cardUid === null) {
+            return;
+        }
+
+        $timestamp = $this->timestampForStage($event, $stage);
+        // The checkout time is always the tap itself, whichever stage's POST happens to arrive first.
+        $authorizedAt = $this->parseTimestamp($event['authorized_at'] ?? null) ?? $timestamp;
+        $this->doorAccessService->applyMemberExitEvent($eventId, $stage, $cardUid, $timestamp, $authorizedAt);
     }
 
     private function applyAccessDenied(string $eventId, int $doorId, array $event): void

@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
  * booking to attach to, and an unexpected open has no PIN at all.
  */
 #[ORM\Entity(repositoryClass: AccessEventRepository::class)]
+#[ORM\Index(name: 'idx_access_event_card_uid_authorized_at', columns: ['card_uid', 'authorized_at'])]
 class AccessEvent
 {
     public const TYPE_ATTENDEE_ACCESS  = 'attendee_access';
@@ -19,6 +20,7 @@ class AccessEvent
     public const TYPE_ACCESS_DENIED    = 'access_denied';
     public const TYPE_UNEXPECTED_OPEN  = 'unexpected_open';
     public const TYPE_STANDING_ACCESS  = 'standing_access';
+    public const TYPE_MEMBER_EXIT      = 'member_exit';
 
     public const STAGE_AUTHORIZED  = 'authorized';
     public const STAGE_DOOR_OPEN   = 'door_open';

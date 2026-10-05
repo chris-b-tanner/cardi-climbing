@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\AccessCard;
+use App\Entity\AccessEvent;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -77,6 +78,30 @@ class AccessCardRepository extends ServiceEntityRepository
             ->where('c.status = :status')
             ->andWhere('c.allHoursAccess = true')
             ->setParameter('status', AccessCard::STATUS_ACTIVE)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Active cards tapped at the door (any reader, any outcome) since {since} — the door's exit-reader
+     * list (door-access-spec.md § Exit reader). The exit reader isn't a gate, so anyone who's used
+     * their card recently enough is trusted to leave; the time bound only keeps the list small enough
+     * for the door controller's memory. Matched on the exact card UID, so a replacement card joins
+     * the list on its first tap rather than inheriting the old card's history.
+     *
+     * @return AccessCard[]
+     */
+    public function findActiveUsedSince(\DateTimeImmutable $since): array
+    {
+        return $this->createQueryBuilder('c')
+            ->leftJoin('c.user', 'u')->addSelect('u')
+            ->where('c.status = :status')
+            ->andWhere(sprintf(
+                'EXISTS (SELECT 1 FROM %s e WHERE e.cardUid = c.uid AND e.authorizedAt >= :since)',
+                AccessEvent::class,
+            ))
+            ->setParameter('status', AccessCard::STATUS_ACTIVE)
+            ->setParameter('since', $since)
             ->getQuery()
             ->getResult();
     }

@@ -335,6 +335,21 @@ membership has lapsed, or who never had an active booking today, still gets the 
 The only thing the tap additionally does, beyond opening the door, is *identify* who left, so their
 session can be closed out if they had one — that's a reporting bonus, never a gate.
 
+> **As built (2026-10-05)** — where this differs from the design below, this wins:
+> - `exit_cards` is every **active** card **tapped at the door (any reader, any outcome) in the last
+>   year**, not every card ever issued (`AccessCardRepository::findActiveUsedSince()`). This keeps
+>   the list small enough for the door controller, which has no PSRAM. Matched on the exact UID, so
+>   a replacement card joins on its first tap. Locked cards are never included.
+> - A tap closes a session only if the member has a booking that was checked in within the **24
+>   hours** before the tap and isn't checked out yet. A stale open check-in (someone who left by
+>   the push button days ago) is left alone rather than being closed with today's time. Anyone
+>   else just gets the door-opening logged.
+> - The checkout happens the first time the server sees that `event_id`, whichever stage arrives
+>   first, always at `authorized_at`.
+> - There's no separate `exit_user_id` column. A `member_exit` row reuses `card_uid`/`card_user_id`,
+>   the same columns the other card events use; `attendee_id` is set to the session it closed, if
+>   any.
+
 - Because it isn't gated, this reader has **no relationship to `attendee.pin`/`pin_status` at all**
   — don't reuse the entry-side credential cache for it. It needs its own, much simpler cache: every
   user in the system who currently has a `card_uid`, full stop, no membership/booking filtering.
@@ -350,9 +365,9 @@ session can be closed out if they had one — that's a reporting bonus, never a 
     ]
   }
   ```
-  Same authoritative-full-replace rule as `credentials`/`keyholders`. This can be a genuinely large
-  list (every card ever issued, active member or not) — that's fine, it's two small fields per
-  row and this only downloads to doors that actually have an internal reader wired up.
+  Same authoritative-full-replace rule as `credentials`/`keyholders`. Bounded to active cards
+  tapped in the last year (see "As built" above). The door controller has no PSRAM, so the full
+  list of every card ever issued could exhaust its memory.
 - **On a tap that resolves to a known `card_uid`:** pulse the relay immediately (§ Concurrent
   access above still applies — if the main door-open cycle is already under way from an entry tap,
   this just joins it rather than pulsing again), and queue an `access_event` of
@@ -429,9 +444,9 @@ Returns active + near-future (e.g. next 2h) PIN/card-bearing attendees for this 
                                                   // works at any hour, no booking required
   ],
   "exit_cards": [
-    { "user_id": 42, "card_uid": "04A3B2C1" }   // § Exit reader — every registered card, no
-                                                  // membership/booking filtering; only present for
-                                                  // a door configured with an internal reader
+    { "user_id": 42, "card_uid": "04A3B2C1" }   // § Exit reader — every active card tapped at
+                                                  // the door in the last year, no membership/
+                                                  // booking filtering
   ]
 }
 ```
@@ -670,7 +685,8 @@ Fail-safe vs fail-secure catch wiring — confirm against local fire code if thi
   two real tables" for why. `GET /v1/doors/{door_id}/credentials` still includes `card_uid` per
   credential exactly as specced above; it's just sourced from a member's active `access_card` row
   now instead of a `user` column. The exit reader (`exit_cards`, `member_exit`,
-  `checked_out_at`/`checked_out_method`) remains entirely unbuilt.
+  `checked_out_at`/`checked_out_method`) was built on 2026-10-05 — see the "As built" note in
+  § Exit reader.
 - **Whether keyholders should also get cards** (tap instead of typing their disarm PIN) isn't
   addressed — this revision only adds cards for booking-attendee entry and for the unconditional
   exit reader. Keyholder PIN entry is unchanged. Worth revisiting once cards are in use and the

@@ -277,6 +277,28 @@ class AttendeeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * {user}'s most recent booking that's checked in but not yet checked out, with the check-in no
+     * earlier than {checkedInSince} — the session an exit-reader tap closes (door-access-spec.md
+     * § Exit reader). The lower bound stops a stale session (someone who left by the push button
+     * days ago and never tapped out) being closed with today's time.
+     */
+    public function findOpenCheckInForUser(User $user, \DateTimeImmutable $checkedInSince): ?Attendee
+    {
+        return $this->createQueryBuilder('a')
+            ->where('a.user = :user')
+            ->andWhere('a.checkedInAt >= :since')
+            ->andWhere('a.checkedOutAt IS NULL')
+            ->andWhere('a.status != :cancelled')
+            ->setParameter('user', $user)
+            ->setParameter('since', $checkedInSince)
+            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->orderBy('a.checkedInAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     private function whereOccurrence(QueryBuilder $qb, ?\DateTimeImmutable $occurrenceDate): void
     {
         if ($occurrenceDate !== null) {

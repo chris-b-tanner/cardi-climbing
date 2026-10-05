@@ -37,6 +37,12 @@ class DoorAccessService
     /** How far ahead of "now" a door's credential sync looks for upcoming sessions. */
     private const SYNC_WINDOW = 'PT2H';
 
+    /** How far back a card's last door tap can be and still be on the exit reader's list (§ Exit reader). */
+    private const EXIT_CARD_LOOKBACK = 'P1Y';
+
+    /** How long before an exit tap a check-in can be and still be the session that tap closes (§ Exit reader). */
+    private const CHECKOUT_LOOKBACK = 'PT24H';
+
     public const SUPPORTED_DOOR_ID = 1;
 
     /**
@@ -288,6 +294,54 @@ class DoorAccessService
             static fn(AccessCard $card) => ['card_uid' => $card->getUid(), 'user_id' => $card->getUser()->getId()],
             $this->accessCardRepository->findAllHoursForDoor(),
         );
+    }
+
+    /**
+     * The card UIDs the door's exit reader should accept right now — every active card tapped at
+     * the door in the last year (§ Exit reader). Same "authoritative full replace" treatment as the
+     * other lists. Not a gate: a card here only opens the door from the inside and identifies who
+     * left; whether that closes a session is decided when the member_exit event arrives.
+     *
+     * @return array<int, array{user_id: int, card_uid: string}>
+     */
+    public function findExitCardsForDoor(int $doorId, \DateTimeImmutable $now): array
+    {
+        if ($doorId !== self::SUPPORTED_DOOR_ID) {
+            return [];
+        }
+
+        return array_map(
+            static fn(AccessCard $card) => ['user_id' => $card->getUser()->getId(), 'card_uid' => $card->getUid()],
+            $this->accessCardRepository->findActiveUsedSince($now->sub(new \DateInterval(self::EXIT_CARD_LOOKBACK))),
+        );
+    }
+
+    /**
+     * Applies one stage of a `member_exit` event (§ Exit reader) — same upsert/stage rules as the
+     * other types. The first time this event_id is seen (whichever stage arrives first), the
+     * card's member is checked out of their open session, if they have one checked in within the
+     * last CHECKOUT_LOOKBACK — at {authorizedAt}, the tap itself, not the door closing. Anyone else
+     * (no booking, never checked in, already checked out) just gets the door-opening logged.
+     */
+    public function applyMemberExitEvent(string $eventId, string $stage, string $cardUid, \DateTimeImmutable $timestamp, \DateTimeImmutable $authorizedAt): void
+    {
+        $event = $this->upsertAccessEvent($eventId, AccessEvent::TYPE_MEMBER_EXIT);
+        $user = $this->accessCardRepository->findOneByUid($cardUid)?->getUser();
+        $event->setCard($cardUid, $user);
+
+        $firstSeen = $event->getStage() === null;
+        if (!$event->advanceStage($stage, $timestamp) || !$firstSeen || $user === null) {
+            return;
+        }
+
+        $since = $authorizedAt->sub(new \DateInterval(self::CHECKOUT_LOOKBACK));
+        $attendee = $this->attendeeRepository->findOpenCheckInForUser($user, $since);
+        if ($attendee === null) {
+            return;
+        }
+
+        $attendee->checkOut($authorizedAt, Attendee::CHECKED_OUT_DOOR_CARD);
+        $event->setAttendee($attendee);
     }
 
     /** Generates a unique 6-digit keyholder PIN, excluding both other active keyholder PINs and currently-active attendee PINs — the two pools must never collide (§ PIN lifecycle). */

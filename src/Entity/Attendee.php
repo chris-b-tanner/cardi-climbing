@@ -28,6 +28,8 @@ class Attendee
     public const CHECKED_IN_DOOR_PIN = 'door_pin';
     public const CHECKED_IN_MANUAL   = 'manual';
 
+    public const CHECKED_OUT_DOOR_CARD = 'door_card';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -95,6 +97,14 @@ class Attendee
     /** door_pin | manual. Null until checked in. */
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $checkedInMethod = null;
+
+    /** When the climbing session ended — set once, from an exit-reader tap (see door-access-spec.md § Exit reader). Null while still checked in, or if they left without tapping out. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $checkedOutAt = null;
+
+    /** door_card. Null until checked out. */
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $checkedOutMethod = null;
 
     public function __construct()
     {
@@ -321,5 +331,28 @@ class Attendee
     public function isCheckedIn(): bool
     {
         return $this->checkedInAt !== null;
+    }
+
+    public function getCheckedOutAt(): ?\DateTimeImmutable
+    {
+        return $this->checkedOutAt;
+    }
+
+    public function getCheckedOutMethod(): ?string
+    {
+        return $this->checkedOutMethod;
+    }
+
+    public function isCheckedOut(): bool
+    {
+        return $this->checkedOutAt !== null;
+    }
+
+    /** Ends the session. Set once only — a second exit tap leaves the first checkout time in place. */
+    public function checkOut(\DateTimeImmutable $at, string $method): static
+    {
+        $this->checkedOutAt ??= $at;
+        $this->checkedOutMethod ??= $method;
+        return $this;
     }
 }

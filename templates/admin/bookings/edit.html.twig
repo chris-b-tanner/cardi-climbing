@@ -116,6 +116,21 @@
           {% endif %}
         </div>
       </div>
+      {% if attendee.checkedInAt %}
+        <div>
+          <div class="card__label">Checked out</div>
+          <div class="card__value">
+            {% if attendee.checkedOutAt %}
+              {{ attendee.checkedOutAt|date('d M Y, H:i') }}
+              {% if attendee.checkedOutMethod == 'door_card' %}
+                &middot; via exit card
+              {% endif %}
+            {% else %}
+              Not yet
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
     </div>
 
     <div id="door-access-error" class="flash flash--error" style="display:none;margin-top:1rem;"></div>
