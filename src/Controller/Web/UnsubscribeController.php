@@ -16,7 +16,12 @@ class UnsubscribeController extends AbstractController
         #[Autowire('%kernel.secret%')] private readonly string $appSecret,
     ) {}
 
-    #[Route('/unsubscribe', name: 'app_unsubscribe', methods: ['GET'])]
+    /**
+     * GET is the link in the email footer. POST is RFC 8058 one-click unsubscribe: mail clients
+     * (Gmail, Yahoo, Apple Mail) POST to the List-Unsubscribe header's URL — query string intact —
+     * with the body "List-Unsubscribe=One-Click", so the same token check covers both.
+     */
+    #[Route('/unsubscribe', name: 'app_unsubscribe', methods: ['GET', 'POST'])]
     public function unsubscribe(Request $request, UserRepository $userRepository, EntityManagerInterface $em): Response
     {
         $email = strtolower(trim($request->query->get('email', '')));

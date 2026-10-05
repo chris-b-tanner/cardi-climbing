@@ -8,9 +8,11 @@ use App\Message\SendBulkEmailMessage;
 use App\Repository\UserRepository;
 use App\Service\Mailer\EmailPlaceholders;
 use App\Service\UserService;
+use App\Twig\AppExtension;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\Bridge\Postmark\Transport\MessageStreamHeader;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Mime\Address;
@@ -31,8 +33,10 @@ final class SendBulkEmailMessageHandler
         private readonly MailerInterface $mailer,
         private readonly UserService $userService,
         private readonly EmailPlaceholders $emailPlaceholders,
+        private readonly AppExtension $appExtension,
         #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
+        #[Autowire('%env(POSTMARK_BROADCAST_STREAM)%')] private readonly string $broadcastStream,
     ) {}
 
     public function __invoke(SendBulkEmailMessage $message): void
@@ -70,6 +74,19 @@ final class SendBulkEmailMessageHandler
             ->htmlTemplate($htmlTemplate)
             ->textTemplate($textTemplate)
             ->context($context);
+
+        // Tag/everyone sends are marketing-style broadcasts: they carry one-click unsubscribe
+        // (RFC 8058, required by Gmail/Yahoo for bulk senders) and go out on Postmark's broadcast
+        // stream so their reputation is kept apart from transactional mail (receipts, password
+        // resets, 1:1 replies). Event/certification/single-member sends are operational, so they
+        // stay on the default transactional stream with no unsubscribe, same as the footer link.
+        if (isset($context['recipientEmail'])) {
+            $unsubscribeUrl = $this->appExtension->unsubscribeUrl($context['recipientEmail']);
+            $mimeMessage->getHeaders()
+                ->addTextHeader('List-Unsubscribe', '<' . $unsubscribeUrl . '>')
+                ->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click')
+                ->add(new MessageStreamHeader($this->broadcastStream));
+        }
 
         try {
             $this->mailer->send($mimeMessage);
