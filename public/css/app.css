@@ -204,24 +204,6 @@ p + p { margin-top: 1rem; }
   height: 64px;
 }
 
-/* ── Survey banner ──────────────────────────────────── */
-.survey-banner { background: var(--sand); }
-.survey-banner--top { margin-top: 64px; }
-.survey-banner__inner {
-  display: flex; align-items: center; justify-content: center;
-  flex-wrap: wrap; gap: 0.85rem 1.5rem;
-  padding: 0.85rem 1.5rem;
-  text-align: center;
-}
-.survey-banner__text {
-  font-family: var(--f-head); font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.03em; font-size: 0.85rem; color: var(--black);
-  margin-right: 10px;
-}
-@media (min-width: 1024px) {
-  .survey-banner__text { white-space: nowrap; }
-}
-
 /* ── Hero ───────────────────────────────────────────── */
 .hero { padding: 10rem 0 5rem; }
 .hero__label {
