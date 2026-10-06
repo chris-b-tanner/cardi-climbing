@@ -30,7 +30,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /**
-     * When each *currently* opted-in member joined — for the dashboard's growth chart. Uses
+     * When each *currently* opted-in member joined — for the dashboard's "since 20 Aug" figure. Uses
      * today's opt-in snapshot rather than reconstructing historical opt-in status day by day (we
      * don't track opt-in change history precisely enough for that, and don't need to): someone
      * who has since opted out simply isn't counted at all, even on days before they opted out.
@@ -44,18 +44,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             $this->createQueryBuilder('u')
                 ->where('u.optIn = true')
                 ->andWhere('u.deletedAt IS NULL')
-                ->getQuery()
-                ->getResult(),
-        );
-    }
-
-    /** Same idea as findOptedInCreatedDates(), but every non-archived contact regardless of opt-in/email — the dashboard's "total members" line. */
-    public function findAllCreatedDates(): array
-    {
-        return array_map(
-            static fn(User $u) => $u->getCreatedAt(),
-            $this->createQueryBuilder('u')
-                ->where('u.deletedAt IS NULL')
                 ->getQuery()
                 ->getResult(),
         );
