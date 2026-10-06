@@ -204,6 +204,30 @@ p + p { margin-top: 1rem; }
   height: 64px;
 }
 
+/* ── Crowdfunder banner ─────────────────────────────── */
+.cf-banner { background: var(--sand); margin-top: 64px; }
+.cf-banner__inner {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 1rem 1.5rem; padding-top: 1.25rem; padding-bottom: 1.25rem;
+}
+.cf-banner__media { flex: 0 0 auto; display: block; }
+.cf-banner__media img {
+  display: block; width: 140px; height: auto;
+  border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.cf-banner__body { flex: 1 1 260px; min-width: 0; }
+.cf-banner__title {
+  font-family: var(--f-head); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; font-size: 1.15rem; line-height: 1.3; color: var(--black);
+}
+.cf-banner__text { font-size: 0.95rem; color: var(--black); margin-top: 0.2rem; }
+.cf-banner__cta { flex: 0 0 auto; }
+@media (max-width: 639px) {
+  .cf-banner__media { flex-basis: 100%; }
+  .cf-banner__media img { width: 100%; }
+  .cf-banner__cta { width: 100%; text-align: center; }
+}
+
 /* ── Hero ───────────────────────────────────────────── */
 .hero { padding: 10rem 0 5rem; }
 .hero__label {

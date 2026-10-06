@@ -17,6 +17,9 @@ hero_h1: "<span style=\"color:var(--muted)\">Climb.</span><br><em>Connect.</em><
 hero_sub: "We are building a community-owned indoor climbing and bouldering wall in the heart of Cardigan — open to all ages, abilities, and backgrounds. Help us make it happen."
 hero_cta_primary: "Get Involved"
 hero_cta_secondary: "Our Mission"
+cf_banner_title: "We're crowdfunding!"
+cf_banner_text: "Help us build Cardigan's community climbing wall — every pledge brings Y Wal closer."
+cf_banner_cta: "Back us on Crowdfunder"
 hero_signup_label: "Follow the project"
 
 stat_1_label: "Dedicated wall in Ceredigion"

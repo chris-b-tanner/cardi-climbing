@@ -4,6 +4,21 @@
 {% set subSuccess = app.flashes('subscribe_success') %}
 {% set subError   = app.flashes('subscribe_error') %}
 
+{# ── Crowdfunder banner ────────────────────────────────── #}
+{% set cfUrl = 'https://www.crowdfunder.co.uk/p/cardigan-climbing-and-bouldering?utm_source=web&utm_medium=website&utm_campaign=cf1' %}
+<div class="cf-banner">
+  <div class="wrap cf-banner__inner">
+    <a href="{{ cfUrl }}" class="cf-banner__media" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+      <img src="/images/cf-vid.png" alt="" width="400" height="227">
+    </a>
+    <div class="cf-banner__body">
+      <p class="cf-banner__title">{{ 'cf_banner_title'|trans }}</p>
+      <p class="cf-banner__text">{{ 'cf_banner_text'|trans }}</p>
+    </div>
+    <a href="{{ cfUrl }}" class="btn btn--dark-grey cf-banner__cta" target="_blank" rel="noopener">{{ 'cf_banner_cta'|trans }}</a>
+  </div>
+</div>
+
 {# ── Hero ──────────────────────────────────────────────── #}
 <section class="hero" id="home">
   <div class="wrap">
