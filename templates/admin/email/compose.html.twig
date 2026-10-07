@@ -34,6 +34,48 @@
         <span class="admin-table__muted">— all delivered</span>
       {% endif %}
     </div>
+
+    {% if openStats %}
+      <div style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
+        {% if openStats.tracked %}
+          <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <span style="font-size:2rem;font-weight:700;color:var(--black);line-height:1;">{{ openStats.rate }}%</span>
+            <span style="font-size:0.85rem;">open rate</span>
+            <span class="admin-table__muted" style="font-size:0.85rem;" title="Per Postmark — Apple Mail can report an open the recipient never made">
+              {{ openStats.opened }} of {{ openStats.tracked }} recipient{{ openStats.tracked == 1 ? '' : 's' }} opened it{% if openStats.tracked < deliveredCount %} ({{ deliveredCount - openStats.tracked }} sent before open tracking aren't counted){% endif %}
+            </span>
+          </div>
+          <div class="card__label" style="margin-bottom:0.4rem;">First opens per hour — 5 days from sending</div>
+          <div class="table-scroll" style="border:none;">
+            <svg viewBox="0 0 {{ openStats.width }} {{ openStats.height }}" width="100%" style="display:block;min-width:600px;">
+              <line x1="{{ openStats.bars[0].x }}" y1="{{ openStats.top }}" x2="{{ openStats.width }}" y2="{{ openStats.top }}" stroke="var(--border)" stroke-dasharray="3,3"></line>
+              <text x="0" y="{{ openStats.top + 4 }}" font-size="10" fill="var(--muted)">{{ openStats.max }}</text>
+              <line x1="{{ openStats.bars[0].x }}" y1="{{ openStats.baseline }}" x2="{{ openStats.width }}" y2="{{ openStats.baseline }}" stroke="var(--border)"></line>
+              <text x="0" y="{{ openStats.baseline }}" font-size="10" fill="var(--muted)">0</text>
+              {% for tick in openStats.ticks %}
+                <line x1="{{ tick.x }}" y1="{{ openStats.top }}" x2="{{ tick.x }}" y2="{{ openStats.baseline + 4 }}" stroke="var(--border)"></line>
+                <text x="{{ tick.x + 3 }}" y="{{ openStats.height - 4 }}" font-size="10" fill="var(--muted)">{{ tick.label }}</text>
+              {% endfor %}
+              {% for bar in openStats.bars %}
+                {# Full-height transparent hit area, so even an empty hour shows its tooltip. #}
+                <g>
+                  <title>{{ bar.label }}: {{ bar.count }} open{{ bar.count == 1 ? '' : 's' }}</title>
+                  <rect x="{{ bar.x }}" y="{{ openStats.top }}" width="{{ bar.width }}" height="{{ openStats.baseline - openStats.top }}" fill="transparent"></rect>
+                  {% if bar.count %}
+                    <rect x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}" fill="var(--teal-dk)" rx="1"></rect>
+                  {% endif %}
+                </g>
+              {% endfor %}
+            </svg>
+          </div>
+          {% if openStats.opened > openStats.inWindow %}
+            <p class="admin-table__muted" style="font-size:0.78rem;margin-top:0.4rem;">{{ openStats.opened - openStats.inWindow }} first opened after these 5 days.</p>
+          {% endif %}
+        {% else %}
+          <p class="admin-table__muted" style="font-size:0.85rem;">No open data — this email went out before open tracking was set up.</p>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 {% endif %}
 

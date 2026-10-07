@@ -42,6 +42,14 @@ use Twig\Environment;
 #[IsGranted('ROLE_TEAM')]
 class AdminEmailController extends AbstractController
 {
+    // Open-tracking chart on a sent email (see buildOpenStats()): hourly bars over the 5 days from the send.
+    private const OPEN_CHART_HOURS      = 120;
+    private const OPEN_CHART_WIDTH      = 960;
+    private const OPEN_CHART_HEIGHT     = 160;
+    private const OPEN_CHART_PAD_LEFT   = 28;
+    private const OPEN_CHART_PAD_TOP    = 8;
+    private const OPEN_CHART_PAD_BOTTOM = 20;
+
     /**
      * Starts (no {id}) or resumes/views (with {id}) an email. A fixed audience for a brand-new
      * one is read from the query string (eventId/certificationId/userId — the "Email" buttons on
@@ -81,7 +89,72 @@ class AdminEmailController extends AbstractController
             // Sending is queued (see send()/SendBulkEmailMessageHandler), so sentCount is how many
             // were queued, not how many have actually gone out yet — this is the confirmed count.
             'deliveredCount'         => $email->getId() ? $noteRepository->countForEmail($email->getId()) : 0,
+            'openStats'              => $email->getId() && $email->isSent() && $email->getSentAt()
+                ? $this->buildOpenStats($noteRepository->findOpenStatsForEmail($email->getId()), $email->getSentAt())
+                : null,
         ]);
+    }
+
+    /**
+     * Open rate plus an hourly bar chart of first opens over the 5 days from the send, in club
+     * (Europe/London) time. Bar geometry is computed here so the template only places coordinates.
+     *
+     * @param array{tracked: int, firstOpens: \DateTimeImmutable[]} $stats
+     */
+    private function buildOpenStats(array $stats, \DateTimeImmutable $sentAt): array
+    {
+        $tz    = new \DateTimeZone('Europe/London');
+        $start = $sentAt->setTimezone($tz);
+        $start = $start->setTime((int) $start->format('G'), 0);
+
+        $buckets = array_fill(0, self::OPEN_CHART_HOURS, 0);
+        foreach ($stats['firstOpens'] as $openedAt) {
+            $hour = intdiv($openedAt->getTimestamp() - $start->getTimestamp(), 3600);
+            if ($hour >= 0 && $hour < self::OPEN_CHART_HOURS) {
+                $buckets[$hour]++;
+            }
+        }
+
+        $opened    = count($stats['firstOpens']);
+        $max       = max(max($buckets), 1);
+        $innerW    = self::OPEN_CHART_WIDTH - self::OPEN_CHART_PAD_LEFT;
+        $innerH    = self::OPEN_CHART_HEIGHT - self::OPEN_CHART_PAD_TOP - self::OPEN_CHART_PAD_BOTTOM;
+        $slot      = $innerW / self::OPEN_CHART_HOURS;
+        $baseline  = self::OPEN_CHART_PAD_TOP + $innerH;
+
+        $bars  = [];
+        $ticks = [];
+        foreach ($buckets as $i => $count) {
+            $from = $start->modify("+{$i} hours");
+            $x    = self::OPEN_CHART_PAD_LEFT + $i * $slot;
+            $h    = $count / $max * $innerH;
+            $bars[] = [
+                'x'      => round($x + 0.5, 1),
+                'y'      => round($baseline - $h, 1),
+                'width'  => round(max($slot - 1, 1), 1),
+                'height' => round($h, 1),
+                'count'  => $count,
+                'label'  => $from->format('D j M, H:i') . '–' . $from->modify('+1 hour')->format('H:i'),
+            ];
+            // Label each midnight (plus the first hour), so days read along the axis.
+            if ($i === 0 || $from->format('G') === '0') {
+                $ticks[] = ['x' => round($x, 1), 'label' => $from->format($i === 0 ? 'D j M H:i' : 'D j M')];
+            }
+        }
+
+        return [
+            'tracked'      => $stats['tracked'],
+            'opened'       => $opened,
+            'rate'         => $stats['tracked'] ? round($opened / $stats['tracked'] * 100) : null,
+            'inWindow'     => array_sum($buckets),
+            'width'        => self::OPEN_CHART_WIDTH,
+            'height'       => self::OPEN_CHART_HEIGHT,
+            'baseline'     => $baseline,
+            'top'          => self::OPEN_CHART_PAD_TOP,
+            'max'          => $max,
+            'bars'         => $bars,
+            'ticks'        => $ticks,
+        ];
     }
 
     #[Route('/admin/email/preview', name: 'app_admin_email_preview', methods: ['POST'])]

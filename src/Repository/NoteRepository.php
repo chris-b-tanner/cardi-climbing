@@ -56,6 +56,29 @@ class NoteRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Open-tracking figures for a bulk Email: how many of its "Emailed:" notes were tracked (sent
+     * with an emailRef — anything sent before tracking existed wasn't), and when each tracked
+     * recipient first opened it. First opens only — we don't keep a timestamp for repeat opens.
+     *
+     * @return array{tracked: int, firstOpens: \DateTimeImmutable[]}
+     */
+    public function findOpenStatsForEmail(int $emailId): array
+    {
+        $rows = $this->createQueryBuilder('n')
+            ->select('n.emailOpenedAt')
+            ->where('n.email = :emailId')
+            ->andWhere('n.emailRef IS NOT NULL')
+            ->setParameter('emailId', $emailId)
+            ->getQuery()
+            ->getArrayResult();
+
+        return [
+            'tracked'    => count($rows),
+            'firstOpens' => array_values(array_filter(array_column($rows, 'emailOpenedAt'))),
+        ];
+    }
+
     public function countPinnedFor(string $type, int $id): int
     {
         return (int) $this->createQueryBuilder('n')
