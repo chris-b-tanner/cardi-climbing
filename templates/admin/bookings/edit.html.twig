@@ -83,61 +83,59 @@
   </div>
 {% endif %}
 
-{% if attendee.event.isSelfAccess %}
-  <div class="card" style="margin-top:1.5rem;">
-    <div class="card__label" style="margin-bottom:0.75rem;">Door access</div>
-    <div class="detail-grid">
-      {% if validFrom and validUntil %}
-        <div>
-          <div class="card__label">Valid</div>
-          <div class="card__value">{{ validFrom|date('d M Y, H:i') }} – {{ validUntil|date('H:i') }}</div>
-        </div>
-      {% endif %}
+<div class="card" style="margin-top:1.5rem;">
+  <div class="card__label" style="margin-bottom:0.75rem;">Attendance</div>
+  <div class="detail-grid">
+    {% if validFrom and validUntil %}
       <div>
-        <div class="card__label">Checked in</div>
-        <div class="card__value" id="door-access-checked-in">
-          {% if attendee.checkedInAt %}
-            {{ attendee.checkedInAt|date('d M Y, H:i') }}
-            {% if attendee.checkedInMethod == 'manual' and attendee.checkedInBy %}
-              &middot; by {{ attendee.checkedInBy.displayName }}
-            {% elseif attendee.checkedInMethod == 'door_card' %}
-              &middot; via door card
-            {% elseif attendee.checkedInMethod == 'door_pin' %}
-              &middot; via door PIN
+        <div class="card__label">Door access valid</div>
+        <div class="card__value">{{ validFrom|date('d M Y, H:i') }} – {{ validUntil|date('H:i') }}</div>
+      </div>
+    {% endif %}
+    <div>
+      <div class="card__label">Checked in</div>
+      <div class="card__value" id="door-access-checked-in">
+        {% if attendee.checkedInAt %}
+          {{ attendee.checkedInAt|date('d M Y, H:i') }}
+          {% if attendee.checkedInMethod == 'manual' and attendee.checkedInBy %}
+            &middot; by {{ attendee.checkedInBy.displayName }}
+          {% elseif attendee.checkedInMethod == 'door_card' %}
+            &middot; via door card
+          {% elseif attendee.checkedInMethod == 'door_pin' %}
+            &middot; via door PIN
+          {% endif %}
+        {% else %}
+          Not yet
+        {% endif %}
+      </div>
+    </div>
+    {% if attendee.checkedInAt %}
+      <div>
+        <div class="card__label">Checked out</div>
+        <div class="card__value">
+          {% if attendee.checkedOutAt %}
+            {{ attendee.checkedOutAt|date('d M Y, H:i') }}
+            {% if attendee.checkedOutMethod == 'door_card' %}
+              &middot; via exit card
             {% endif %}
           {% else %}
             Not yet
           {% endif %}
         </div>
       </div>
-      {% if attendee.checkedInAt %}
-        <div>
-          <div class="card__label">Checked out</div>
-          <div class="card__value">
-            {% if attendee.checkedOutAt %}
-              {{ attendee.checkedOutAt|date('d M Y, H:i') }}
-              {% if attendee.checkedOutMethod == 'door_card' %}
-                &middot; via exit card
-              {% endif %}
-            {% else %}
-              Not yet
-            {% endif %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-
-    <div id="door-access-error" class="flash flash--error" style="display:none;margin-top:1rem;"></div>
-
-    <div class="btn-row" style="margin-top:1rem;">
-      {% if not attendee.checkedIn %}
-        <button type="button" id="door-access-checkin" class="btn btn--teal btn--sm"
-                data-url="{{ path('app_api_attendee_check_in', {id: attendee.id}) }}"
-                data-csrf="{{ csrf_token('attendee_check_in_' ~ attendee.id) }}">Check in now</button>
-      {% endif %}
-    </div>
+    {% endif %}
   </div>
-{% endif %}
+
+  <div id="door-access-error" class="flash flash--error" style="display:none;margin-top:1rem;"></div>
+
+  <div class="btn-row" style="margin-top:1rem;">
+    {% if not attendee.checkedIn and attendee.status == 'confirmed' %}
+      <button type="button" id="door-access-checkin" class="btn btn--teal btn--sm"
+              data-url="{{ path('app_api_attendee_check_in', {id: attendee.id}) }}"
+              data-csrf="{{ csrf_token('attendee_check_in_' ~ attendee.id) }}">Check in now</button>
+    {% endif %}
+  </div>
+</div>
 
 <div class="card" style="margin-top:1.5rem;">
   <div class="card__label" style="margin-bottom:0.6rem;">Notes</div>
@@ -164,7 +162,6 @@
 {% endblock %}
 
 {% block scripts %}
-{% if attendee.event.isSelfAccess %}
 <script>
   function doorAccessCall(button) {
     const errorBox = document.getElementById('door-access-error');
@@ -197,5 +194,4 @@
 
   if (doorAccessCheckin) doorAccessCheckin.addEventListener('click', () => doorAccessCall(doorAccessCheckin));
 </script>
-{% endif %}
 {% endblock %}
