@@ -20,12 +20,9 @@ class Attendee
     public const STAFFING_APPROVED = 'approved';
     public const STAFFING_DECLINED = 'declined';
 
-    public const PIN_STATUS_ACTIVE  = 'active';
-    public const PIN_STATUS_USED    = 'used';
-    public const PIN_STATUS_REVOKED = 'revoked';
-    public const PIN_STATUS_EXPIRED = 'expired';
-
-    public const CHECKED_IN_DOOR_PIN = 'door_pin';
+    /** Historic only — door check-ins from before entry went card-only. */
+    public const CHECKED_IN_DOOR_PIN  = 'door_pin';
+    public const CHECKED_IN_DOOR_CARD = 'door_card';
     public const CHECKED_IN_MANUAL   = 'manual';
 
     public const CHECKED_OUT_DOOR_CARD = 'door_card';
@@ -78,23 +75,15 @@ class Attendee
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
-    /** This booking's 6-digit self-access door PIN — only set for events with isSelfAccess. attendee.id doubles as the door credential_id; see DoorAccessService. */
-    #[ORM\Column(length: 6, nullable: true)]
-    private ?string $pin = null;
-
-    /** active | used | revoked | expired — null when this booking never got a PIN. */
-    #[ORM\Column(length: 20, nullable: true)]
-    private ?string $pinStatus = null;
-
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $checkedInAt = null;
 
-    /** Null = self check-in via door PIN; set = which staff member checked the attendee in manually. */
+    /** Null = self check-in at the door; set = which staff member checked the attendee in manually. */
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $checkedInBy = null;
 
-    /** door_pin | manual. Null until checked in. */
+    /** door_card | manual (door_pin on historic rows). Null until checked in. */
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $checkedInMethod = null;
 
@@ -266,33 +255,6 @@ class Attendee
             self::STAFFING_DECLINED => 'Declined',
             default => null,
         };
-    }
-
-    public function getPin(): ?string
-    {
-        return $this->pin;
-    }
-
-    public function setPin(?string $pin): static
-    {
-        $this->pin = $pin;
-        return $this;
-    }
-
-    public function getPinStatus(): ?string
-    {
-        return $this->pinStatus;
-    }
-
-    public function setPinStatus(?string $pinStatus): static
-    {
-        $this->pinStatus = $pinStatus;
-        return $this;
-    }
-
-    public function isPinActive(): bool
-    {
-        return $this->pin !== null && $this->pinStatus === self::PIN_STATUS_ACTIVE;
     }
 
     public function getCheckedInAt(): ?\DateTimeImmutable

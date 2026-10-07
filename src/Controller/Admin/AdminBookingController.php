@@ -132,7 +132,7 @@ class AdminBookingController extends AbstractController
                     // waiting-list entry would be actively wrong, so skip it regardless of the
                     // checkbox until there's a waiting-list-specific email to send instead.
                     if ($status !== Attendee::STATUS_WAITING && $request->request->has('sendEmail') && $user->getEmail()) {
-                        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
+                        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
                     }
 
                     $successMessage = match (true) {

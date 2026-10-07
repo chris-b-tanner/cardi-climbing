@@ -6,6 +6,7 @@ use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -238,41 +239,26 @@ class AttendeeRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
-    /** Whether an attendee currently holds this exact PIN as their active door credential — used to avoid issuing duplicates. */
-    public function pinIsActive(string $pin): bool
-    {
-        return $this->count(['pin' => $pin, 'pinStatus' => Attendee::PIN_STATUS_ACTIVE]) > 0;
-    }
-
-    /** Every booking (any status) ever issued this exact PIN — debug-only lookup for the door simulator, ignoring the active/near-future filtering findActivePinAttendees() applies. */
-    public function findByPinAnyStatus(string $pin): array
-    {
-        return $this->createQueryBuilder('a')
-            ->innerJoin('a.event', 'e')->addSelect('e')
-            ->innerJoin('a.user', 'u')->addSelect('u')
-            ->where('a.pin = :pin')
-            ->setParameter('pin', $pin)
-            ->getQuery()
-            ->getResult();
-    }
-
     /**
-     * Every non-cancelled, PIN-bearing booking with an active door credential — the candidate pool
-     * a door's credential sync filters down to its own near-future window. Small enough in practice
-     * (one climbing wall, one door) to filter the actual time window in memory rather than in SQL,
-     * since valid_from/valid_until are derived from the event's schedule, not stored columns.
+     * Every confirmed booking on a self-access event whose session date is yesterday or later —
+     * the candidate pool a door's credential sync filters down to its own near-future window.
+     * Yesterday rather than today so a session running past midnight UTC isn't dropped early.
+     * Small enough in practice (one climbing wall, one door) to filter the actual time window in
+     * memory rather than in SQL, since valid_from/valid_until are derived from the event's
+     * schedule, not stored columns.
      *
      * @return Attendee[]
      */
-    public function findActivePinAttendees(): array
+    public function findConfirmedSelfAccessAttendees(): array
     {
         return $this->createQueryBuilder('a')
             ->innerJoin('a.event', 'e')->addSelect('e')
             ->innerJoin('a.user', 'u')->addSelect('u') // eager-loaded since findCredentialsForDoor() reads $attendee->getUser() for every row
-            ->where('a.pinStatus = :active')
-            ->andWhere('a.status != :cancelled')
-            ->setParameter('active', Attendee::PIN_STATUS_ACTIVE)
-            ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
+            ->where('e.isSelfAccess = true')
+            ->andWhere('a.status = :confirmed')
+            ->andWhere('COALESCE(a.occurrenceDate, e.date) >= :since')
+            ->setParameter('confirmed', Attendee::STATUS_CONFIRMED)
+            ->setParameter('since', new \DateTimeImmutable('yesterday'), Types::DATE_IMMUTABLE)
             ->getQuery()
             ->getResult();
     }

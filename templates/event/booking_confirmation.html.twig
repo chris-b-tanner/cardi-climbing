@@ -22,11 +22,10 @@
       </div>
     </div>
 
-    {% if event.isSelfAccess and attendee.pin %}
+    {% if event.isSelfAccess and attendee.status == 'confirmed' %}
       <div class="booking-confirm-card">
-        <h2 class="booking-confirm-card__title">Your door PIN</h2>
-        <p style="font-family:monospace;font-size:2rem;letter-spacing:0.15em;margin:0.5rem 0;">{{ attendee.pin }}</p>
-        <p class="booking-confirm-card__meta">Enter this on the door keypad to let yourself in. It only works for this session — a few minutes either side of the times above.</p>
+        <h2 class="booking-confirm-card__title">Getting in</h2>
+        <p class="booking-confirm-card__meta">Tap your Y Wal card on the door reader to let yourself in. It only works for this session — a few minutes either side of the times above.</p>
       </div>
     {% endif %}
 

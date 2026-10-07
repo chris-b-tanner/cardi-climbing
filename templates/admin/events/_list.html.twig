@@ -26,7 +26,7 @@
                 {{ event.title }}
               </a>
               {% if event.isSelfAccess %}
-                <i class="bi bi-lock-fill" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Self access (door PIN)"></i>
+                <i class="bi bi-lock-fill" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Self access (door card)"></i>
               {% endif %}
               {% if event.restrictions is not empty %}
                 <i class="bi bi-shield-check" style="color:var(--muted);font-size:0.8em;margin-left:0.3rem;" title="Restricted to: {% for c in event.restrictions %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}"></i>

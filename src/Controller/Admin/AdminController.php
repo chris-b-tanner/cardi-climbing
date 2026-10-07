@@ -529,7 +529,7 @@ class AdminController extends AbstractController
                 } elseif (!preg_match('/^\d{6}$/', $keyholderPin)) {
                     $this->addFlash('error', 'Keyholder PIN must be exactly 6 digits.');
                     return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
-                } elseif ($attendeeRepository->pinIsActive($keyholderPin) || $userRepository->keyholderPinExists($keyholderPin, $user->getId())) {
+                } elseif ($userRepository->keyholderPinExists($keyholderPin, $user->getId())) {
                     $this->addFlash('error', 'That PIN is already in use — choose another or generate one.');
                     return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
                 } else {

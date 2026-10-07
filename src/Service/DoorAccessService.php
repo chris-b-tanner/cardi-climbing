@@ -13,12 +13,13 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * The self-access door PIN lifecycle — see door-access-spec.md. A booking on an Event with
- * isSelfAccess gets a 6-digit PIN valid for its session window (event/occurrence start–end,
- * plus a grace period); the attendee's own id doubles as the door credential_id, so there's no
- * separate credential table. Single door for now (door_id 1, hardcoded per the spec).
+ * Self-access door entry — see door-access-spec.md. A confirmed booking on an Event with
+ * isSelfAccess lets the member's registered card open the door during its session window
+ * (event/occurrence start–end, plus a grace period); the attendee's own id doubles as the door
+ * credential_id, so there's no separate credential table. Single door for now (door_id 1,
+ * hardcoded per the spec). Card-only: attendee PINs were removed along with the door keypad.
  *
- * Every door interaction — attendee PIN, keyholder disarm PIN, an unexpected open, or a denial —
+ * Every door interaction — attendee card, keyholder disarm PIN, an unexpected open, or a denial —
  * is also recorded as an AccessEvent row (§ Access event log), keyed on the device's own
  * client-generated event_id and updated in place as its stage advances. That's the detailed log;
  * `attendee.checkedInAt`/`checkedInBy`/`checkedInMethod` stay the attendee's own "attendance
@@ -28,10 +29,10 @@ class DoorAccessService
 {
     private const PIN_LENGTH = 6;
 
-    /** How long before the session start a PIN starts working. */
+    /** How long before the session start a booking's credential starts working. */
     private const GRACE_BEFORE = 'PT5M';
 
-    /** How long after the session end a PIN keeps working. */
+    /** How long after the session end a booking's credential keeps working. */
     private const GRACE_AFTER = 'PT10M';
 
     /** How far ahead of "now" a door's credential sync looks for upcoming sessions. */
@@ -44,6 +45,9 @@ class DoorAccessService
     private const CHECKOUT_LOOKBACK = 'PT24H';
 
     public const SUPPORTED_DOOR_ID = 1;
+
+    /** The only credential `status` the server now sends — the firmware only caches a credential whose status is "active". */
+    private const CREDENTIAL_STATUS_ACTIVE = 'active';
 
     /**
      * Per-request/per-command cache of AccessEvent rows created but not yet flushed, keyed on
@@ -63,45 +67,16 @@ class DoorAccessService
         private readonly AccessCardRepository $accessCardRepository,
     ) {}
 
-    /** Issues a PIN for {attendee} if its event is self-access and it doesn't already have an active one. A no-op otherwise (e.g. a normal event, or a cancelled/pending booking). */
-    public function generatePinIfNeeded(Attendee $attendee): void
-    {
-        if (!$attendee->getEvent()->isSelfAccess() || $attendee->getStatus() !== Attendee::STATUS_CONFIRMED) {
-            return;
-        }
-
-        if ($attendee->isPinActive()) {
-            return;
-        }
-
-        $attendee->setPin($this->generateUniquePin());
-        $attendee->setPinStatus(Attendee::PIN_STATUS_ACTIVE);
-    }
-
-    /** Revokes {attendee}'s PIN (e.g. its booking was cancelled) — a no-op if it never had an active one. */
-    public function revokePin(Attendee $attendee): void
-    {
-        if ($attendee->getPinStatus() === Attendee::PIN_STATUS_ACTIVE) {
-            $attendee->setPinStatus(Attendee::PIN_STATUS_REVOKED);
-        }
-    }
-
-    /** The moment {attendee}'s PIN starts working — the session start, less the "before" grace. */
+    /** The moment {attendee}'s door credential starts working — the session start, less the "before" grace. */
     public function computeValidFrom(Attendee $attendee): \DateTimeImmutable
     {
         return $this->sessionStart($attendee)->sub(new \DateInterval(self::GRACE_BEFORE));
     }
 
-    /** The moment {attendee}'s PIN stops working — the session end, plus the "after" grace. */
+    /** The moment {attendee}'s door credential stops working — the session end, plus the "after" grace. */
     public function computeValidUntil(Attendee $attendee): \DateTimeImmutable
     {
         return $this->sessionEnd($attendee)->add(new \DateInterval(self::GRACE_AFTER));
-    }
-
-    /** Whether {now} still falls within {attendee}'s session window (including grace) — regeneration is refused once this has fully lapsed. */
-    public function isWithinGraceWindow(Attendee $attendee, \DateTimeImmutable $now): bool
-    {
-        return $now <= $this->computeValidUntil($attendee);
     }
 
     /**
@@ -109,13 +84,11 @@ class DoorAccessService
      * {eventId}: a stage only ever advances (see AccessEvent::advanceStage()), so a retried or
      * reordered POST for a stage already applied is a harmless no-op.
      *
-     * The credential is deliberately NOT single-use: a PIN or card stays `active` (and therefore
-     * synced to the door) for the attendee's whole session window, so the same PIN/card grants
-     * entry any number of times during it — someone stepping out and back in, or a card that also
-     * doubles as the exit-adjacent re-entry method, shouldn't get locked out after the first tap.
+     * The credential is deliberately NOT single-use: a confirmed booking stays synced to the door
+     * for its whole session window, so the same card grants entry any number of times during it —
+     * someone stepping out and back in shouldn't get locked out after the first tap.
      * `checked_in_at` (set once, at `door_closed`) is the "did they ever show up" summary — that's
-     * a one-time fact regardless of how many times the credential is later reused; `pin_status`
-     * only ever changes via cancellation (`revokePin()`) or an explicit regenerate.
+     * a one-time fact regardless of how many times the credential is later reused.
      */
     public function applyAttendeeAccessEvent(string $eventId, string $stage, Attendee $attendee, \DateTimeImmutable $timestamp, ?string $cardUid = null): void
     {
@@ -133,7 +106,7 @@ class DoorAccessService
         if ($stage === AccessEvent::STAGE_DOOR_CLOSED && !$attendee->isCheckedIn()) {
             $attendee->setCheckedInAt($timestamp);
             $attendee->setCheckedInBy(null);
-            $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_PIN);
+            $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_CARD);
         }
     }
 
@@ -188,43 +161,15 @@ class DoorAccessService
         $attendee->setCheckedInAt(new \DateTimeImmutable());
         $attendee->setCheckedInBy($staff);
         $attendee->setCheckedInMethod(Attendee::CHECKED_IN_MANUAL);
-
-        if ($attendee->getPin() !== null) {
-            $attendee->setPinStatus(Attendee::PIN_STATUS_USED);
-        }
-    }
-
-    /**
-     * Issues a fresh PIN for {attendee} — e.g. the door opened but the member didn't get through
-     * in time. Same session window; the old PIN simply stops validating once regenerated. Doesn't
-     * touch the old AccessEvent row — it stays as history of the stuck attempt.
-     *
-     * @throws \InvalidArgumentException if the session window (including grace) has already fully lapsed
-     */
-    public function regeneratePin(Attendee $attendee): string
-    {
-        if (!$this->isWithinGraceWindow($attendee, new \DateTimeImmutable())) {
-            throw new \InvalidArgumentException('This booking\'s session window has already ended.');
-        }
-
-        $pin = $this->generateUniquePin();
-
-        $attendee->setPin($pin);
-        $attendee->setPinStatus(Attendee::PIN_STATUS_ACTIVE);
-        $attendee->setCheckedInAt(null);
-        $attendee->setCheckedInBy(null);
-        $attendee->setCheckedInMethod(null);
-
-        return $pin;
     }
 
     /**
      * The active + near-future credentials a door should hold right now — an authoritative list
      * the device replaces its whole local cache with on every sync (see spec's firmware notes).
-     * `card_uid` rides alongside `pin` (§ Card-based entry) so a tap authenticates the same
-     * attendee-credential row a PIN already represents — null if the member has no card registered.
+     * One per confirmed booking on a self-access event, carrying the member's active `card_uid`
+     * (§ Card-based entry) — null if they have no usable card, which the firmware then skips.
      *
-     * @return array<int, array{credential_id: int, pin: string, card_uid: ?string, valid_from: \DateTimeImmutable, valid_until: \DateTimeImmutable, status: string}>
+     * @return array<int, array{credential_id: int, card_uid: ?string, valid_from: \DateTimeImmutable, valid_until: \DateTimeImmutable, status: string}>
      */
     public function findCredentialsForDoor(int $doorId, \DateTimeImmutable $now): array
     {
@@ -235,7 +180,7 @@ class DoorAccessService
         $syncHorizon = $now->add(new \DateInterval(self::SYNC_WINDOW));
         $credentials = [];
 
-        foreach ($this->attendeeRepository->findActivePinAttendees() as $attendee) {
+        foreach ($this->attendeeRepository->findConfirmedSelfAccessAttendees() as $attendee) {
             $validFrom  = $this->computeValidFrom($attendee);
             $validUntil = $this->computeValidUntil($attendee);
 
@@ -246,11 +191,10 @@ class DoorAccessService
 
             $credentials[] = [
                 'credential_id' => $attendee->getId(),
-                'pin'           => $attendee->getPin(),
                 'card_uid'      => $this->accessCardRepository->findActiveForUser($attendee->getUser())?->getUid(),
                 'valid_from'    => $validFrom,
                 'valid_until'   => $validUntil,
-                'status'        => $attendee->getPinStatus(),
+                'status'        => self::CREDENTIAL_STATUS_ACTIVE,
             ];
         }
 
@@ -344,13 +288,13 @@ class DoorAccessService
         $event->setAttendee($attendee);
     }
 
-    /** Generates a unique 6-digit keyholder PIN, excluding both other active keyholder PINs and currently-active attendee PINs — the two pools must never collide (§ PIN lifecycle). */
+    /** Generates a 6-digit keyholder PIN not already held by another keyholder. */
     public function generateUniqueKeyholderPin(?int $excludeUserId = null): string
     {
         for ($i = 0; $i < 20; $i++) {
             $pin = str_pad((string) random_int(0, 10 ** self::PIN_LENGTH - 1), self::PIN_LENGTH, '0', STR_PAD_LEFT);
 
-            if (!$this->attendeeRepository->pinIsActive($pin) && !$this->userRepository->keyholderPinExists($pin, $excludeUserId)) {
+            if (!$this->userRepository->keyholderPinExists($pin, $excludeUserId)) {
                 return $pin;
             }
         }
@@ -400,18 +344,5 @@ class DoorAccessService
         $date = $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate();
 
         return $attendee->getEvent()->combineDateAndTime($date, $time);
-    }
-
-    private function generateUniquePin(): string
-    {
-        for ($i = 0; $i < 20; $i++) {
-            $pin = str_pad((string) random_int(0, 10 ** self::PIN_LENGTH - 1), self::PIN_LENGTH, '0', STR_PAD_LEFT);
-
-            if (!$this->attendeeRepository->pinIsActive($pin) && !$this->userRepository->keyholderPinExists($pin)) {
-                return $pin;
-            }
-        }
-
-        throw new \RuntimeException('Could not generate a unique door PIN after 20 attempts.');
     }
 }

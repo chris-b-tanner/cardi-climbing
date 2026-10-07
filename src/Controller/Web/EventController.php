@@ -293,7 +293,7 @@ class EventController extends AbstractController
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
 
         return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
     }
@@ -391,7 +391,7 @@ class EventController extends AbstractController
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate, $result->getPin());
+        $bookingMailer->sendBookingConfirmation($user, $event, $occurrenceDate);
 
         return $this->redirectToRoute('app_booking_confirmation', ['id' => $result->getId()]);
     }

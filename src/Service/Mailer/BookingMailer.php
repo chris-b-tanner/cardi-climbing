@@ -23,7 +23,7 @@ class BookingMailer
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
     ) {}
 
-    public function sendBookingConfirmation(User $user, Event $event, \DateTimeImmutable $occurrenceDate, ?string $pin = null): void
+    public function sendBookingConfirmation(User $user, Event $event, \DateTimeImmutable $occurrenceDate): void
     {
         $email = (new TemplatedEmail())
             ->from(new Address($this->mailerFrom, $this->mailerFromName))
@@ -35,7 +35,6 @@ class BookingMailer
                 'user'           => $user,
                 'event'          => $event,
                 'occurrenceDate' => $occurrenceDate,
-                'pin'            => $pin,
             ]);
 
         $this->mailer->send($email);

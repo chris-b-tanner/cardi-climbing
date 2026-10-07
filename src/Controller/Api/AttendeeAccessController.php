@@ -13,9 +13,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Staff-facing counterparts to the door device's own API (see door-access-spec.md) — manual
- * reception check-in, and issuing a fresh PIN when a door opened but the member didn't get
- * through in time. Authenticated as a logged-in staff member, not the device bearer token.
+ * Staff-facing counterpart to the door device's own API (see door-access-spec.md) — manual
+ * reception check-in. Authenticated as a logged-in staff member, not the device bearer token.
  */
 #[Route('/v1/attendees/{id}', requirements: ['id' => '\d+'])]
 #[IsGranted('ROLE_TEAM')]
@@ -48,33 +47,6 @@ class AttendeeAccessController extends AbstractController
         return new JsonResponse([
             'checked_in_at'     => $attendee->getCheckedInAt()->format('Y-m-d\TH:i:s\Z'),
             'checked_in_method' => $attendee->getCheckedInMethod(),
-        ]);
-    }
-
-    /** Issues a fresh PIN for the same booking/session window — e.g. the door opened but the member didn't get through in time. */
-    #[Route('/regenerate-pin', name: 'app_api_attendee_regenerate_pin', methods: ['POST'])]
-    public function regeneratePin(Request $request, Attendee $attendee): JsonResponse
-    {
-        if (!$this->isCsrfTokenValid('attendee_regenerate_pin_' . $attendee->getId(), $this->csrfToken($request))) {
-            return new JsonResponse(['error' => 'Access denied.'], 403);
-        }
-
-        if ($attendee->getPin() === null) {
-            return new JsonResponse(['error' => 'This booking has no door PIN to regenerate.'], 422);
-        }
-
-        try {
-            $pin = $this->doorAccessService->regeneratePin($attendee);
-        } catch (\InvalidArgumentException $e) {
-            return new JsonResponse(['error' => $e->getMessage()], 422);
-        }
-
-        $this->em->flush();
-
-        return new JsonResponse([
-            'pin'         => $pin,
-            'valid_from'  => $this->doorAccessService->computeValidFrom($attendee)->format('Y-m-d\TH:i:s\Z'),
-            'valid_until' => $this->doorAccessService->computeValidUntil($attendee)->format('Y-m-d\TH:i:s\Z'),
         ]);
     }
 

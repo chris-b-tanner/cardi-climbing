@@ -42,7 +42,7 @@
               {{ attendee.isCheckedIn ? attendee.checkedInAt|date('d M Y, H:i') : '—' }}
             </td>
             <td class="admin-table__muted">
-              {{ attendee.isCheckedIn ? (attendee.checkedInMethod == 'door_pin' ? 'Door PIN' : 'Manual') : '—' }}
+              {{ attendee.isCheckedIn ? (attendee.checkedInMethod == 'door_card' ? 'Door card' : (attendee.checkedInMethod == 'door_pin' ? 'Door PIN' : 'Manual')) : '—' }}
             </td>
             <td><a href="{{ path('app_admin_booking_edit', {id: attendee.id}) }}" class="admin-table__link">Edit</a></td>
           </tr>

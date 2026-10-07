@@ -14,7 +14,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * (as opposed to being fulfilled from a paid ticket sale — see EventTicketFulfilmentHandler,
  * which is a genuinely different flow with its own eligibility checks already done at cart-add
  * time): the public self-serve "book now" button, guest booking, and admin check-in. Centralised
- * here so the eligibility/credit/PIN sequence — and any future fix to it — only lives once.
+ * here so the eligibility/credit sequence — and any future fix to it — only lives once.
  */
 class BookingService
 {
@@ -22,7 +22,6 @@ class BookingService
         private readonly EntityManagerInterface $em,
         private readonly AttendeeRepository $attendeeRepository,
         private readonly EventBookingCreditService $eventBookingCreditService,
-        private readonly DoorAccessService $doorAccessService,
         private readonly UserService $userService,
     ) {}
 
@@ -118,20 +117,17 @@ class BookingService
             $this->eventBookingCreditService->spendCredit($user, $event, $attendee);
         }
 
-        $this->doorAccessService->generatePinIfNeeded($attendee);
-
         $this->em->flush();
 
         return $attendee;
     }
 
-    /** Cancels {attendee} and revokes any door PIN it holds. @param ?User $actor Set when a staff member (or the member themselves, self-service) is making this change — attributed on the status-change note. */
+    /** Cancels {attendee} — which also drops it from the door's credential sync. @param ?User $actor Set when a staff member (or the member themselves, self-service) is making this change — attributed on the status-change note. */
     public function cancelBooking(Attendee $attendee, ?User $actor = null): void
     {
         $previousStatus = $attendee->getStatus();
 
         $attendee->setStatus(Attendee::STATUS_CANCELLED);
-        $this->doorAccessService->revokePin($attendee);
         $this->em->flush();
 
         $this->recordStatusChangeIfNeeded($attendee, $previousStatus, $actor);
@@ -139,8 +135,7 @@ class BookingService
 
     /**
      * Moves {attendee} to {status} (confirmed/pending/waiting) — the other side of cancelBooking(),
-     * e.g. un-cancelling a booking. Issues a door PIN if the event is self-access and it doesn't
-     * already have an active one. Returns an error message instead of reinstating if doing so would
+     * e.g. un-cancelling a booking. Returns an error message instead of reinstating if doing so would
      * push a capped event over its max attendees — only checked when {attendee} is currently
      * cancelled (switching an already-active booking between statuses doesn't add a new seat) and
      * the target isn't "waiting" (which never claims a seat — that's the point of it).
@@ -163,7 +158,6 @@ class BookingService
         $previousStatus = $attendee->getStatus();
 
         $attendee->setStatus($status);
-        $this->doorAccessService->generatePinIfNeeded($attendee);
         $this->em->flush();
 
         $this->recordStatusChangeIfNeeded($attendee, $previousStatus, $actor);

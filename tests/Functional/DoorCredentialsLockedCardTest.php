@@ -50,8 +50,6 @@ class DoorCredentialsLockedCardTest extends WebTestCase
         $attendee->setEvent($event);
         $attendee->setUser($user);
         $attendee->setStatus(Attendee::STATUS_CONFIRMED);
-        $attendee->setPin('654321');
-        $attendee->setPinStatus(Attendee::PIN_STATUS_ACTIVE);
         $em->persist($attendee);
         $em->flush();
 
@@ -81,7 +79,7 @@ class DoorCredentialsLockedCardTest extends WebTestCase
             }
         }
 
-        self::assertNotNull($credential, 'Expected this booking\'s PIN credential to be present at all.');
+        self::assertNotNull($credential, 'Expected this booking\'s credential to be present at all.');
         self::assertArrayNotHasKey('card_uid', $credential, 'A locked card must not be exposed to the door as a working credential.');
     }
 

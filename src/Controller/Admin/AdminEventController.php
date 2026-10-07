@@ -16,7 +16,6 @@ use App\Repository\ProductRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\BookingMailer;
-use App\Service\DoorAccessService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -297,7 +296,6 @@ class AdminEventController extends AbstractController
         EntityManagerInterface $em,
         UserRepository $userRepository,
         AttendeeRepository $attendeeRepository,
-        DoorAccessService $doorAccessService,
         BookingMailer $bookingMailer,
     ): Response {
         if (!$this->isCsrfTokenValid('admin_event_staffing_' . $event->getId(), $request->request->get('_csrf_token'))) {
@@ -346,8 +344,6 @@ class AdminEventController extends AbstractController
         $attendee->setStaffingStatus($staffingStatus);
 
         $em->persist($attendee);
-        // No-op while pending — generatePinIfNeeded() only issues one once status is confirmed.
-        $doorAccessService->generatePinIfNeeded($attendee);
         $em->flush();
 
         if ($staffingStatus === Attendee::STAFFING_PENDING) {

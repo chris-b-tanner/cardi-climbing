@@ -10,8 +10,8 @@ Time:     {{ event.timeFrom }}–{{ event.timeTo }}
 Location: {{ event.location }}
 Price:    Free
 
-{% if pin %}
-Your door PIN: {{ pin }} (only valid for this session)
+{% if event.isSelfAccess %}
+To get in, tap your Y Wal card on the door reader. It works for this session only.
 
 {% endif %}
 {% if event.description %}

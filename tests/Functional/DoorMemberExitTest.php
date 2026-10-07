@@ -178,7 +178,7 @@ class DoorMemberExitTest extends WebTestCase
         $attendee->setUser($user);
         $attendee->setStatus(Attendee::STATUS_CONFIRMED);
         $attendee->setCheckedInAt($checkedInAt);
-        $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_PIN);
+        $attendee->setCheckedInMethod(Attendee::CHECKED_IN_DOOR_CARD);
         $em->persist($attendee);
 
         return $attendee;

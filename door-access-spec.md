@@ -1,5 +1,12 @@
 # Door access spec (slim)
 
+> **2026-10-07 — attendee PINs removed.** Entry is card-only (the firmware dropped the keypad on
+> 2026-10-05; see the firmware repo's `PINS.md`). `attendee.pin`/`pin_status`, PIN regeneration and
+> the `/door-sim` keypad simulator are gone. `GET /credentials` now returns one entry per
+> **confirmed booking on an `is_self_access` event** (no `pin` field; `status` is always `active`),
+> and door check-ins record `checked_in_method='door_card'`. Sections below that describe attendee
+> PINs are historical. Keyholder disarm PINs are unchanged for now.
+
 ## Assumptions locked in
 
 - Single door for now: `door_id = 1` hardcoded in the sync query filter. No door-mapping table yet — add one later when a second door exists.

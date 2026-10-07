@@ -68,7 +68,7 @@ class Event
     #[ORM\Column]
     private bool $isRecurring = false;
 
-    /** Whether attendees of this event get a self-access door PIN (see DoorAccessService). */
+    /** Whether confirmed attendees of this event can open the self-access door with their card during the session (see DoorAccessService). */
     #[ORM\Column(options: ['default' => false])]
     private bool $isSelfAccess = false;
 
