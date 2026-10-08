@@ -162,7 +162,7 @@
       <form method="post" action="{{ path('app_event_book', {id: event.id}) }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('book_event_' ~ event.id) }}">
         <input type="hidden" name="occurrenceDate" value="{{ date|date('Y-m-d') }}">
-        <button type="submit" class="btn btn--teal">{{ needsMembershipOrCredit ? 'events_check_in'|trans : 'events_book_now'|trans }}</button>
+        <button type="submit" class="btn btn--teal">{{ 'events_book_button'|trans }}</button>
         {% if needsMembershipOrCredit %}
           <p class="event-preview__booking-hint">
             {% if activeMembershipTypeName %}

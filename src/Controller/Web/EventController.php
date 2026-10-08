@@ -551,8 +551,7 @@ class EventController extends AbstractController
 
         // Whether this event is a membership/credit-gated event at all — a property of the event
         // itself, not of whether this particular user already satisfies it. Drives the direct-book
-        // button's "Check in" (something is being verified/spent) vs "Book now" wording even when
-        // the user is covered for free by their membership.
+        // button's membership/credit hint even when the user is covered for free by their membership.
         $needsMembershipOrCredit = $event->acceptsCredit() || $event->acceptsMembership();
 
         // Open booking (no access method selected) is always free; otherwise membership/credit
