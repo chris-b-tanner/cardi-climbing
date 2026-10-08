@@ -263,9 +263,11 @@ class DoorAccessService
     /**
      * Applies one stage of a `member_exit` event (§ Exit reader) — same upsert/stage rules as the
      * other types. The first time this event_id is seen (whichever stage arrives first), the
-     * card's member is checked out of their open session, if they have one checked in within the
-     * last CHECKOUT_LOOKBACK — at {authorizedAt}, the tap itself, not the door closing. Anyone else
-     * (no booking, never checked in, already checked out) just gets the door-opening logged.
+     * card's member is checked out of their session (see findSessionForExit()) — at
+     * {authorizedAt}, the tap itself, not the door closing. Members can step out and back in
+     * during a session, so a later exit tap moves the checkout time forward (checked_in_at stays
+     * the first entry). Anyone else (no booking, never checked in, session already over and
+     * closed) just gets the door-opening logged.
      */
     public function applyMemberExitEvent(string $eventId, string $stage, string $cardUid, \DateTimeImmutable $timestamp, \DateTimeImmutable $authorizedAt): void
     {
@@ -278,14 +280,53 @@ class DoorAccessService
             return;
         }
 
-        $since = $authorizedAt->sub(new \DateInterval(self::CHECKOUT_LOOKBACK));
-        $attendee = $this->attendeeRepository->findOpenCheckInForUser($user, $since);
+        $attendee = $this->findSessionForExit($user, $authorizedAt);
         if ($attendee === null) {
             return;
         }
 
         $attendee->checkOut($authorizedAt, Attendee::CHECKED_OUT_DOOR_CARD);
         $event->setAttendee($attendee);
+    }
+
+    /**
+     * The booking an exit tap at {exitAt} belongs to, so that one session's taps never land on
+     * another booking the same member has that day (e.g. an open staffed-hours check-in that was
+     * never closed, then a separate evening self-access booking):
+     *
+     * 1. A checked-in booking whose session window (incl. grace) covers the exit — their current
+     *    session. Already checked out is fine: that's a re-entry, and the checkout moves forward.
+     * 2. Otherwise, if the exit falls in the window of another confirmed booking they never got
+     *    checked into (e.g. they followed someone else in), it belongs to that session — nothing
+     *    is checked out rather than closing an earlier, unrelated one.
+     * 3. Otherwise it's an overstay: their most recent check-in within CHECKOUT_LOOKBACK, if still
+     *    open. Never an older one — an exit after a closed session mustn't reach back past it.
+     */
+    private function findSessionForExit(User $user, \DateTimeImmutable $exitAt): ?Attendee
+    {
+        $since = $exitAt->sub(new \DateInterval(self::CHECKOUT_LOOKBACK));
+        $checkIns = $this->attendeeRepository->findRecentCheckInsForUser($user, $since);
+
+        foreach ($checkIns as $attendee) {
+            if ($this->isWithinSessionWindow($attendee, $exitAt)) {
+                return $attendee;
+            }
+        }
+
+        foreach ($this->attendeeRepository->findConfirmedForUserFrom($user, $since) as $attendee) {
+            if ($this->isWithinSessionWindow($attendee, $exitAt)) {
+                return null;
+            }
+        }
+
+        $latest = $checkIns[0] ?? null;
+
+        return $latest !== null && !$latest->isCheckedOut() ? $latest : null;
+    }
+
+    private function isWithinSessionWindow(Attendee $attendee, \DateTimeImmutable $at): bool
+    {
+        return $at >= $this->computeValidFrom($attendee) && $at <= $this->computeValidUntil($attendee);
     }
 
     /** Generates a 6-digit keyholder PIN not already held by another keyholder. */

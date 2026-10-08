@@ -23,8 +23,8 @@ class CardService
     ) {}
 
     /**
-     * Links {uid} to {user} as their new active card — marking any existing active card
-     * `replaced` first. Used by both manual entry and a successful station scan. Notes the
+     * Links {uid} to {user} as their new active card — marking their current card (active or
+     * locked, e.g. locked because it was lost) `replaced` first, so a member only ever has one. Used by both manual entry and a successful station scan. Notes the
      * member's history either way (see card-setup.md's audit-trail rationale) — worded
      * differently depending on whether this is their first card or a replacement.
      *
@@ -36,7 +36,7 @@ class CardService
             throw new \InvalidArgumentException('That card is already registered to another member.');
         }
 
-        $existing = $this->accessCardRepository->findActiveForUser($user);
+        $existing = $this->accessCardRepository->findCurrentForUser($user);
         $existing?->markReplaced();
 
         $card = new AccessCard($user, $uid, $staff);

@@ -264,25 +264,48 @@ class AttendeeRepository extends ServiceEntityRepository
     }
 
     /**
-     * {user}'s most recent booking that's checked in but not yet checked out, with the check-in no
-     * earlier than {checkedInSince} — the session an exit-reader tap closes (door-access-spec.md
-     * § Exit reader). The lower bound stops a stale session (someone who left by the push button
-     * days ago and never tapped out) being closed with today's time.
+     * {user}'s non-cancelled bookings checked in no earlier than {checkedInSince}, most recent
+     * check-in first — the candidates for the session an exit-reader tap belongs to
+     * (door-access-spec.md § Exit reader; DoorAccessService::applyMemberExitEvent() picks one).
+     * The lower bound stops a stale session (someone who left by the push button days ago and
+     * never tapped out) being closed with today's time.
+     *
+     * @return Attendee[]
      */
-    public function findOpenCheckInForUser(User $user, \DateTimeImmutable $checkedInSince): ?Attendee
+    public function findRecentCheckInsForUser(User $user, \DateTimeImmutable $checkedInSince): array
     {
         return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
             ->where('a.user = :user')
             ->andWhere('a.checkedInAt >= :since')
-            ->andWhere('a.checkedOutAt IS NULL')
             ->andWhere('a.status != :cancelled')
             ->setParameter('user', $user)
             ->setParameter('since', $checkedInSince)
             ->setParameter('cancelled', Attendee::STATUS_CANCELLED)
             ->orderBy('a.checkedInAt', 'DESC')
-            ->setMaxResults(1)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getResult();
+    }
+
+    /**
+     * {user}'s confirmed bookings (any event, checked in or not) whose session date is on or after
+     * {from}'s date — for working out which session an exit tap falls in
+     * (DoorAccessService::findSessionForExit()).
+     *
+     * @return Attendee[]
+     */
+    public function findConfirmedForUserFrom(User $user, \DateTimeImmutable $from): array
+    {
+        return $this->createQueryBuilder('a')
+            ->innerJoin('a.event', 'e')->addSelect('e')
+            ->where('a.user = :user')
+            ->andWhere('a.status = :confirmed')
+            ->andWhere('COALESCE(a.occurrenceDate, e.date) >= :from')
+            ->setParameter('user', $user)
+            ->setParameter('confirmed', Attendee::STATUS_CONFIRMED)
+            ->setParameter('from', $from->setTime(0, 0), Types::DATE_IMMUTABLE)
+            ->getQuery()
+            ->getResult();
     }
 
     private function whereOccurrence(QueryBuilder $qb, ?\DateTimeImmutable $occurrenceDate): void

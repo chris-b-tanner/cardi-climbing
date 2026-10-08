@@ -310,11 +310,17 @@ class Attendee
         return $this->checkedOutAt !== null;
     }
 
-    /** Ends the session. Set once only — a second exit tap leaves the first checkout time in place. */
+    /**
+     * Records an exit. Members can step out and back in during their session, so each later exit
+     * moves the checkout time forward — it ends up as their last exit. Never moves it backwards,
+     * so an exit event arriving late (e.g. a door's queued batch) can't undo a newer one.
+     */
     public function checkOut(\DateTimeImmutable $at, string $method): static
     {
-        $this->checkedOutAt ??= $at;
-        $this->checkedOutMethod ??= $method;
+        if ($this->checkedOutAt === null || $at > $this->checkedOutAt) {
+            $this->checkedOutAt = $at;
+            $this->checkedOutMethod = $method;
+        }
         return $this;
     }
 }

@@ -41,7 +41,7 @@ Notes:
   the raw timestamps directly.
 - Manual reception check-in writes the same `checked_in_at`/`checked_in_by_id`/`checked_in_method='manual'` fields — single source for attendance reporting regardless of channel. It creates no `access_event` row (see § Manual check-in) since nothing physical is being observed.
 - Uniqueness: PIN must be unique among attendees with `pin_status='active'` for the same door at overlapping/near-term windows, **and** against any value currently held in `user.keyholder_pin` (§ Keyholder disarm PIN) — the two PIN pools must never collide. If one event maps to one door, scope uniqueness by `event_id`'s door; if multiple doors, add `door_id` resolution via event → venue/door mapping (not detailed here — plug into your existing model). A card's `uid` (§ Card-based entry; schema in `card-setup.md`) lives in a completely separate value space (NFC UID, not a 6-digit number) so it never needs to be checked against either PIN pool.
-- `checked_out_at`/`checked_out_method` are new in this revision, added for the internal exit reader (§ Exit reader). They're set once, same "single completion, not a running log" shape as `checked_in_at` — but, unlike `checked_in_at`, set at the tap itself (`stage=authorized`) rather than waiting for the matching `access_event` to reach `door_closed`. See § Exit reader for why entry and exit are deliberately asymmetric here.
+- `checked_out_at`/`checked_out_method` are new in this revision, added for the internal exit reader (§ Exit reader). `checked_out_at` is the member's *last* exit during the session (re-entry is allowed — see § Exit reader), while `checked_in_at` stays their first entry. Unlike `checked_in_at`, it's set at the tap itself (`stage=authorized`) rather than waiting for the matching `access_event` to reach `door_closed`. See § Exit reader for why entry and exit are deliberately asymmetric here.
 
 ## PIN lifecycle
 
@@ -383,9 +383,15 @@ session can be closed out if they had one — that's a reporting bonus, never a 
   reader, there's no "wrong" answer worth recording here beyond "not one of ours," and the physical
   push-button next to it has never distinguished who pressed it either.
 - **Resolving and closing the "active session" happens at `stage=authorized` — the tap itself,
-  not the door physically closing.** The server looks up the **most recent `attendee` row for
-  `exit_user_id` where `checked_in_at IS NOT NULL AND checked_out_at IS NULL`** and sets
-  `checked_out_at=authorized_at`, `checked_out_method='door_card'`, recording that row's id back
+  not the door physically closing.** The server picks the booking the tap belongs to — **a
+  checked-in booking whose session window (incl. grace) covers the tap; else nothing, if the tap
+  falls in another confirmed booking's window they never checked into; else (an overstay) their
+  most recent check-in within 24h, if still open** (`DoorAccessService::findSessionForExit()`). An
+  exit tap therefore never closes an unrelated earlier booking, e.g. a staffed-hours check-in left
+  open before an evening self-access session. It sets
+  `checked_out_at=authorized_at` (only ever moving it later), `checked_out_method='door_card'`.
+  *(Revised 2026-10-07: members may exit and re-enter any number of times during their session;
+  `checked_in_at` stays the first entry and `checked_out_at` becomes the last exit.)* That row's id is recorded back
   onto the `access_event.attendee_id` column, all as part of processing the `authorized`-stage
   POST. If no such row exists (they never checked in via this system today — a keyholder just
   leaving, say, or a lapsed member let in on a guest basis), the `member_exit` row is still written

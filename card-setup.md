@@ -117,7 +117,7 @@ CREATE TABLE `card_link_session` (
 ## Assumptions locked in
 
 - Single station for now, same spirit as `door_id = 1` in door-access-spec.md — the station has
-  nothing to identify itself by at all, it just asks "what's the one pending session?" (§ API).
+  nothing to identify itself by at all; each tap it reports is applied to the one pending session (§ API).
 - Staff-initiated only, not a public kiosk. Every arm happens from the admin UI, already
   authenticated as `ROLE_ADMIN` (same gate as the card fields it replaces), for one specific,
   already-known member. The station never lets a walk-up figure out whose card they're holding —
@@ -137,23 +137,9 @@ Auth: `Authorization: Bearer <card_station_api_key>` (`CARD_STATION_API_KEY` env
 secret from the door's `DOOR_API_KEY`, since this is a different physical device with a different
 trust boundary: it lives at a staffed desk, not bolted to an access-controlled door).
 
-### `GET /v1/card-station/pending`
-
-Polled every **1–2 seconds** — an interactive, watched-in-person flow, not a background sync.
-
-```json
-// Nothing armed right now:
-{ "server_time": "2026-09-22T10:00:00Z", "pending": null }
-
-// Armed:
-{
-  "server_time": "2026-09-22T10:00:02Z",
-  "pending": { "mode": "link", "user_name": "Chris Tanner" }
-}
-```
-
-`user_name` is the only identifying info the station ever receives — no email, no member id, just
-enough for "Link card for Chris Tanner — tap now." / "Verify card for Chris Tanner — tap now."
+The station has no screen (§ Privacy), so it never asks what's armed — it just reports each tap.
+An earlier revision had a `GET /v1/card-station/pending` poll to show "Link card for {name} — tap
+now." on a station display; it was removed on 2026-10-07 along with the display.
 
 ### `POST /v1/card-station/scan`
 
@@ -186,8 +172,8 @@ creates/updates the `access_card` row right here — no separate finalise step, 
 { "result": "expired" }
 ```
 
-The station's screen never needs more than this five-value enum — see § Privacy for what text each
-one maps to. It never learns whose card it actually was on a mismatch; that's for the browser only.
+The station only logs this result (it has no screen — § Privacy). It never learns whose card it
+actually was; that's for the browser only.
 
 ## API — server exposes to the admin UI
 
@@ -295,30 +281,16 @@ POST, so saving an unrelated profile field (phone number, memo, …) can never t
 as a side effect. This was the actual bug that prompted this redesign (§ "Why two real tables"
 above).
 
-## Privacy: what the station's screen shows
+## Privacy: the station shows nothing
 
-- **Idle:** a neutral "Y Wal" idle screen — nothing armed, nothing to see.
-- **Armed, link/verify:** "{Link/Verify} card for {member's name} — tap now." Always the *target*
-  member's name.
-- **Armed, lookup:** "Tap a card to look up its member" — deliberately generic, since a lookup has
-  no target to name.
-- **After a tap**, exactly one of:
-  - `linked` → "✓ Linked to {member's name}."
-  - `conflict` → "✗ Already registered to someone else." (no name)
-  - `matched` → "✓ This is {member's name}'s card."
-  - `mismatch` → "✗ Not {member's name}'s card." (no name — the station can't tell "someone else's"
-    from "no one's" and doesn't need to)
-  - `found`/`not_found` (lookup) → a generic "✓ Card read." regardless of which — **even though
-    finding out who it is is the entire point of this mode**, that answer is deliberately withheld
-    from the station's own screen, same as every other mode. The reveal happens only once, in the
-    browser of the staff member who armed it (via the redirect on `found`), not on a device sat at
-    a reception desk anyone could glance at.
-  - `expired` → "Session timed out."
+The station has **no screen**. Its only feedback is a beep and a green LED flash when a card is
+read, plus a steady blue (ready) / red (no connection) LED — see the `ywal-reader` firmware README.
+It never receives or shows a member's name, so a walk-up at the desk can't learn whose card they're
+holding from it.
 
-The **only** places "whose card is this, actually" ever get answered are `matchedUserName` on the
-authenticated `GET /admin/users/{id}/card-scan` response (verify) and `userName`/`userId` on
-`GET /admin/card-lookup` (lookup) — both consumed by a staff member already at their own screen,
-never pushed to the station's.
+Every result — including "whose card is this" — is shown only in the browser of the staff member
+who armed the scan: `matchedUserName` on the authenticated `GET /admin/users/{id}/card-scan`
+response (verify) and `userName`/`userId` on `GET /admin/card-lookup` (lookup).
 
 ## Settings > Cards (report)
 
@@ -361,15 +333,16 @@ rather than deleting: the "bad actor" stays traceable.
 ## Hardware note
 
 Not designed in detail here — this stays a server/API/UI spec, same split as
-door-access-spec.md/door-access-firmware-spec.md. When built, expect:
+door-access-spec.md/door-access-firmware-spec.md. As built (`ywal-reader` PlatformIO project):
 
-- A small networked (WiFi is fine — this sits at a staffed desk, not on the door's dedicated
-  ethernet drop) microcontroller + NFC reader + small display, no relay, no door-position sensor.
+- A small WiFi microcontroller (ESP32) + NFC reader + beeper + status LED — **no display**, no
+  relay, no door-position sensor. It sits at a staffed desk, not on the door's dedicated
+  ethernet drop.
 - Reuse the door firmware's exact UID-capture/formatting approach (`card_reader.cpp`'s
   `formatUid()`: uppercase hex, no separators) so a UID read by either device is byte-for-byte the
   same string.
-- A companion `card-station-firmware-spec.md`, living in its own PlatformIO project the same way
-  `door-access-firmware-spec.md` lives in `/Documents/PlatformIO/Projects/y-wal/spec.md`.
+- Its behaviour is documented in that project's own README
+  (`/Documents/PlatformIO/Projects/ywal-reader/README.md`).
 
 ## Open items
 
