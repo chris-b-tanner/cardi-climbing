@@ -11,7 +11,7 @@
 {% set activeMembership = user.effectiveMembership and user.effectiveMembership.currentlyActive ? user.effectiveMembership : null %}
 {% set avatarUrl = avatar_url(user) %}
 <div style="display:flex;gap:1.25rem;align-items:flex-start;">
-  <div style="flex-shrink:0;">
+  <div class="user-show__avatar" style="flex-shrink:0;">
     {% if avatarUrl %}
       <img src="{{ avatarUrl }}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">
     {% else %}
@@ -721,6 +721,12 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+  @media (max-width: 639px) {
+    .user-show__avatar,
+    .page-header .member-id { display: none; }
+  }
+</style>
 <script>
   // Card linking is a separate persisted record (AccessCard), not a form field — a successful
   // station scan just reloads the page to show the freshly-linked card's summary.

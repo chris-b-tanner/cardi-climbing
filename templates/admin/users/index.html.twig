@@ -2,15 +2,15 @@
 {% block title %}People{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header people-header">
   <h1>{{ context == 'new_sale' ? 'Choose a person' : 'People' }}</h1>
   {% if context == 'new_sale' %}
     <a href="{{ path('app_admin_sales') }}" class="btn btn--ghost btn--sm">← Cancel</a>
   {% else %}
     <div class="btn-row">
       <a href="{{ path('app_admin_recent_updates') }}" class="btn btn--ghost btn--sm">Recent updates</a>
-      <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm">Send bulk email</a>
-      <button type="button" class="card-scan-trigger btn btn--ghost btn--sm"
+      <a href="{{ path('app_admin_email_compose') }}" class="btn btn--ghost btn--sm hide-on-mobile">Send bulk email</a>
+      <button type="button" class="card-scan-trigger btn btn--ghost btn--sm hide-on-mobile"
               data-url="{{ path('app_admin_card_lookup_start') }}"
               data-mode="lookup"
               data-csrf="{{ csrf_token('card_lookup') }}"
@@ -23,9 +23,9 @@
 {% include 'admin/_card_scan_modal.html.twig' with {prefix: 'card-scan'} %}
 
 <div class="filter-form">
-  <input type="search" id="search-q" placeholder="Search…" style="flex:0 0 22rem;"
+  <input type="search" id="search-q" placeholder="Search…"
          value="{{ currentQuery }}" aria-label="Search members" autocomplete="off" autofocus>
-  <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--muted);white-space:nowrap;">
+  <label class="people-memo-toggle" style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--muted);white-space:nowrap;">
     <input type="checkbox" id="show-memo"{% if currentHasMemo %} checked{% endif %} style="width:1rem;height:1rem;accent-color:var(--teal);">
     Show memo
   </label>
@@ -35,7 +35,7 @@
       <option value="{{ tag.id }}"{% if currentTagId == tag.id %} selected{% endif %}>{{ tag.name }}</option>
     {% endfor %}
   </select>
-  <select id="search-assigned-to" aria-label="Filter by assignee" style="flex:1 1 80px;">
+  <select id="search-assigned-to" class="people-assignee" aria-label="Filter by assignee">
     <option value="">Assigned to anyone</option>
     <option value="unassigned"{% if currentAssignedToId is same as(0) %} selected{% endif %}>Unassigned</option>
     {% for member in staff %}
@@ -43,7 +43,7 @@
     {% endfor %}
   </select>
   {% if context != 'new_sale' %}
-    <div style="margin-left:auto;display:flex;gap:0.5rem;">
+    <div class="people-export" style="margin-left:auto;display:flex;gap:0.5rem;">
       <a id="print-link" href="{{ path('app_admin_users_print') }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm"><i class="bi bi-printer"></i> Print</a>
       <a id="csv-link" href="{{ path('app_admin_users_export') }}" class="btn btn--ghost btn--sm"><i class="bi bi-file-earmark-spreadsheet"></i> Export CSV</a>
     </div>
@@ -77,6 +77,22 @@
     margin-bottom: 0.75rem;
   }
   .merge-count { font-size: 0.875rem; font-weight: 500; color: #0369a1; }
+
+  .filter-form #search-q { flex: 0 0 22rem; }
+  .filter-form .people-assignee { flex: 1 1 80px; }
+
+  /* Phone portrait: full-width search, header buttons kept on the heading's line, and the
+     desk-only actions (card lookup needs a reader; bulk email is a desktop job) hidden. */
+  @media (max-width: 639px) {
+    .filter-form #search-q { flex: 0 0 100%; width: 100%; min-width: 0; box-sizing: border-box; }
+    .filter-form select,
+    .filter-form .people-assignee { flex: 1 1 calc(50% - 0.3rem); min-width: 0; }
+    .people-header { flex-wrap: nowrap; }
+    .people-header .btn-row { margin-left: auto; }
+    .people-header .hide-on-mobile { display: none; }
+    .filter-form .people-export,
+    .filter-form .people-memo-toggle { display: none !important; }
+  }
 
   .admin-table__memo-col { display: none; }
   #results.show-memo .admin-table__memo-col { display: table-cell; }
