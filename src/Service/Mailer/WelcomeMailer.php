@@ -9,7 +9,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-/** Sends the welcome email a newly self-registered member gets — see RegistrationController. */
+/** Sends the first email a new contact gets — the welcome for a self-registered member (RegistrationController), or the thanks for a newsletter signup (SubscribeController). */
 class WelcomeMailer
 {
     public function __construct(
@@ -33,6 +33,19 @@ class WelcomeMailer
                 'user'       => $user,
                 'accountUrl' => $accountUrl,
             ]);
+
+        $this->mailer->send($email);
+    }
+
+    public function sendSubscribeThanks(User $user): void
+    {
+        $email = (new TemplatedEmail())
+            ->from(new Address($this->mailerFrom, $this->mailerFromName))
+            ->to($user->getEmail())
+            ->subject('Thanks for signing up — Y Wal')
+            ->htmlTemplate('email/subscribe_thanks.html.twig')
+            ->textTemplate('email/subscribe_thanks.txt.twig')
+            ->context(['user' => $user, 'recipientEmail' => $user->getEmail()]);
 
         $this->mailer->send($email);
     }

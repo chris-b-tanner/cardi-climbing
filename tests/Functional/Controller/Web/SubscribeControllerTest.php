@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Web;
 
 use App\Entity\Note;
 use App\Entity\User;
@@ -16,7 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * (see SubscribeController) — signing up again with the same email is also a "good" response
  * (success message, no error, no duplicate contact), not a crash or a rejection.
  */
-class PublicSubscribeTest extends WebTestCase
+class SubscribeControllerTest extends WebTestCase
 {
     private ?string $testEmail = null;
 

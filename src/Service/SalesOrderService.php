@@ -78,7 +78,7 @@ class SalesOrderService
         $payment->setTakenBy($takenBy);
 
         $intent = $this->stripe->paymentIntents->create([
-            'amount'               => $this->toMinorUnits($order->getTotal()),
+            'amount'               => StripePaymentService::toMinorUnits($order->getTotal()),
             'currency'             => $payment->getCurrency(),
             'payment_method_types' => ['card_present'],
             'capture_method'       => 'automatic',
@@ -152,11 +152,6 @@ class SalesOrderService
 
         $this->markComplete($order);
         $this->em->flush();
-    }
-
-    private function toMinorUnits(string $amount): int
-    {
-        return (int) round((float) $amount * 100);
     }
 
     /**

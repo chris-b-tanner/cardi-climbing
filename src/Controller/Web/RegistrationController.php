@@ -5,12 +5,10 @@ namespace App\Controller\Web;
 use App\Entity\User;
 use App\Service\UserService;
 use App\Service\Mailer\WelcomeMailer;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /** Self-service account creation — a real, member-chosen password and every field the account profile page has, so a new member never has to visit "My account" afterward just to fill in details they could have given up front. */
@@ -19,9 +17,7 @@ class RegistrationController extends AbstractController
     #[Route('/register', name: 'app_register', methods: ['GET', 'POST'])]
     public function register(
         Request $request,
-        EntityManagerInterface $em,
         UserService $userService,
-        UserPasswordHasherInterface $passwordHasher,
         Security $security,
         WelcomeMailer $welcomeMailer,
     ): Response {
@@ -69,8 +65,8 @@ class RegistrationController extends AbstractController
                 $error = 'Please fill in your name, email, and a password.';
             } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $error = 'Please enter a valid email address.';
-            } elseif (strlen($password) < 8) {
-                $error = 'Your password must be at least 8 characters.';
+            } elseif (strlen($password) < UserService::MIN_PASSWORD_LENGTH) {
+                $error = 'Your password must be at least ' . UserService::MIN_PASSWORD_LENGTH . ' characters.';
             } elseif ($password !== $passwordConfirm) {
                 $error = 'Those passwords don\'t match.';
             } elseif ($userService->findExistingByEmail($email)) {
@@ -79,29 +75,12 @@ class RegistrationController extends AbstractController
             }
 
             if (!$error) {
-                $dob = $input['dateOfBirth'] !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $input['dateOfBirth']) ?: null) : null;
-
                 $user = new User();
+                $userService->applyProfileFields($user, $input);
                 $user->setEmail($email);
-                $user->setFirstName($input['firstName']);
-                $user->setLastName($input['lastName']);
-                $user->setCompany($input['company'] ?: null);
-                $user->setPhone($input['phone'] ?: null);
-                $user->setDateOfBirth($dob);
-                $user->setEmergencyContactName($input['emergencyContactName'] ?: null);
-                $user->setEmergencyContactPhone($input['emergencyContactPhone'] ?: null);
-                $user->setAddressLine1($input['addressLine1'] ?: null);
-                $user->setAddressLine2($input['addressLine2'] ?: null);
-                $user->setTown($input['town'] ?: null);
-                $user->setPostcode($input['postcode'] ?: null);
                 $user->setOptIn($input['optIn']);
-                $user->setPassword($passwordHasher->hashPassword($user, $password));
-                $user->setCreatedBy($user);
 
-                $em->persist($user);
-                $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
-
-                $userService->addNote($user, 'Contact added via self-registration.');
+                $userService->registerMember($user, $password, 'Contact added via self-registration.');
                 $welcomeMailer->sendWelcome($user);
 
                 $security->login($user);

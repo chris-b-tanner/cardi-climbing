@@ -14,12 +14,11 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
-use App\Service\Mailer\PaymentMailer;
 use App\Service\SalesOrderService;
+use App\Service\StripePaymentService;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Exception\ApiErrorException;
-use Stripe\StripeClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -717,33 +716,9 @@ class AdminSalesController extends AbstractController
 
     /** Polled by the sale page while waiting for a terminal payment to settle — same fallback pattern as PaymentController::status() for donations, in case the webhook is delayed or (locally) not configured at all. */
     #[Route('/payments/{id}/status', name: 'app_admin_sale_payment_status', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function paymentStatus(
-        Payment $payment,
-        StripeClient $stripe,
-        EntityManagerInterface $em,
-        SalesOrderService $salesOrderService,
-        PaymentMailer $paymentMailer,
-    ): JsonResponse {
-        if ($payment->getSucceededAt() === null && $payment->getFailedAt() === null && $payment->getStripePaymentIntentId()) {
-            $intent = $stripe->paymentIntents->retrieve($payment->getStripePaymentIntentId());
-
-            if ($intent->status === 'succeeded') {
-                $payment->setSucceededAt(new \DateTimeImmutable());
-                $em->flush();
-
-                $salesOrderService->completeFromPayment($payment);
-
-                try {
-                    $paymentMailer->sendReceipt($payment);
-                } catch (\Throwable $e) {
-                    error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
-                }
-            } elseif ($intent->status === 'canceled' || $intent->last_payment_error) {
-                $payment->setFailedAt(new \DateTimeImmutable());
-                $payment->setFailureReason($intent->last_payment_error->message ?? null);
-                $em->flush();
-            }
-        }
+    public function paymentStatus(Payment $payment, StripePaymentService $stripePaymentService): JsonResponse
+    {
+        $stripePaymentService->refreshFromStripe($payment);
 
         return new JsonResponse([
             'status'      => $payment->getStatus(),

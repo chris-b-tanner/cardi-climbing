@@ -5,14 +5,12 @@ namespace App\Controller\Web;
 use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\EventStaffingRequirement;
-use App\Entity\Product;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
-use App\Repository\ProductRepository;
 use App\Service\Mailer\BookingMailer;
 use App\Service\BookingService;
-use App\Service\CartService;
+use App\Service\EventOccurrenceService;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,8 +23,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 class EventController extends AbstractController
 {
+    public function __construct(
+        private readonly EventOccurrenceService $occurrences,
+    ) {}
+
     #[Route('/events', name: 'app_events')]
-    public function index(Request $request, EventRepository $eventRepository, AttendeeRepository $attendeeRepository): Response
+    public function index(Request $request, EventRepository $eventRepository): Response
     {
         /** @var User|null $user */
         $user  = $this->getUser();
@@ -36,7 +38,7 @@ class EventController extends AbstractController
         // a different layout — a plain GET form (rather than AJAX) so it's deep-linkable and works
         // without JS, consistent with the week/date navigation already using plain links.
         $searchQuery   = trim($request->query->get('q', ''));
-        $requestedDate = $this->parseDate($request->query->get('date', ''));
+        $requestedDate = EventOccurrenceService::parseDate($request->query->get('date', ''));
 
         if ($requestedDate !== null) {
             $anchor = $requestedDate;
@@ -53,49 +55,10 @@ class EventController extends AbstractController
 
         $events = $eventRepository->findPublishedOverlapping($weekStart, $weekEnd, $this->isGranted('ROLE_TEAM'), $searchQuery);
 
-        // Fetch every booking for these events across the whole week in one query, then
-        // derive per-occurrence counts/booked-state from it in memory — avoids running a
-        // count + booking-lookup query for every single occurrence shown on the calendar.
-        $eventIds        = array_map(static fn (Event $e) => $e->getId(), $events);
-        $activeAttendees = $attendeeRepository->findActiveForEventsInRange($eventIds, $weekStart, $weekEnd);
-
-        $occurrenceStats = [];
-        foreach ($activeAttendees as $attendee) {
-            $key = $this->occurrenceKey($attendee->getEvent(), $attendee->getOccurrenceDate() ?? $attendee->getEvent()->getDate());
-            $occurrenceStats[$key] ??= ['count' => 0, 'bookedByUser' => false];
-            $occurrenceStats[$key]['count']++;
-
-            if ($user && $attendee->getUser()->getId() === $user->getId()) {
-                $occurrenceStats[$key]['bookedByUser'] = true;
-            }
-        }
-
-        $days = [];
-        $period = new \DatePeriod($weekStart, new \DateInterval('P1D'), $weekEnd->modify('+1 day'));
-        foreach ($period as $day) {
-            $dayOccurrences = [];
-            foreach ($events as $event) {
-                // Drafts are only shown to team/admin as a preview of what's coming — a past draft
-                // occurrence never happened for real, so it's just noise on the calendar.
-                if (!$event->isPublished() && $day < $today) {
-                    continue;
-                }
-
-                if ($event->isValidForDate($day)) {
-                    $stats = $occurrenceStats[$this->occurrenceKey($event, $day)] ?? ['count' => 0, 'bookedByUser' => false];
-                    $dayOccurrences[] = $this->buildOccurrenceView($event, $day, $user, $stats);
-                }
-            }
-
-            usort($dayOccurrences, static fn(array $a, array $b) => $a['event']->getTimeFrom() <=> $b['event']->getTimeFrom());
-
-            $days[] = ['date' => $day, 'events' => $dayOccurrences];
-        }
-
         return $this->render('event/calendar.html.twig', [
             'weekStart'   => $weekStart,
             'weekEnd'     => $weekEnd,
-            'days'        => $days,
+            'days'        => $this->occurrences->buildWeek($events, $weekStart, $weekEnd, $user),
             'prevWeek'    => $weekStart->modify('-7 days')->format('Y-m-d'),
             'nextWeek'    => $weekStart->modify('+7 days')->format('Y-m-d'),
             'today'       => $today,
@@ -111,7 +74,7 @@ class EventController extends AbstractController
             return $today;
         }
 
-        return $this->resolveOccurrenceDate($matches[0], null, $today);
+        return $this->occurrences->resolveOccurrenceDate($matches[0], null, $today);
     }
 
     /**
@@ -121,29 +84,12 @@ class EventController extends AbstractController
      * calendar — falling back to the next upcoming occurrence when none is given.
      */
     #[Route('/events/{id}', name: 'app_event_show', requirements: ['id' => '\d+'])]
-    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    public function show(Request $request, Event $event): Response
     {
-        if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
-            throw $this->createNotFoundException('Event not found.');
-        }
-
-        $today          = new \DateTimeImmutable('today');
-        $requestedDate  = $this->parseDate($request->query->get('date', ''));
-        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
-
-        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
-
         /** @var User|null $user */
         $user = $this->getUser();
 
-        $stats = [
-            'count'        => $event->getMaxAttendees() !== null
-                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
-                : 0,
-            'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
-        ];
-
-        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
+        $view = $this->buildPageView($request, $event, checkBookedByUser: true, withTicketContext: false);
         $view['accountConflict'] = (bool) $request->query->get('accountConflict');
 
         // Which of this event's staffing requirements the member is qualified to volunteer for —
@@ -164,33 +110,9 @@ class EventController extends AbstractController
      * "book now" / "log in to book" button (not yet wired up to anything — that's the cart, to come).
      */
     #[Route('/events/{id}/preview', name: 'app_event_preview', requirements: ['id' => '\d+'])]
-    public function preview(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, CartService $cartService): Response
+    public function preview(Request $request, Event $event): Response
     {
-        if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
-            throw $this->createNotFoundException('Event not found.');
-        }
-
-        $today          = new \DateTimeImmutable('today');
-        $requestedDate  = $this->parseDate($request->query->get('date', ''));
-        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
-
-        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
-
-        $stats = [
-            'count'        => $event->getMaxAttendees() !== null
-                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
-                : 0,
-            'bookedByUser' => false,
-        ];
-
-        /** @var User|null $user */
-        $user = $this->getUser();
-
-        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
-        $view = array_merge($view, $this->buildTicketContext($event, $storedOccurrenceDate, $user, $productRepository, $cartService));
-        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
-
-        return $this->render('event/_preview.html.twig', $view);
+        return $this->render('event/_preview.html.twig', $this->buildPageView($request, $event, checkBookedByUser: false, withTicketContext: true));
     }
 
     /**
@@ -201,59 +123,28 @@ class EventController extends AbstractController
      * same as preview()/show() — falling back to the next upcoming occurrence when omitted.
      */
     #[Route('/events/{id}/details', name: 'app_event_landing', requirements: ['id' => '\d+'])]
-    public function landing(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, CartService $cartService): Response
+    public function landing(Request $request, Event $event): Response
+    {
+        return $this->render('event/landing.html.twig', $this->buildPageView($request, $event, checkBookedByUser: true, withTicketContext: true));
+    }
+
+    /** The shared body of show()/preview()/landing() — drafts are only visible to team/admin, and `?date=` picks the occurrence. */
+    private function buildPageView(Request $request, Event $event, bool $checkBookedByUser, bool $withTicketContext): array
     {
         if (!$event->isPublished() && !$this->isGranted('ROLE_TEAM')) {
             throw $this->createNotFoundException('Event not found.');
         }
 
-        $today          = new \DateTimeImmutable('today');
-        $requestedDate  = $this->parseDate($request->query->get('date', ''));
-        $occurrenceDate = $this->resolveOccurrenceDate($event, $requestedDate, $today);
-
-        $storedOccurrenceDate = $event->isRecurring() ? $occurrenceDate : null;
-
         /** @var User|null $user */
         $user = $this->getUser();
 
-        $stats = [
-            'count'        => $event->getMaxAttendees() !== null
-                ? $attendeeRepository->countActiveForOccurrence($event, $storedOccurrenceDate)
-                : 0,
-            'bookedByUser' => $user !== null && $attendeeRepository->findActiveBooking($event, $user, $storedOccurrenceDate) !== null,
-        ];
-
-        $view = $this->buildOccurrenceView($event, $occurrenceDate, $user, $stats);
-        $view = array_merge($view, $this->buildTicketContext($event, $storedOccurrenceDate, $user, $productRepository, $cartService));
-        $view['existingBookingCount'] = $user !== null ? $attendeeRepository->countActiveForUserOccurrence($event, $user, $storedOccurrenceDate) : 0;
-
-        return $this->render('event/landing.html.twig', $view);
-    }
-
-    /** The ticket-purchase context the preview modal and the public landing page both need — which active ticket products this event has, which of them {user} qualifies for, and how many are already in their cart for this occurrence. */
-    private function buildTicketContext(Event $event, ?\DateTimeImmutable $storedOccurrenceDate, ?User $user, ProductRepository $productRepository, CartService $cartService): array
-    {
-        $eventTicketProducts = $productRepository->findActiveEventTickets($event);
-
-        $ticketAccess = [];
-        foreach ($eventTicketProducts as $ticketProduct) {
-            $ticketAccess[$ticketProduct->getId()] = $this->userQualifiesForTicket($user, $ticketProduct);
-        }
-
-        $cartTicketCount = 0;
-        if ($user !== null) {
-            foreach ($cartService->getLines($user) as $line) {
-                if (in_array($line['product'], $eventTicketProducts, true) && $line['occurrenceDate'] == $storedOccurrenceDate) {
-                    $cartTicketCount++;
-                }
-            }
-        }
-
-        return [
-            'eventTicketProducts' => $eventTicketProducts,
-            'ticketAccess'        => $ticketAccess,
-            'cartTicketCount'     => $cartTicketCount,
-        ];
+        return $this->occurrences->buildPageView(
+            $event,
+            EventOccurrenceService::parseDate($request->query->get('date', '')),
+            $user,
+            $checkBookedByUser,
+            $withTicketContext,
+        );
     }
 
     #[Route('/events/{id}/book', name: 'app_event_book', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -346,8 +237,8 @@ class EventController extends AbstractController
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
-        if (strlen($password) < 8) {
-            $this->addFlash('error', 'Your password must be at least 8 characters.');
+        if (strlen($password) < UserService::MIN_PASSWORD_LENGTH) {
+            $this->addFlash('error', 'Your password must be at least ' . UserService::MIN_PASSWORD_LENGTH . ' characters.');
             return $this->redirectToRoute('app_event_show', $redirectParams);
         }
 
@@ -361,6 +252,7 @@ class EventController extends AbstractController
             $user = $existingUser;
             if ($optIn && !$user->isOptIn()) {
                 $user->setOptIn(true);
+                $em->flush();
             }
         } else {
             // Not routed through UserService::createContact() — that's for "quick contact, no
@@ -371,16 +263,9 @@ class EventController extends AbstractController
             $user->setFirstName($firstName);
             $user->setLastName($lastName);
             $user->setOptIn($optIn);
-            $user->setPassword($passwordHasher->hashPassword($user, $password));
-            $user->setCreatedBy($user);
 
-            $em->persist($user);
-            $em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
-
-            $userService->addNote($user, 'Contact added via event booking: "' . $event->getTitle() . '".');
+            $userService->registerMember($user, $password, 'Contact added via event booking: "' . $event->getTitle() . '".');
         }
-
-        $em->flush();
 
         $security->login($user);
 
@@ -425,7 +310,7 @@ class EventController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $occurrenceDate       = $this->parseDate($request->request->get('occurrenceDate', ''));
+        $occurrenceDate       = EventOccurrenceService::parseDate($request->request->get('occurrenceDate', ''));
         $storedOccurrenceDate = $occurrenceDate !== null && $event->isRecurring() ? $occurrenceDate : null;
 
         $attendee = $occurrenceDate !== null
@@ -451,7 +336,7 @@ class EventController extends AbstractController
      */
     private function validateBookableOccurrence(Event $event, string $rawDate, bool $allowDraft = false): array
     {
-        $occurrenceDate = $this->parseDate($rawDate);
+        $occurrenceDate = EventOccurrenceService::parseDate($rawDate);
         $redirectParams = ['id' => $event->getId()];
         if ($occurrenceDate) {
             $redirectParams['date'] = $occurrenceDate->format('Y-m-d');
@@ -482,176 +367,5 @@ class EventController extends AbstractController
         }
 
         return $requirement;
-    }
-
-    /**
-     * Whether $user can select this ticket's price — always true for an open ticket, otherwise
-     * only if $user (or one of their dependents, who they can also book the ticket for) currently
-     * holds the membership type it's restricted to.
-     */
-    private function userQualifiesForTicket(?User $user, Product $ticketProduct): bool
-    {
-        $membershipType = $ticketProduct->getEventTicketProduct()?->getMembershipType();
-
-        if ($membershipType === null) {
-            return true;
-        }
-
-        if ($user === null) {
-            return false;
-        }
-
-        if ($user->hasActiveMembershipType($membershipType)) {
-            return true;
-        }
-
-        foreach ($user->getDependents() as $dependent) {
-            if ($dependent->hasActiveMembershipType($membershipType)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** @param array{count: int, bookedByUser: bool} $stats */
-    private function buildOccurrenceView(Event $event, \DateTimeImmutable $date, ?User $user, array $stats): array
-    {
-        // Past means fully ended, not just "started" — an occurrence that's under way right now
-        // (or hasn't reached its end time yet today) still shows the booking/ticket form.
-        // combineDateAndTime() reads timeTo as UK wall-clock and converts to UTC (not literal
-        // UTC) so this stays correct across a DST change, same as the door-access API.
-        $isPast = $event->combineDateAndTime($date, $event->getTimeTo()) < new \DateTimeImmutable();
-
-        $isFull    = false;
-        $spotsLeft = null;
-
-        if ($event->getMaxAttendees() !== null) {
-            $spotsLeft = max(0, $event->getMaxAttendees() - $stats['count']);
-            $isFull    = $spotsLeft <= 0;
-        }
-
-        $isBooked     = $user ? $stats['bookedByUser'] : false;
-        $isRestricted = $user ? !$event->allowsUser($user) : false;
-
-        // Whether membership/credit already covers a free seat — checked against only the access
-        // methods the event actually accepts, since either one on its own is now a valid, complete
-        // route (see Event::acceptsMembership()/acceptsCredit()).
-        $coveredByMembership = false;
-        $coveredByCredit     = false;
-        if ($user !== null) {
-            if ($event->acceptsMembership()) {
-                $membership          = $user->getEffectiveMembership();
-                $coveredByMembership = $membership !== null && $membership->isCurrentlyActive();
-            }
-            if (!$coveredByMembership && $event->acceptsCredit()) {
-                $coveredByCredit = $user->getCreditBalance() > 0;
-            }
-        }
-
-        // Whether this event is a membership/credit-gated event at all — a property of the event
-        // itself, not of whether this particular user already satisfies it. Drives the direct-book
-        // button's membership/credit hint even when the user is covered for free by their membership.
-        $needsMembershipOrCredit = $event->acceptsCredit() || $event->acceptsMembership();
-
-        // Open booking (no access method selected) is always free; otherwise membership/credit
-        // cover is the free route. If neither applies but a ticket is also accepted, the ticket
-        // purchase route takes over instead of a hard block.
-        $canBookFree                 = !$event->hasAccessRestriction() || $coveredByMembership || $coveredByCredit;
-        $needsTicket                 = !$canBookFree && $event->acceptsTicket();
-        $blockedByMembershipOrCredit = !$canBookFree && !$needsTicket;
-
-        // A certification-restricted event needs a way to reach the booker in an emergency —
-        // checked here regardless of access method, same as before.
-        $blockedByMissingEmergencyContact = !$event->getRestrictions()->isEmpty() && $user !== null && !$user->hasCompleteEmergencyContact();
-
-        // Only set when an active membership is what covers this booking — lets the template tell
-        // "no payment needed" (membership) apart from "a credit will be spent" (no membership).
-        $activeMembership = $coveredByMembership ? $user->getEffectiveMembership() : null;
-
-        // A draft is only ever reachable here as a published event, or as a team/admin preview
-        // (show()/index() already gate that) — so team/admin can book onto it like any other
-        // event, e.g. to put themselves on duty and build out the rota before publishing.
-        $canBookUnpublished = !$event->isPublished() && $this->isGranted('ROLE_TEAM');
-
-        return [
-            'event'                            => $event,
-            'date'                             => $date,
-            'isPast'                           => $isPast,
-            'isFull'                           => $isFull,
-            'spotsLeft'                        => $spotsLeft,
-            'isBooked'                         => $isBooked,
-            'isRestricted'                     => $isRestricted,
-            'needsMembershipOrCredit'          => $needsMembershipOrCredit,
-            'needsTicket'                      => $needsTicket,
-            'blockedByMembershipOrCredit'      => $blockedByMembershipOrCredit,
-            'blockedByMissingEmergencyContact' => $blockedByMissingEmergencyContact,
-            'activeMembershipTypeName'         => $activeMembership?->getMembershipType()->getName(),
-            'isDraft'                          => !$event->isPublished(),
-            'canBook'                          => $user !== null && ($event->isPublished() || $canBookUnpublished) && !$isPast && !$isBooked && !$isFull && !$isRestricted && !$needsTicket && !$blockedByMembershipOrCredit && !$blockedByMissingEmergencyContact,
-        ];
-    }
-
-    /**
-     * Which occurrence to show/book on the event page: the requested date if it's a real
-     * occurrence of this event, otherwise the next upcoming one, falling back to the most
-     * recent past occurrence if the event (or its recurrence window) has already ended.
-     */
-    private function resolveOccurrenceDate(Event $event, ?\DateTimeImmutable $requested, \DateTimeImmutable $today): \DateTimeImmutable
-    {
-        if ($requested !== null && $event->isValidForDate($requested)) {
-            return $requested;
-        }
-
-        if (!$event->isRecurring()) {
-            return $event->getDate();
-        }
-
-        $searchFrom = max($event->getDate(), $today);
-
-        for ($i = 0; $i < 7; $i++) {
-            $candidate = $searchFrom->modify("+{$i} days");
-            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
-                break;
-            }
-            if ($event->isValidForDate($candidate)) {
-                return $candidate;
-            }
-        }
-
-        if ($event->getRecurUntil()) {
-            for ($i = 0; $i < 7; $i++) {
-                $candidate = $event->getRecurUntil()->modify("-{$i} days");
-                if ($candidate < $event->getDate()) {
-                    break;
-                }
-                if ($event->isValidForDate($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        return $event->getDate();
-    }
-
-    private function occurrenceKey(Event $event, \DateTimeImmutable $date): string
-    {
-        return $event->getId() . '|' . ($event->isRecurring() ? $date->format('Y-m-d') : 'single');
-    }
-
-    private function parseDate(string $raw): ?\DateTimeImmutable
-    {
-        // Guard against the empty string specifically: DateTimeImmutable's constructor treats it
-        // like "now" rather than throwing, so without this every caller's "no date given" case
-        // would silently resolve to today instead of null.
-        if ($raw === '') {
-            return null;
-        }
-
-        try {
-            return new \DateTimeImmutable($raw);
-        } catch (\Exception) {
-            return null;
-        }
     }
 }

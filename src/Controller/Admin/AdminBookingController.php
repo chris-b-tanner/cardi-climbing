@@ -2,6 +2,7 @@
 
 namespace App\Controller\Admin;
 
+use App\Controller\Concern\SafeLocalRedirectTrait;
 use App\Entity\Attendee;
 use App\Entity\Event;
 use App\Entity\Note;
@@ -13,6 +14,7 @@ use App\Repository\UserRepository;
 use App\Service\Mailer\BookingMailer;
 use App\Service\BookingService;
 use App\Service\DoorAccessService;
+use App\Service\EventOccurrenceService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,6 +26,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_TEAM')]
 class AdminBookingController extends AbstractController
 {
+    use SafeLocalRedirectTrait;
+
     #[Route('', name: 'app_admin_bookings')]
     public function index(Request $request, AttendeeRepository $attendeeRepository): Response
     {
@@ -149,7 +153,7 @@ class AdminBookingController extends AbstractController
         $selectedEventId = (int) $request->query->get('eventId', $request->request->get('eventId', 0));
 
         $today     = new \DateTimeImmutable('today');
-        $anchor    = $this->parseDate($request->query->get('date', '')) ?? $today;
+        $anchor    = EventOccurrenceService::parseDate($request->query->get('date', '')) ?? $today;
         $weekStart = $anchor->modify('monday this week');
         $weekEnd   = $weekStart->modify('+6 days');
 
@@ -218,20 +222,6 @@ class AdminBookingController extends AbstractController
         ]);
     }
 
-    /** Guards against the empty string specifically: DateTimeImmutable's constructor treats it like "now" rather than throwing, so "no date given" needs handling before it silently resolves to today. */
-    private function parseDate(string $raw): ?\DateTimeImmutable
-    {
-        if ($raw === '') {
-            return null;
-        }
-
-        try {
-            return new \DateTimeImmutable($raw);
-        } catch (\Exception) {
-            return null;
-        }
-    }
-
     #[Route('/{id}/edit', name: 'app_admin_booking_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function edit(Request $request, Attendee $attendee, NoteRepository $noteRepository, DoorAccessService $doorAccessService, BookingService $bookingService): Response
     {
@@ -283,11 +273,10 @@ class AdminBookingController extends AbstractController
      */
     private function resolveReturnTo(Request $request, Attendee $attendee): string
     {
-        $returnTo = $request->request->get('returnTo') ?? $request->query->get('returnTo', '');
-
-        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
-            ? $returnTo
-            : $this->generateUrl('app_admin_user_show', ['id' => $attendee->getUser()->getId()]);
+        return $this->localPathOr(
+            $request->request->get('returnTo') ?? $request->query->get('returnTo', ''),
+            $this->generateUrl('app_admin_user_show', ['id' => $attendee->getUser()->getId()]),
+        );
     }
 
     #[Route('/{id}/staffing/approve', name: 'app_admin_booking_staffing_approve', requirements: ['id' => '\d+'], methods: ['POST'])]

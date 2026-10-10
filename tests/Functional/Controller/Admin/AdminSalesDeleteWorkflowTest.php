@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Admin;
 
 use App\Entity\Payment;
 use App\Entity\Product;
@@ -27,7 +27,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * is a deliberate no-op, so completing an order never has side effects beyond the sale itself,
  * keeping this test focused purely on the payment/order lifecycle.
  */
-class AdminSaleDeleteWorkflowTest extends WebTestCase
+class AdminSalesDeleteWorkflowTest extends WebTestCase
 {
     use CreatesTestAdmin;
 

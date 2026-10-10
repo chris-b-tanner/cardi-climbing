@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Web;
 
 use App\Entity\User;
 use App\Entity\UserCertification;
@@ -15,7 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * The walk-in kiosk flow: a contact with no email/password gets into the certification wizard by
  * entering the record ID + their surname on a shared tablet, instead of logging in. See
  * KioskController and AdminController::confirmCertification() (where the ID is generated). See
- * CertificationLifecycleTest for the "has an email, gets a magic link" variant of this same wizard.
+ * AdminCertificationLifecycleTest for the "has an email, gets a magic link" variant of this same wizard.
  */
 class KioskCertificationTest extends WebTestCase
 {
@@ -141,7 +141,7 @@ class KioskCertificationTest extends WebTestCase
 
         self::assertResponseRedirects();
         // No email address on file at all (not even a parent's) — sendCompletion() never reaches
-        // the transport, so nothing should be logged here, unlike CertificationLifecycleTest's
+        // the transport, so nothing should be logged here, unlike AdminCertificationLifecycleTest's
         // equivalent step.
         self::assertEmailCount(0);
 
@@ -224,7 +224,7 @@ class KioskCertificationTest extends WebTestCase
         $client->submit($form);
     }
 
-    /** Satisfies completeCertification()'s "missing profile fields" gate so the wizard goes straight to declarations/signature — see CertificationLifecycleTest's identical need for the emailed-magic-link variant. */
+    /** Satisfies completeCertification()'s "missing profile fields" gate so the wizard goes straight to declarations/signature — see AdminCertificationLifecycleTest's identical need for the emailed-magic-link variant. */
     private function fillRequiredProfileFields(User $user): void
     {
         $user->setEmergencyContactName('Someone');
@@ -242,7 +242,7 @@ class KioskCertificationTest extends WebTestCase
      * the client is already on (or has just been redirected to) the completion wizard. Posted
      * directly rather than via a scraped Form object: several `declarations[]` checkboxes sharing
      * one name don't collapse into a single settable multi-value field the way DomCrawler handles
-     * a real `<select multiple>` — see CertificationLifecycleTest for the same workaround.
+     * a real `<select multiple>` — see AdminCertificationLifecycleTest for the same workaround.
      */
     private function completeCurrentWizard(KernelBrowser $client, UserCertification $record): void
     {

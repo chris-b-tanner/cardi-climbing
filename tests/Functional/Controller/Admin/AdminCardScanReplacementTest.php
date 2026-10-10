@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Admin;
 
 use App\Entity\AccessCard;
 use App\Entity\Note;
@@ -19,7 +19,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * the locked one stayed current alongside the new one — after which the member's admin page (and
  * Lock/Unlock/Remove) failed with a NonUniqueResultException.
  */
-class CardReplacementTest extends WebTestCase
+class AdminCardScanReplacementTest extends WebTestCase
 {
     use CreatesTestAdmin;
 

@@ -5,7 +5,7 @@ namespace App\Twig;
 use App\Service\AvatarUploader;
 use App\Service\ProductImageUploader;
 use App\Service\UkPhoneFormatter;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use App\Service\UnsubscribeToken;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
@@ -15,7 +15,7 @@ class AppExtension extends AbstractExtension
 {
     public function __construct(
         private readonly UrlGeneratorInterface $router,
-        #[Autowire('%kernel.secret%')] private readonly string $appSecret,
+        private readonly UnsubscribeToken $unsubscribeToken,
         private readonly UkPhoneFormatter $ukPhoneFormatter,
         private readonly AvatarUploader $avatarUploader,
         private readonly ProductImageUploader $productImageUploader,
@@ -40,12 +40,9 @@ class AppExtension extends AbstractExtension
 
     public function unsubscribeUrl(string $email): string
     {
-        $email = strtolower(trim($email));
-        $token = hash_hmac('sha256', $email, $this->appSecret);
-
         return $this->router->generate('app_unsubscribe', [
-            'email' => $email,
-            'token' => $token,
+            'email' => UnsubscribeToken::normaliseEmail($email),
+            'token' => $this->unsubscribeToken->generate($email),
         ], UrlGeneratorInterface::ABSOLUTE_URL);
     }
 }

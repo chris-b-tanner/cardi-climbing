@@ -5,10 +5,7 @@ namespace App\Controller\Web;
 use App\Entity\Payment;
 use App\Entity\User;
 use App\Service\CartService;
-use App\Service\Mailer\PaymentMailer;
-use App\Service\SalesOrderService;
-use Doctrine\ORM\EntityManagerInterface;
-use Stripe\StripeClient;
+use App\Service\StripePaymentService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +19,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class CartController extends AbstractController
 {
     public function __construct(
-        private readonly StripeClient $stripe,
         private readonly string $stripePublishableKey,
     ) {}
 
@@ -77,7 +73,7 @@ class CartController extends AbstractController
 
     /** Materialises the cart into a real draft SalesOrder and starts an online Stripe payment for it — mirrors PaymentController::createIntent for donations. */
     #[Route('/checkout', name: 'app_cart_checkout', methods: ['POST'])]
-    public function checkout(Request $request, CartService $cartService, EntityManagerInterface $em): JsonResponse
+    public function checkout(Request $request, CartService $cartService, StripePaymentService $stripePaymentService): JsonResponse
     {
         if (!$this->isCsrfTokenValid('cart_checkout', $request->request->get('_csrf_token'))) {
             return new JsonResponse(['error' => 'Access denied.'], 403);
@@ -92,70 +88,24 @@ class CartController extends AbstractController
             return new JsonResponse(['error' => $e->getMessage()], 422);
         }
 
-        $payment = new Payment();
-        $payment->setUser($user);
-        $payment->setOrder($order);
-        $payment->setAmount($order->getTotal());
-        $payment->setMethod(Payment::METHOD_ONLINE);
-
-        $intent = $this->stripe->paymentIntents->create([
-            'amount'               => $this->toMinorUnits($order->getTotal()),
-            'currency'             => $payment->getCurrency(),
-            'payment_method_types' => ['card'],
-            'description'          => 'Y Wal order #' . $order->getId(),
-            'metadata'             => ['user_id' => (string) $user->getId(), 'order_id' => (string) $order->getId()],
-            'receipt_email'        => $user->getEmail(),
-        ]);
-
-        $payment->setStripePaymentIntentId($intent->id);
-
-        $em->persist($payment);
-        $em->flush();
+        [$payment, $clientSecret] = $stripePaymentService->startOnlinePayment($user, $order->getTotal(), 'Y Wal order #' . $order->getId(), $order);
 
         return new JsonResponse([
             'paymentId'    => $payment->getId(),
-            'clientSecret' => $intent->client_secret,
+            'clientSecret' => $clientSecret,
         ]);
     }
 
-    /** Polled by the checkout page while waiting for the payment to settle — mirrors PaymentController::status, plus completing the order once it does. */
+    /** Polled by the checkout page while waiting for the payment to settle — the order is completed as part of marking the payment succeeded. */
     #[Route('/status/{id}', name: 'app_cart_status', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function status(Payment $payment, EntityManagerInterface $em, PaymentMailer $paymentMailer, SalesOrderService $salesOrderService): JsonResponse
+    public function status(Payment $payment, StripePaymentService $stripePaymentService): JsonResponse
     {
         if ($payment->getUser() !== $this->getUser()) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        // The webhook is the normal way this gets set, but it can be delayed (or, locally, not
-        // configured at all via `stripe listen`) — so fall back to asking Stripe directly.
-        if ($payment->getSucceededAt() === null && $payment->getFailedAt() === null && $payment->getStripePaymentIntentId()) {
-            $intent = $this->stripe->paymentIntents->retrieve($payment->getStripePaymentIntentId());
-
-            if ($intent->status === 'succeeded') {
-                $payment->setSucceededAt(new \DateTimeImmutable());
-                $em->flush();
-
-                $salesOrderService->completeFromPayment($payment);
-
-                try {
-                    $paymentMailer->sendReceipt($payment);
-                } catch (\Throwable $e) {
-                    // The payment (and order) are already saved as succeeded at this point — an
-                    // email failure here shouldn't turn into a 500 and leave the buyer unsure.
-                    error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
-                }
-            } elseif ($intent->status === 'canceled' || $intent->last_payment_error) {
-                $payment->setFailedAt(new \DateTimeImmutable());
-                $payment->setFailureReason($intent->last_payment_error->message ?? null);
-                $em->flush();
-            }
-        }
+        $stripePaymentService->refreshFromStripe($payment);
 
         return new JsonResponse(['status' => $payment->getStatus()]);
-    }
-
-    private function toMinorUnits(string $amount): int
-    {
-        return (int) round((float) $amount * 100);
     }
 }

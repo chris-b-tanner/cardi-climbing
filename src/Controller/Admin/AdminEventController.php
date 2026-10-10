@@ -15,6 +15,7 @@ use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
 use App\Repository\UserCertificationRepository;
 use App\Repository\UserRepository;
+use App\Service\EventOccurrenceService;
 use App\Service\Mailer\BookingMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -96,14 +97,14 @@ class AdminEventController extends AbstractController
      * admins alike. For a recurring event, ?date= picks which occurrence's attendees are shown.
      */
     #[Route('/{id}', name: 'app_admin_event_show', requirements: ['id' => '\d+'])]
-    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, NoteRepository $noteRepository): Response
+    public function show(Request $request, Event $event, AttendeeRepository $attendeeRepository, ProductRepository $productRepository, NoteRepository $noteRepository, EventOccurrenceService $occurrences): Response
     {
         $occurrenceDate = null;
         $prevDate       = null;
         $nextDate       = null;
 
         if ($event->isRecurring()) {
-            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
+            $occurrenceDate = $occurrences->resolveOccurrenceDate($event, EventOccurrenceService::parseDate($request->query->get('date', '')));
             $prevDate       = $this->adjacentOccurrence($event, $occurrenceDate, -1);
             $nextDate       = $this->adjacentOccurrence($event, $occurrenceDate, 1);
 
@@ -131,12 +132,12 @@ class AdminEventController extends AbstractController
 
     /** A print-friendly page listing this occurrence's non-cancelled attendees — name, email, and membership number. */
     #[Route('/{id}/attendees/print', name: 'app_admin_event_attendees_print', requirements: ['id' => '\d+'])]
-    public function printAttendees(Request $request, Event $event, AttendeeRepository $attendeeRepository): Response
+    public function printAttendees(Request $request, Event $event, AttendeeRepository $attendeeRepository, EventOccurrenceService $occurrences): Response
     {
         $occurrenceDate = null;
 
         if ($event->isRecurring()) {
-            $occurrenceDate = $this->resolveOccurrenceDateFromRequest($request, $event);
+            $occurrenceDate = $occurrences->resolveOccurrenceDate($event, EventOccurrenceService::parseDate($request->query->get('date', '')));
             $attendees      = $attendeeRepository->findForEventOccurrence($event, $occurrenceDate);
         } else {
             $attendees = $attendeeRepository->findForEvent($event);
@@ -693,61 +694,6 @@ class AdminEventController extends AbstractController
                 $em->remove($requirement);
             }
         }
-    }
-
-    /** Parses the `?date=` query param (if any) and resolves it to a real occurrence of this recurring event. */
-    private function resolveOccurrenceDateFromRequest(Request $request, Event $event): \DateTimeImmutable
-    {
-        $requestedDate = null;
-        $requestedRaw  = $request->query->get('date', '');
-        if ($requestedRaw !== '') {
-            try {
-                $requestedDate = new \DateTimeImmutable($requestedRaw);
-            } catch (\Exception) {
-                $requestedDate = null;
-            }
-        }
-
-        return $this->resolveOccurrenceDate($event, $requestedDate);
-    }
-
-    /**
-     * Which occurrence to show on the event info screen: the requested date if it's a real
-     * occurrence, otherwise the next upcoming one, falling back to the most recent past
-     * occurrence once the recurrence window has ended.
-     */
-    private function resolveOccurrenceDate(Event $event, ?\DateTimeImmutable $requested): \DateTimeImmutable
-    {
-        if ($requested !== null && $event->isValidForDate($requested)) {
-            return $requested;
-        }
-
-        $today      = new \DateTimeImmutable('today');
-        $searchFrom = max($event->getDate(), $today);
-
-        for ($i = 0; $i < 7; $i++) {
-            $candidate = $searchFrom->modify("+{$i} days");
-            if ($event->getRecurUntil() && $candidate > $event->getRecurUntil()) {
-                break;
-            }
-            if ($event->isValidForDate($candidate)) {
-                return $candidate;
-            }
-        }
-
-        if ($event->getRecurUntil()) {
-            for ($i = 0; $i < 7; $i++) {
-                $candidate = $event->getRecurUntil()->modify("-{$i} days");
-                if ($candidate < $event->getDate()) {
-                    break;
-                }
-                if ($event->isValidForDate($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        return $event->getDate();
     }
 
     /** The previous/next valid occurrence date relative to $from, or null if there isn't one. */

@@ -487,31 +487,18 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
             }
 
-            $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
-            $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
-            $user->setCompany(trim($request->request->get('company', '')) ?: null);
+            $userService->applyProfileFields($user, $request->request->all());
             $user->setEmail($newEmail);
             $user->setEmail2(trim($request->request->get('email2', '')) ?: null);
             $user->setEmail3(trim($request->request->get('email3', '')) ?: null);
             $user->setMemo(trim($request->request->get('memo', '')) ?: null);
             $user->setOptIn($request->request->has('optIn'));
-            $user->setPhone(trim($request->request->get('phone', '')) ?: null);
 
             $website = trim($request->request->get('website', ''));
             if ($website !== '' && !preg_match('#^https?://#i', $website)) {
                 $website = 'https://' . $website;
             }
             $user->setWebsite($website ?: null);
-
-            $dob = trim($request->request->get('dateOfBirth', ''));
-            $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
-
-            $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
-            $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
-            $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
-            $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
-            $user->setTown(trim($request->request->get('town', '')) ?: null);
-            $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
 
             if ($this->isGranted('ROLE_ADMIN')) {
                 $role = $request->request->get('role', User::ROLE_MEMBER);

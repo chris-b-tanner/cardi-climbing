@@ -2,6 +2,7 @@
 
 namespace App\Controller\Web;
 
+use App\Controller\Concern\SafeLocalRedirectTrait;
 use App\Entity\Attendee;
 use App\Entity\Tag;
 use App\Entity\User;
@@ -25,6 +26,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 class AccountController extends AbstractController
 {
+    use SafeLocalRedirectTrait;
+
     #[Route('', name: 'app_account', methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
@@ -78,22 +81,9 @@ class AccountController extends AbstractController
             }
 
             if (!$error) {
-                $user->setFirstName(trim($request->request->get('firstName', '')) ?: null);
-                $user->setLastName(trim($request->request->get('lastName', '')) ?: null);
-                $user->setCompany(trim($request->request->get('company', '')) ?: null);
+                $userService->applyProfileFields($user, $request->request->all());
                 $user->setEmail($newEmail);
-                $user->setPhone(trim($request->request->get('phone', '')) ?: null);
-                $user->setAddressLine1(trim($request->request->get('addressLine1', '')) ?: null);
-                $user->setAddressLine2(trim($request->request->get('addressLine2', '')) ?: null);
-                $user->setTown(trim($request->request->get('town', '')) ?: null);
-                $user->setPostcode(trim($request->request->get('postcode', '')) ?: null);
                 $user->setOptIn($newOptIn);
-
-                $dob = trim($request->request->get('dateOfBirth', ''));
-                $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
-
-                $user->setEmergencyContactName(trim($request->request->get('emergencyContactName', '')) ?: null);
-                $user->setEmergencyContactPhone(trim($request->request->get('emergencyContactPhone', '')) ?: null);
 
                 // Only ever touches public tags — never removes a non-public tag staff may have
                 // assigned internally, since those never appear as a checkbox here at all.
@@ -399,10 +389,6 @@ class AccountController extends AbstractController
      */
     private function resolveReturnTo(Request $request): string
     {
-        $returnTo = $request->request->get('returnTo', '');
-
-        return (is_string($returnTo) && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//'))
-            ? $returnTo
-            : $this->generateUrl('app_account');
+        return $this->localPathOr($request->request->get('returnTo', ''), $this->generateUrl('app_account'));
     }
 }

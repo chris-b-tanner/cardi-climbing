@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Admin;
 
 use App\Entity\User;
 use App\Entity\UserCertification;
@@ -26,7 +26,7 @@ use Symfony\Component\Mime\Email;
  * link token from the invitation email's body rather than fetching it straight from MagicLinkService,
  * so the real end-to-end path (including the email content itself) is what's under test.
  */
-class CertificationLifecycleTest extends WebTestCase
+class AdminCertificationLifecycleTest extends WebTestCase
 {
     use CreatesTestAdmin;
     use CreatesTestCertification;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Api;
 
 use App\Entity\AccessCard;
 use App\Entity\Attendee;

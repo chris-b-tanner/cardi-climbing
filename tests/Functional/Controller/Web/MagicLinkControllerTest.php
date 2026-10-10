@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional;
+namespace App\Tests\Functional\Controller\Web;
 
 use App\Entity\MagicLink;
 use App\Entity\User;
@@ -13,7 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * for — the whole point being that a contact with no password (most are created by an admin
  * without one) can still get into their account via an emailed link. See MagicLinkService.
  */
-class MagicLinkTest extends WebTestCase
+class MagicLinkControllerTest extends WebTestCase
 {
     private ?int $testUserId = null;
 

@@ -2,12 +2,10 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\Payment;
 use App\Entity\Refund;
 use App\Repository\PaymentRepository;
 use App\Repository\RefundRepository;
-use App\Service\Mailer\PaymentMailer;
-use App\Service\SalesOrderService;
+use App\Service\StripePaymentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Stripe\Event;
 use Stripe\Webhook;
@@ -32,8 +30,7 @@ class StripeWebhookController extends AbstractController
         PaymentRepository $paymentRepository,
         RefundRepository $refundRepository,
         EntityManagerInterface $em,
-        PaymentMailer $paymentMailer,
-        SalesOrderService $salesOrderService,
+        StripePaymentService $stripePaymentService,
     ): JsonResponse {
         try {
             $event = Webhook::constructEvent(
@@ -46,8 +43,8 @@ class StripeWebhookController extends AbstractController
         }
 
         match ($event->type) {
-            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $em, $paymentMailer, $salesOrderService),
-            'payment_intent.payment_failed' => $this->onPaymentFailed($event, $paymentRepository, $em),
+            'payment_intent.succeeded' => $this->onPaymentSucceeded($event, $paymentRepository, $stripePaymentService),
+            'payment_intent.payment_failed' => $this->onPaymentFailed($event, $paymentRepository, $stripePaymentService),
             'charge.refunded' => $this->onChargeRefunded($event, $paymentRepository, $refundRepository, $em),
             default => null,
         };
@@ -55,50 +52,23 @@ class StripeWebhookController extends AbstractController
         return new JsonResponse(['status' => 'ok']);
     }
 
-    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em, PaymentMailer $paymentMailer, SalesOrderService $salesOrderService): void
+    private function onPaymentSucceeded(Event $event, PaymentRepository $paymentRepository, StripePaymentService $stripePaymentService): void
     {
-        $intent  = $event->data->object;
-        $payment = $paymentRepository->findOneBy(['stripePaymentIntentId' => $intent->id]);
+        $payment = $paymentRepository->findOneBy(['stripePaymentIntentId' => $event->data->object->id]);
 
-        if (!$payment || $payment->getSucceededAt() !== null) {
-            return;
-        }
-
-        $payment->setSucceededAt(new \DateTimeImmutable());
-
-        $attendee = $payment->getAttendee();
-        if ($attendee !== null) {
-            $attendee->setPaidAmount(number_format((float) $attendee->getPaidAmount() + (float) $payment->getAmount(), 2, '.', ''));
-        }
-
-        $em->flush();
-
-        if ($payment->getOrder() !== null) {
-            $salesOrderService->completeFromPayment($payment);
-        }
-
-        try {
-            $paymentMailer->sendReceipt($payment);
-        } catch (\Throwable $e) {
-            // The payment is already saved as succeeded at this point — an email failure here
-            // shouldn't turn into a webhook error and risk Stripe endlessly retrying the event.
-            error_log('Payment receipt email failed for payment ' . $payment->getId() . ': ' . $e->getMessage());
+        if ($payment) {
+            $stripePaymentService->markSucceeded($payment);
         }
     }
 
-    private function onPaymentFailed(Event $event, PaymentRepository $paymentRepository, EntityManagerInterface $em): void
+    private function onPaymentFailed(Event $event, PaymentRepository $paymentRepository, StripePaymentService $stripePaymentService): void
     {
         $intent  = $event->data->object;
         $payment = $paymentRepository->findOneBy(['stripePaymentIntentId' => $intent->id]);
 
-        if (!$payment || $payment->getFailedAt() !== null) {
-            return;
+        if ($payment) {
+            $stripePaymentService->markFailed($payment, $intent->last_payment_error->message ?? null);
         }
-
-        $payment->setFailedAt(new \DateTimeImmutable());
-        $payment->setFailureReason($intent->last_payment_error->message ?? null);
-
-        $em->flush();
     }
 
     /** Reconciles refunds issued directly in the Stripe Dashboard (ones issued via our admin action are already recorded). */

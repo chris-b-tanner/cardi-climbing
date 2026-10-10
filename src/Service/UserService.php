@@ -20,6 +20,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 class UserService
 {
+    /** Shared by every place a member chooses their own password — registration, guest booking and password reset. */
+    public const MIN_PASSWORD_LENGTH = 8;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $hasher,
@@ -89,6 +92,51 @@ class UserService
         $this->addNote($user, $noteContent, $addedBy);
 
         return $user;
+    }
+
+    /**
+     * Genuine self-registration: saves {user} (already populated by the caller) with a real,
+     * member-chosen password, as self-created — then records {noteContent} against it. Unlike
+     * createContact(), the member can log in straight away.
+     */
+    public function registerMember(User $user, string $plainPassword, string $noteContent): User
+    {
+        $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
+        $user->setCreatedBy($user);
+
+        $this->em->persist($user);
+        $this->em->flush(); // assigns $user's id — needed before a Note can reference it via noteableId
+
+        $this->addNote($user, $noteContent);
+
+        return $user;
+    }
+
+    /**
+     * Applies the personal-details fields every profile form shares (registration, the member's
+     * own account page, the admin contact edit screen) from submitted {input} — trimmed, with blanks
+     * stored as null. Email and opt-in are left to the caller, since each form treats those differently.
+     *
+     * @param array<string, mixed> $input e.g. $request->request->all()
+     */
+    public function applyProfileFields(User $user, array $input): void
+    {
+        $field = static fn (string $name): ?string => trim((string) ($input[$name] ?? '')) ?: null;
+
+        $user->setFirstName($field('firstName'));
+        $user->setLastName($field('lastName'));
+        $user->setCompany($field('company'));
+        $user->setPhone($field('phone'));
+
+        $dob = $field('dateOfBirth');
+        $user->setDateOfBirth($dob ? \DateTimeImmutable::createFromFormat('Y-m-d', $dob) ?: null : null);
+
+        $user->setEmergencyContactName($field('emergencyContactName'));
+        $user->setEmergencyContactPhone($field('emergencyContactPhone'));
+        $user->setAddressLine1($field('addressLine1'));
+        $user->setAddressLine2($field('addressLine2'));
+        $user->setTown($field('town'));
+        $user->setPostcode($field('postcode'));
     }
 
     /** Records a Note against {$user}. Only call this once $user is guaranteed to already have an id (already flushed, or an existing record). */

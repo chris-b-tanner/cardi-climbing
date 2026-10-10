@@ -4,13 +4,12 @@ namespace App\Controller\Web;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Mailer\PasswordResetMailer;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Address;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use SymfonyCasts\Bundle\ResetPassword\Controller\ResetPasswordControllerTrait;
@@ -24,19 +23,17 @@ class ResetPasswordController extends AbstractController
 
     public function __construct(
         private readonly ResetPasswordHelperInterface $resetPasswordHelper,
-        private readonly string $mailerFrom,
-        private readonly string $mailerFromName,
     ) {}
 
     #[Route('', name: 'app_forgot_password_request')]
-    public function request(Request $request, MailerInterface $mailer, UserRepository $userRepository): Response
+    public function request(Request $request, PasswordResetMailer $passwordResetMailer, UserRepository $userRepository): Response
     {
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('forgot-password', $request->request->get('_csrf_token'))) {
                 $this->addFlash('error', 'Access denied.');
                 return $this->redirectToRoute('app_home');
             }
-            return $this->processForgotPassword($request, $mailer, $userRepository);
+            return $this->processForgotPassword($request, $passwordResetMailer, $userRepository);
         }
 
         return $this->render('reset_password/request.html.twig', [
@@ -87,10 +84,10 @@ class ResetPasswordController extends AbstractController
                 ]);
             }
 
-            if (strlen($password) < 8) {
+            if (strlen($password) < UserService::MIN_PASSWORD_LENGTH) {
                 return $this->render('reset_password/reset.html.twig', [
                     'token' => $token,
-                    'error' => 'Password must be at least 8 characters.',
+                    'error' => 'Password must be at least ' . UserService::MIN_PASSWORD_LENGTH . ' characters.',
                 ]);
             }
 
@@ -112,7 +109,7 @@ class ResetPasswordController extends AbstractController
         ]);
     }
 
-    private function processForgotPassword(Request $request, MailerInterface $mailer, UserRepository $userRepository): Response
+    private function processForgotPassword(Request $request, PasswordResetMailer $passwordResetMailer, UserRepository $userRepository): Response
     {
         $email = trim((string) $request->request->get('email', ''));
         $user  = $userRepository->findOneBy(['email' => $email]);
@@ -127,15 +124,7 @@ class ResetPasswordController extends AbstractController
             return $this->redirectToRoute('app_check_email');
         }
 
-        $message = (new TemplatedEmail())
-            ->from(new Address($this->mailerFrom, $this->mailerFromName))
-            ->to((string) $user->getEmail())
-            ->subject('Password reset request — Y Wal')
-            ->htmlTemplate('email/reset_password.html.twig')
-            ->textTemplate('email/reset_password.txt.twig')
-            ->context(['resetToken' => $resetToken, 'user' => $user]);
-
-        $mailer->send($message);
+        $passwordResetMailer->sendResetLink($user, $resetToken);
 
         $this->setTokenObjectInSession($resetToken);
 

@@ -483,6 +483,8 @@
             <tr>
               <th>Event</th>
               <th>Date</th>
+              <th>In</th>
+              <th>Out</th>
               <th>Price</th>
               <th>Status</th>
               <th></th>
@@ -501,6 +503,8 @@
                   {% endif %}
                 </td>
                 <td class="admin-table__muted">{{ (booking.occurrenceDate ?? booking.event.date)|date('d M Y') }}</td>
+                <td class="admin-table__muted">{{ booking.checkedInAt ? booking.checkedInAt|date('H:i') : '—' }}</td>
+                <td class="admin-table__muted">{{ booking.checkedOutAt ? booking.checkedOutAt|date('H:i') : '—' }}</td>
                 <td class="admin-table__muted">{{ booking.effectivePrice ? '£' ~ booking.effectivePrice : 'Free' }}</td>
                 <td><span class="status-pill{{ pillClass }}">{{ booking.status|capitalize }}</span></td>
                 <td><a href="{{ path('app_admin_booking_edit', {id: booking.id, returnTo: path('app_admin_user_show', {id: user.id})}) }}" class="admin-table__link">Edit</a></td>
