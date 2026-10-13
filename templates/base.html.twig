@@ -65,19 +65,39 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/app.css?t=2026100qz1filled">
+  <link rel="stylesheet" href="/css/app.css?t=20261013cookie">
+
+  {% block analytics %}
+  {# Google tag with Consent Mode v2 (basic): everything defaults to denied and gtag.js is only
+     loaded once the visitor accepts analytics cookies via the banner at the foot of the page. #}
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'denied'
+    });
+    window.ywalLoadAnalytics = function () {
+      if (window.ywalAnalyticsLoaded) return;
+      window.ywalAnalyticsLoaded = true;
+      gtag('consent', 'update', { analytics_storage: 'granted' });
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-85J8S7GGWP';
+      document.head.appendChild(s);
+      gtag('js', new Date());
+      gtag('config', 'G-85J8S7GGWP');
+    };
+    try {
+      if (localStorage.getItem('ywal_cookie_consent') === 'granted') window.ywalLoadAnalytics();
+    } catch (e) {}
+  </script>
+  {% endblock %}
 
   {% block head %}{% endblock %}
 </head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-85J8S7GGWP"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-85J8S7GGWP');
-</script>
 
 <body class="lang-{{ app.request.locale }}">
 
@@ -221,11 +241,58 @@
       </div>
     </div>
     <div class="footer__bottom">
-      <span>&copy; {{ "now"|date("Y") }} Y Wal. {{ 'footer_rights'|trans }}</span>
+      <span>&copy; {{ "now"|date("Y") }} Y Wal. {{ 'footer_rights'|trans }} · <button type="button" class="footer__cookie-link" id="cookie-settings">{{ 'cookie_settings'|trans }}</button></span>
       <span>{{ 'footer_tagline'|trans }}</span>
     </div>
   </div>
 </footer>
+{% endblock %}
+
+{# Kiosk/shared-device pages override this and the analytics block to opt out entirely. #}
+{% block cookie_banner %}
+<div class="cookie-banner" id="cookie-banner" role="region" aria-label="{{ 'cookie_banner_label'|trans }}" hidden>
+  <p class="cookie-banner__text">{{ 'cookie_banner_text'|trans }} <a href="{{ path('app_policies') }}">{{ 'cookie_banner_more'|trans }}</a></p>
+  <div class="cookie-banner__actions">
+    <button type="button" class="btn btn--sm btn--outline" data-cookie-choice="denied">{{ 'cookie_reject'|trans }}</button>
+    <button type="button" class="btn btn--sm btn--outline" data-cookie-choice="granted">{{ 'cookie_accept'|trans }}</button>
+  </div>
+</div>
+<script>
+  (function () {
+    var banner = document.getElementById('cookie-banner');
+    var choice = null;
+    try { choice = localStorage.getItem('ywal_cookie_consent'); } catch (e) {}
+    if (!choice) banner.hidden = false;
+
+    function clearGaCookies() {
+      var host = location.hostname.replace(/^www\./, '');
+      document.cookie.split(';').forEach(function (c) {
+        var name = c.split('=')[0].trim();
+        if (name.indexOf('_ga') !== 0) return;
+        ['', '; domain=' + host, '; domain=.' + host].forEach(function (d) {
+          document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + d;
+        });
+      });
+    }
+
+    banner.querySelectorAll('[data-cookie-choice]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var value = btn.getAttribute('data-cookie-choice');
+        try { localStorage.setItem('ywal_cookie_consent', value); } catch (e) {}
+        banner.hidden = true;
+        if (value === 'granted') {
+          window.ywalLoadAnalytics();
+        } else {
+          gtag('consent', 'update', { analytics_storage: 'denied' });
+          clearGaCookies();
+        }
+      });
+    });
+
+    var settings = document.getElementById('cookie-settings');
+    if (settings) settings.addEventListener('click', function () { banner.hidden = false; });
+  })();
+</script>
 {% endblock %}
 
 {% block scripts %}

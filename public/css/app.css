@@ -1088,3 +1088,19 @@ p + p { margin-top: 1rem; }
 }
 .event-landing__share-btn:hover { border-color: var(--teal); color: var(--teal-dk); }
 .event-landing__share-feedback { font-size: 0.82rem; color: var(--teal-dk); font-weight: 600; }
+/* ── Cookie banner ──────────────────────────────────── */
+.cookie-banner {
+  position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 1000;
+  max-width: 640px; margin: 0 auto;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  background: var(--white); border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); padding: 1rem 1.25rem;
+}
+.cookie-banner[hidden] { display: none; }
+.cookie-banner__text { flex: 1 1 260px; font-size: 0.85rem; line-height: 1.5; margin: 0; }
+.cookie-banner__text a { color: var(--teal-dk); text-decoration: underline; }
+.cookie-banner__actions { display: flex; gap: 0.5rem; }
+.footer__cookie-link {
+  background: none; border: none; padding: 0; font: inherit; color: inherit;
+  text-decoration: underline; cursor: pointer;
+}
