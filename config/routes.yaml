@@ -1,3 +1,10 @@
+app_survey2_redirect:
+    path: /survey2
+    controller: Symfony\Bundle\FrameworkBundle\Controller\RedirectController::urlRedirectAction
+    defaults:
+        path: https://docs.google.com/forms/d/e/1FAIpQLSe_7QUuTk0w4VW_Lsxd1ZZZ4-d9Agw4tl-c3wr121tOrWKBnA/viewform?usp=publish-editor
+        permanent: false
+
 controllers:
     resource:
         path: ../src/Controller/
