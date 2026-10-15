@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" role="img" aria-label="Coastline Outdoor">
+  <rect width="240" height="80" rx="10" fill="#0f5c74"/>
+  <path d="M14 48 q10 -10 20 0 t20 0 t20 0" stroke="#9fe3f0" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M14 58 q10 -10 20 0 t20 0 t20 0" stroke="#ffffff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="56" cy="26" r="8" fill="#ecbe49"/>
+  <text x="86" y="40" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#ffffff">COASTLINE</text>
+  <text x="87" y="59" font-family="Arial, sans-serif" font-size="12" letter-spacing="5" fill="#9fe3f0">OUTDOOR</text>
+</svg>

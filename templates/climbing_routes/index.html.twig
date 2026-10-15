@@ -1,0 +1,212 @@
+{% extends 'base.html.twig' %}
+
+{# MOCKUP — sample data and fictional sponsors; see ClimbingRoutesController. #}
+
+{% block title %}Routes at the wall — Y Wal{% endblock %}
+{% block meta_description %}Every boulder problem and roped route currently set at Y Wal, sortable by popularity or grade.{% endblock %}
+{% block canonical_url %}https://www.cardiganclimbing.org/routes{% endblock %}
+
+{% block head %}
+<meta name="robots" content="noindex,nofollow">
+<style>
+  .routes-mock-banner { background: var(--sand); color: var(--black); text-align: center; font-size: 0.8rem; padding: 0.5rem 1rem; margin-top: 64px; }
+  .routes-mock-banner + .page-hero { padding-top: 3rem; }
+  .routes-hero .page-hero__sub { max-width: none; }
+
+  .routes-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
+  .routes-tabs { display: flex; border: 2px solid var(--black); }
+  .routes-tab {
+    font-family: var(--f-head); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.7rem 1.25rem; background: var(--white); color: var(--black); border: none; cursor: pointer;
+  }
+  .routes-tab + .routes-tab { border-left: 2px solid var(--black); }
+  .routes-tab[aria-selected="true"] { background: var(--black); color: var(--white); }
+  .routes-tab__count { opacity: 0.6; margin-left: 0.35rem; }
+  .routes-sort { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); }
+  .routes-sort select {
+    font: inherit; font-size: 0.85rem; color: var(--black); background: var(--white);
+    border: 1px solid var(--border); padding: 0.55rem 0.75rem; cursor: pointer;
+  }
+
+  .routes-list { list-style: none; display: grid; gap: 0.75rem; }
+  .routes-list[hidden] { display: none; }
+  .route-card {
+    display: grid; grid-template-columns: 6px 4.5rem 1fr auto; align-items: center; gap: 0 1.25rem;
+    background: var(--white); border: 1px solid var(--border); padding-right: 1.25rem; min-height: 5.5rem;
+  }
+  .route-card__swatch { align-self: stretch; background: var(--hold); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+  .route-card__grade { font-family: var(--f-head); font-size: 1.6rem; font-weight: 700; line-height: 1; text-align: center; }
+  .route-card__body { padding: 1rem 0; min-width: 0; }
+  .route-card__name { font-family: var(--f-head); font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.25; }
+  .route-card__name--unnamed { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 0.95rem; }
+  .route-card__meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+  .route-card__meta span + span::before { content: "·"; margin: 0 0.45rem; opacity: 0.6; }
+  .route-card__namedby { display: inline-block; font-size: 0.72rem; background: var(--lichen); color: var(--teal-dk); padding: 0.1rem 0.5rem; margin-top: 0.35rem; }
+  .route-card__stats { text-align: right; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+  .route-card__ascents { display: block; font-family: var(--f-head); font-size: 1.1rem; font-weight: 700; color: var(--black); }
+  .route-card__stars { color: #c99a1d; letter-spacing: 0.05em; }
+
+  /* Sponsored routes: brand-coloured edge, logo, tagline and link — the bit sponsors are paying for. */
+  .route-card--sponsored { border: 2px solid var(--brand); position: relative; }
+  .route-card__sponsor { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .route-card__logo { height: 40px; width: auto; }
+  .route-card__sponsor-text { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+  .route-card__sponsor-text strong { display: block; color: var(--black); font-weight: 500; }
+  .route-card__sponsor-text a { color: var(--brand); text-decoration: underline; }
+  .route-card__flag {
+    position: absolute; top: -0.6rem; right: 1rem; background: var(--brand); color: var(--white);
+    font-family: var(--f-head); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.15rem 0.55rem;
+  }
+
+  @media (max-width: 560px) {
+    .route-card, .route-card--sponsored { grid-template-columns: 6px 3.25rem 1fr; padding-right: 1rem; }
+    .route-card__grade { font-size: 1.3rem; }
+    .route-card__stats { grid-column: 3; text-align: left; padding-bottom: 1rem; margin-top: -0.5rem; }
+    .route-card__ascents { display: inline; font-size: 0.85rem; margin-right: 0.4rem; }
+    .route-card__swatch { grid-row: span 2; }
+    .route-card__grade { grid-row: span 2; }
+    .routes-toolbar { flex-direction: column; align-items: stretch; }
+    .routes-tab { flex: 1; }
+  }
+
+  .sponsor-pitch { display: grid; gap: 2.5rem; }
+  @media (min-width: 768px) { .sponsor-pitch { grid-template-columns: 1fr 1fr; align-items: center; } }
+  .sponsor-pitch__list { list-style: none; display: grid; gap: 1rem; margin-top: 1.5rem; }
+  .sponsor-pitch__list li { padding-left: 1.75rem; position: relative; color: var(--muted); font-size: 0.95rem; }
+  .sponsor-pitch__list li::before { content: "▲"; position: absolute; left: 0; top: 0.1rem; color: var(--teal); font-size: 0.8rem; }
+  .sponsor-pitch__list strong { color: var(--black); font-weight: 500; }
+  .sponsor-pitch .btn { margin-top: 2rem; }
+</style>
+{% endblock %}
+
+{% macro route_card(route, kind) %}
+  {% set stars = route.rating|round %}
+  <li class="route-card{{ route.sponsor ? ' route-card--sponsored' : '' }}"
+      data-ascents="{{ route.ascents }}" data-grade="{{ route.gradeRank }}" data-pinned="{{ route.pinned ? 1 : 0 }}"
+      style="--hold: {{ route.hex }};{% if route.sponsor %} --brand: {{ route.sponsor.colour }};{% endif %}">
+    {% if route.sponsor %}<span class="route-card__flag">Sponsored route</span>{% endif %}
+    <span class="route-card__swatch" title="{{ route.colour }} holds"></span>
+    <span class="route-card__grade">{{ route.grade }}</span>
+    <div class="route-card__body">
+      {% if route.name is defined %}
+        <div class="route-card__name">{{ route.name }}</div>
+      {% else %}
+        <div class="route-card__name route-card__name--unnamed">{{ route.colour }} {{ kind }}</div>
+      {% endif %}
+      <div class="route-card__meta">
+        <span>{{ route.colour }} holds</span>
+        <span>{{ route.wall }}</span>
+        {% if route.style is defined %}<span>{{ route.style }}</span>{% endif %}
+        <span>Set {{ route.setOn|date('j M') }} by {{ route.setter }}</span>
+      </div>
+      {% if route.namedBy is defined %}
+        <span class="route-card__namedby">Named by {{ route.namedBy }}</span>
+      {% endif %}
+      {% if route.sponsor %}
+        <div class="route-card__sponsor">
+          <img src="{{ route.sponsor.logo }}" alt="{{ route.sponsor.name }}" class="route-card__logo">
+          <div class="route-card__sponsor-text">
+            <strong>Sponsored by {{ route.sponsor.name }}</strong>
+            {{ route.sponsor.tagline }} · <a href="{{ route.sponsor.url }}" target="_blank" rel="noopener sponsored">Visit</a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="route-card__stats">
+      <span class="route-card__ascents">{{ route.ascents }}</span> ascents
+      <div class="route-card__stars" aria-label="Rated {{ route.rating }} out of 5">{% for i in 1..5 %}{{ i <= stars ? '★' : '☆' }}{% endfor %}</div>
+    </div>
+  </li>
+{% endmacro %}
+
+{% block content %}
+<div class="routes-mock-banner">Mockup — sample routes and example sponsors for illustration only.</div>
+
+<section class="section page-hero routes-hero">
+  <div class="wrap">
+    <h1 class="page-hero__h1">Routes at the wall</h1>
+    <p class="page-hero__sub">Everything that's set right now. Find your next project, see what everyone else is climbing, and tick off the classics.</p>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap">
+    <div class="routes-toolbar">
+      <div class="routes-tabs" role="tablist">
+        <button type="button" class="routes-tab" role="tab" id="tab-bouldering" aria-controls="panel-bouldering" aria-selected="true">Bouldering<span class="routes-tab__count">{{ boulders|length }}</span></button>
+        <button type="button" class="routes-tab" role="tab" id="tab-roped" aria-controls="panel-roped" aria-selected="false">Roped<span class="routes-tab__count">{{ roped|length }}</span></button>
+      </div>
+      <label class="routes-sort">
+        Sort by
+        <select id="routes-sort">
+          <option value="popular">Most popular</option>
+          <option value="grade-asc">Grade: easiest first</option>
+          <option value="grade-desc">Grade: hardest first</option>
+        </select>
+      </label>
+    </div>
+
+    <ul class="routes-list" id="panel-bouldering" role="tabpanel" aria-labelledby="tab-bouldering">
+      {% for route in boulders %}{{ _self.route_card(route, 'problem') }}{% endfor %}
+    </ul>
+    <ul class="routes-list" id="panel-roped" role="tabpanel" aria-labelledby="tab-roped" hidden>
+      {% for route in roped %}{{ _self.route_card(route, 'route') }}{% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="sponsor-a-route">
+  <div class="wrap sponsor-pitch">
+    <div>
+      <h2>Put your name on the wall</h2>
+      <p>Every route at Y Wal can carry a name. Sponsor one and it's yours until the next reset, seen by every climber who checks what's on.</p>
+      <ul class="sponsor-pitch__list">
+        <li><strong>Name the route.</strong> Pick something that fits your brand, and it appears here and on the tag at the base of the climb.</li>
+        <li><strong>Your logo and link</strong> on the route listing, with a short tagline.</li>
+        <li><strong>Stand out in the list.</strong> Sponsored routes are highlighted in your brand colour, however climbers sort.</li>
+        <li><strong>Support local climbing.</strong> Sponsorship helps keep Y Wal affordable and open to everyone.</li>
+      </ul>
+      <a href="mailto:hello@cardiganclimbing.org?subject={{ 'Sponsoring a route at Y Wal'|url_encode }}" class="btn btn--teal">Talk to us about sponsoring</a>
+    </div>
+    <ul class="routes-list" aria-label="Example sponsored route">
+      {{ _self.route_card(boulders|filter(r => r.sponsor)|first, 'problem') }}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+  (function () {
+    var tabs   = document.querySelectorAll('.routes-tab');
+    var panels = [document.getElementById('panel-bouldering'), document.getElementById('panel-roped')];
+    var sort   = document.getElementById('routes-sort');
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.setAttribute('aria-selected', t === tab ? 'true' : 'false'); });
+        panels.forEach(function (p) { p.hidden = p.id !== tab.getAttribute('aria-controls'); });
+      });
+    });
+
+    function apply() {
+      var mode = sort.value;
+      panels.forEach(function (panel) {
+        var cards = Array.prototype.slice.call(panel.children);
+        // Pinned routes stay at the top whatever the sort; the sort applies within each group.
+        cards.sort(function (a, b) {
+          var pin = b.dataset.pinned - a.dataset.pinned;
+          if (pin) return pin;
+          var pop = b.dataset.ascents - a.dataset.ascents;
+          if (mode === 'popular') return pop;
+          var g = a.dataset.grade - b.dataset.grade;
+          return (mode === 'grade-desc' ? -g : g) || pop;
+        });
+        cards.forEach(function (c) { panel.appendChild(c); });
+      });
+    }
+    sort.addEventListener('change', apply);
+  })();
+</script>
+{% endblock %}
