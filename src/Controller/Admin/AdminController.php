@@ -405,7 +405,7 @@ class AdminController extends AbstractController
         }
 
         $assignee = $userRepository->find($userId);
-        $isStaff  = $assignee && (in_array(User::ROLE_ADMIN, $assignee->getRoles(), true) || in_array(User::ROLE_TEAM, $assignee->getRoles(), true));
+        $isStaff  = $assignee && $assignee->isStaff();
 
         if (!$isStaff) {
             $this->addFlash('error', 'Contacts can only be assigned to a team member.');
@@ -501,10 +501,20 @@ class AdminController extends AbstractController
             $user->setWebsite($website ?: null);
 
             if ($this->isGranted('ROLE_ADMIN')) {
-                $role = $request->request->get('role', User::ROLE_MEMBER);
-                if (in_array($role, [User::ROLE_ADMIN, User::ROLE_TEAM, User::ROLE_MEMBER], true)) {
-                    if ($user === $this->getUser() && $role !== User::ROLE_ADMIN) {
+                $role         = $request->request->get('role', $user->getPrimaryRole());
+                $assignable   = [User::ROLE_ADMIN, User::ROLE_TEAM, User::ROLE_MEMBER];
+                $actorIsOwner = $this->isGranted('ROLE_OWNER');
+                if ($actorIsOwner) {
+                    $assignable[] = User::ROLE_OWNER;
+                }
+
+                if ($role !== $user->getPrimaryRole() && in_array($role, $assignable, true)) {
+                    if ($user === $this->getUser()) {
                         $this->addFlash('error', 'You cannot change your own role.');
+                        return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                    }
+                    if ($user->isOwner() && !$actorIsOwner) {
+                        $this->addFlash('error', 'Only an owner can change another owner\'s role.');
                         return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
                     }
                     $user->setRoles([$role]);

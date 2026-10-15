@@ -271,6 +271,12 @@
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_email_' ~ email.id) }}">
         <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete draft</button>
       </form>
+    {% elseif email.id and not email.draft and is_granted('ROLE_OWNER') %}
+      <form method="post" action="{{ path('app_admin_settings_email_delete', {id: email.id}) }}" id="delete-form" style="margin-top:1rem;"
+            onsubmit="return window.prompt('This permanently deletes the email and every recipient note and open record it created. Type DELETE to confirm:') === 'DELETE';">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_email_' ~ email.id) }}">
+        <button type="submit" style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;color:var(--red);text-decoration:underline;cursor:pointer;">Delete email and all its data</button>
+      </form>
     {% endif %}
   </div>
 

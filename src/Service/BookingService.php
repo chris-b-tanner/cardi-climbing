@@ -75,7 +75,7 @@ class BookingService
         // admin is allowed to knowingly oversubscribe an event, so only a confirmed/pending
         // booking made by a non-admin (self-serve, guest, or ordinary team member) is actually
         // blocked by a full event.
-        $isAdmin = $addedBy !== null && in_array(User::ROLE_ADMIN, $addedBy->getRoles(), true);
+        $isAdmin = $addedBy !== null && $addedBy->isAdmin();
 
         if ($status !== Attendee::STATUS_WAITING
             && !$isAdmin
@@ -144,7 +144,7 @@ class BookingService
     public function reinstateBooking(Attendee $attendee, string $status, ?User $actor = null): ?string
     {
         $event   = $attendee->getEvent();
-        $isAdmin = $actor !== null && in_array(User::ROLE_ADMIN, $actor->getRoles(), true);
+        $isAdmin = $actor !== null && $actor->isAdmin();
 
         if ($attendee->isCancelled()
             && $status !== Attendee::STATUS_WAITING

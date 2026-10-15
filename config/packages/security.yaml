@@ -28,6 +28,7 @@ security:
                 target: app_home
 
     role_hierarchy:
+        ROLE_OWNER:  [ROLE_ADMIN, ROLE_TEAM, ROLE_MEMBER, ROLE_USER]
         ROLE_ADMIN:  [ROLE_TEAM, ROLE_MEMBER, ROLE_USER]
         ROLE_TEAM:   [ROLE_MEMBER, ROLE_USER]
         ROLE_MEMBER: [ROLE_USER]

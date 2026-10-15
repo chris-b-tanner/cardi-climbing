@@ -201,10 +201,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getQuery()
             ->getResult();
 
-        return array_values(array_filter($all, static function (User $user) {
-            $roles = $user->getRoles();
-            return in_array(User::ROLE_ADMIN, $roles, true) || in_array(User::ROLE_TEAM, $roles, true);
-        }));
+        return array_values(array_filter($all, static fn (User $user) => $user->isStaff()));
     }
 
     /**

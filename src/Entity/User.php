@@ -15,6 +15,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[UniqueEntity(fields: ['email'], message: 'There is already an account with this email')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    public const ROLE_OWNER  = 'ROLE_OWNER';
     public const ROLE_ADMIN  = 'ROLE_ADMIN';
     public const ROLE_TEAM   = 'ROLE_TEAM';
     public const ROLE_MEMBER = 'ROLE_MEMBER';
@@ -211,6 +212,34 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $roles[] = 'ROLE_USER';
 
         return array_unique($roles);
+    }
+
+    public function isOwner(): bool
+    {
+        return in_array(self::ROLE_OWNER, $this->roles, true);
+    }
+
+    /** Admin or owner — owners inherit every admin permission (see role_hierarchy in security.yaml). */
+    public function isAdmin(): bool
+    {
+        return $this->isOwner() || in_array(self::ROLE_ADMIN, $this->roles, true);
+    }
+
+    /** Any team role — team, admin or owner. */
+    public function isStaff(): bool
+    {
+        return $this->isAdmin() || in_array(self::ROLE_TEAM, $this->roles, true);
+    }
+
+    /** The single stored role this user holds (owner > admin > team > member). */
+    public function getPrimaryRole(): string
+    {
+        return match (true) {
+            $this->isOwner()                                 => self::ROLE_OWNER,
+            in_array(self::ROLE_ADMIN, $this->roles, true)   => self::ROLE_ADMIN,
+            in_array(self::ROLE_TEAM, $this->roles, true)    => self::ROLE_TEAM,
+            default                                          => self::ROLE_MEMBER,
+        };
     }
 
     public function setRoles(array $roles): static

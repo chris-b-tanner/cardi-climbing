@@ -76,16 +76,21 @@
     </div>
     {% if is_granted('ROLE_ADMIN') %}
       {% set isSelf = user == app.user %}
+      {% set currentRole = user.primaryRole %}
+      {% set roleLocked = isSelf or (user.owner and not is_granted('ROLE_OWNER')) %}
       <div class="form-group" style="margin-bottom:0;">
         <label for="role">Role</label>
-        <select id="role" name="role" class="form-control"{% if isSelf %} disabled{% endif %}>
-          <option value="ROLE_MEMBER"{% if 'ROLE_ADMIN' not in user.roles and 'ROLE_TEAM' not in user.roles %} selected{% endif %}>Member</option>
-          <option value="ROLE_TEAM"{% if 'ROLE_TEAM' in user.roles and 'ROLE_ADMIN' not in user.roles %} selected{% endif %}>Team</option>
-          <option value="ROLE_ADMIN"{% if 'ROLE_ADMIN' in user.roles %} selected{% endif %}>Admin</option>
+        <select id="role" name="role" class="form-control"{% if roleLocked %} disabled{% endif %}>
+          <option value="ROLE_MEMBER"{% if currentRole == 'ROLE_MEMBER' %} selected{% endif %}>Member</option>
+          <option value="ROLE_TEAM"{% if currentRole == 'ROLE_TEAM' %} selected{% endif %}>Team</option>
+          <option value="ROLE_ADMIN"{% if currentRole == 'ROLE_ADMIN' %} selected{% endif %}>Admin</option>
+          {% if is_granted('ROLE_OWNER') or currentRole == 'ROLE_OWNER' %}
+            <option value="ROLE_OWNER"{% if currentRole == 'ROLE_OWNER' %} selected{% endif %}>Owner</option>
+          {% endif %}
         </select>
-        {% if isSelf %}
-          <input type="hidden" name="role" value="{{ 'ROLE_ADMIN' in user.roles ? 'ROLE_ADMIN' : ('ROLE_TEAM' in user.roles ? 'ROLE_TEAM' : 'ROLE_MEMBER') }}">
-          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">You can't change your own role.</p>
+        {% if roleLocked %}
+          <input type="hidden" name="role" value="{{ currentRole }}">
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:0.35rem;">{{ isSelf ? 'You can\'t change your own role.' : 'Only an owner can change an owner\'s role.' }}</p>
         {% endif %}
       </div>
       <div class="form-group" style="margin-top:1rem;margin-bottom:0;">

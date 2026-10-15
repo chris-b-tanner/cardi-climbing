@@ -18,13 +18,20 @@ class AdminTeamController extends AbstractController
     #[Route('', name: 'app_admin_settings_team')]
     public function index(Request $request, UserRepository $userRepository): Response
     {
-        // One tab per role — everyone findTeam() returns is either an admin or plain team.
-        $byRole = ['admin' => [], 'team' => []];
+        // One tab per role — everyone findTeam() returns is an owner, an admin or plain team.
+        $byRole = ['owner' => [], 'admin' => [], 'team' => []];
         foreach ($userRepository->findTeam() as $member) {
-            $byRole[in_array(User::ROLE_ADMIN, $member->getRoles(), true) ? 'admin' : 'team'][] = $member;
+            $byRole[match (true) {
+                $member->isOwner() => 'owner',
+                $member->isAdmin() => 'admin',
+                default            => 'team',
+            }][] = $member;
         }
 
-        $role = $request->query->get('role') === 'team' ? 'team' : 'admin';
+        $role = $request->query->get('role');
+        if (!array_key_exists($role ?? '', $byRole)) {
+            $role = 'admin';
+        }
 
         return $this->render('admin/settings/team/index.html.twig', [
             'byRole'      => $byRole,

@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\Certification;
 use App\Entity\Email;
 use App\Entity\Event;
+use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
@@ -434,7 +435,13 @@ class AdminEmailController extends AbstractController
         ]);
     }
 
-    /** Admin-only: permanently removes a draft that was never sent — a draft can never have linked notes (those are only written by send()), but the check stays as a hard guard against ever deleting part of the audit trail. */
+    /**
+     * Permanently removes an email. Admins can only delete a draft that was never sent — a draft
+     * can never have linked notes (those are only written by send()), but the check stays as a
+     * hard guard against admins deleting part of the audit trail. Owners can also delete a sent
+     * email, which removes every per-recipient note it wrote (including open tracking); any sends
+     * still queued are dropped, since SendBulkEmailMessageHandler skips a missing Email.
+     */
     #[Route('/admin/settings/emails/{id}/delete', name: 'app_admin_settings_email_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
     public function delete(Request $request, Email $email, NoteRepository $noteRepository, EntityManagerInterface $em): Response
@@ -444,15 +451,28 @@ class AdminEmailController extends AbstractController
             return $this->redirectToRoute('app_home');
         }
 
-        if (!$email->isDraft() || $noteRepository->count(['email' => $email]) > 0) {
+        $noteCount = $noteRepository->count(['email' => $email]);
+        $wasDraft  = $email->isDraft() && $noteCount === 0;
+
+        if (!$wasDraft && !$this->isGranted('ROLE_OWNER')) {
             $this->addFlash('error', 'Only a draft that has never been sent can be deleted.');
             return $this->redirectToRoute('app_admin_email_compose_edit', ['id' => $email->getId()]);
         }
 
-        $em->remove($email);
-        $em->flush();
+        $em->wrapInTransaction(static function (EntityManagerInterface $em) use ($email): void {
+            $em->createQueryBuilder()
+                ->delete(Note::class, 'n')
+                ->where('n.email = :email')
+                ->setParameter('email', $email)
+                ->getQuery()
+                ->execute();
 
-        $this->addFlash('success', 'Draft deleted.');
+            $em->remove($email);
+        });
+
+        $this->addFlash('success', $wasDraft
+            ? 'Draft deleted.'
+            : sprintf('Email deleted, along with its %d recipient %s.', $noteCount, $noteCount === 1 ? 'note' : 'notes'));
         return $this->redirectToRoute('app_admin_settings_emails');
     }
 

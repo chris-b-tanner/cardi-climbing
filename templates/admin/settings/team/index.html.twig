@@ -7,7 +7,7 @@
   <a href="{{ path('app_admin_users') }}" class="btn btn--ghost btn--sm">← Members</a>
 </div>
 
-{% set roleLabels = {admin: 'Admins', team: 'Team'} %}
+{% set roleLabels = {owner: 'Owners', admin: 'Admins', team: 'Team'} %}
 <div class="pos-tabs">
   {% for role, label in roleLabels %}
     <a href="{{ path('app_admin_settings_team', {role: role}) }}" class="pos-tab{{ currentRole == role ? ' is-active' : '' }}">
@@ -21,7 +21,7 @@
     To give someone team access, open their member profile, click Edit, and change their role.
   </p>
   {% if team is empty %}
-    <p class="tag-badge--none">No {{ currentRole == 'admin' ? 'admins' : 'team members' }} yet.</p>
+    <p class="tag-badge--none">No {{ {owner: 'owners', admin: 'admins', team: 'team members'}[currentRole] }} yet.</p>
   {% else %}
     <div class="table-scroll">
       <table class="admin-table">
@@ -37,7 +37,7 @@
         <tbody>
           {% for member in team %}
             {% set displayName = member.displayName %}
-            {% set memberIsAdmin = 'ROLE_ADMIN' in member.roles %}
+            {% set memberIsAdmin = member.admin %}
             <tr>
               <td>
                 <a href="{{ path('app_admin_user_show', {id: member.id}) }}" class="admin-table__link">
@@ -47,7 +47,7 @@
               <td class="admin-table__muted">{{ member.email }}</td>
               <td>
                 <span class="role-pill{{ memberIsAdmin ? ' role-pill--admin' : ' role-pill--team' }}">
-                  {{ memberIsAdmin ? 'Admin' : 'Team' }}
+                  {{ member.owner ? 'Owner' : (memberIsAdmin ? 'Admin' : 'Team') }}
                 </span>
               </td>
               <td class="admin-table__muted">

@@ -152,7 +152,7 @@ class AdminNoteController extends AbstractController
             : number_format($bytes / 1048576, 1) . ' MB';
     }
 
-    /** Only the note's own author can delete it. */
+    /** Only the note's own author can delete it — except owners, who can delete any note. */
     #[Route('/{id}/delete', name: 'app_admin_note_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(Request $request, Note $note, EntityManagerInterface $em): Response
     {
@@ -161,7 +161,7 @@ class AdminNoteController extends AbstractController
             return $this->redirectToRoute('app_home');
         }
 
-        if ($note->getAddedBy() !== $this->getUser()) {
+        if ($note->getAddedBy() !== $this->getUser() && !$this->isGranted('ROLE_OWNER')) {
             $this->addFlash('error', 'You can only delete notes you added.');
             return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
         }
@@ -248,7 +248,7 @@ class AdminNoteController extends AbstractController
         }
 
         $assignee = $this->userRepository->find($userId);
-        $isStaff  = $assignee && (in_array(User::ROLE_ADMIN, $assignee->getRoles(), true) || in_array(User::ROLE_TEAM, $assignee->getRoles(), true));
+        $isStaff  = $assignee && $assignee->isStaff();
 
         if (!$isStaff) {
             $this->addFlash('error', 'Notes can only be assigned to a team member.');
