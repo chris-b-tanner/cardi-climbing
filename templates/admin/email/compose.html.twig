@@ -223,9 +223,13 @@
           {% if email.draft %}
             <button type="button" class="insert-placeholder-trigger" data-target="body"
                     style="border:none;background:none;padding:0.3rem 0 0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Insert first name</button>
+            <span style="font-size:0.75rem;color:var(--muted);margin:0 0.35rem;">·</span>
+            <button type="button" class="insert-button-trigger" data-target="body"
+                    style="border:none;background:none;padding:0.3rem 0 0;font:inherit;font-size:0.75rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Insert button</button>
             <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">
               HTML is supported — each line becomes its own paragraph. To embed an image already hosted online, put its tag on its own line, e.g. <code>&lt;img src="https://example.com/photo.jpg" style="max-width:100%"&gt;</code>.
               Use "Insert first name" to drop a <code>_firstName_</code> placeholder wherever you want one, substituted for real when it's sent.
+              Use "Insert button" for a link styled as a button — it's added as a single line, so leave it on one line when editing.
             </div>
           {% endif %}
         </div>
@@ -351,8 +355,7 @@
 
   // See EmailPlaceholders — inserts the literal "_firstName_" text at the cursor so the admin can
   // opt into personalising the message, rather than every plain-layout email getting a greeting
-  // whether it fits the wording or not. Dispatches a real "input" event so the live preview and
-  // the unsaved-changes/disable-Send tracking above both pick it up, same as typing would.
+  // whether it fits the wording or not.
   document.addEventListener('click', (e) => {
     const insertBtn = e.target.closest('.insert-placeholder-trigger');
     if (!insertBtn) return;
@@ -360,13 +363,51 @@
     const el = document.getElementById(insertBtn.dataset.target);
     if (!el) return;
 
+    insertAtCursor(el, '_firstName_');
+  });
+
+  // Each body line becomes its own <p> in the email templates, so a button pasted across several
+  // lines gets torn apart — this builds the whole bulletproof button as one line instead, on a
+  // line of its own so it isn't merged into the surrounding paragraph.
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('.insert-button-trigger');
+    if (!trigger) return;
+
+    const el = document.getElementById(trigger.dataset.target);
+    if (!el) return;
+
+    const label = (prompt('Button text', 'Find out more') || '').trim();
+    if (!label) return;
+    const url = (prompt('Link the button to (full web address)', 'https://www.cardiganclimbing.org/') || '').trim();
+    if (!url) return;
+    if (!/^(https?:\/\/|mailto:)/i.test(url)) {
+      alert('The link needs to start with https:// (or mailto: for an email address).');
+      return;
+    }
+
+    const esc = (v) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = '<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:24px auto;"><tr>'
+      + '<td align="center" bgcolor="#1e4f41" style="background:#1e4f41;">'
+      + '<a href="' + esc(url) + '" target="_blank" style="display:inline-block;padding:14px 32px;font-family:\'Varela Round\',Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;text-decoration:none;border:2px solid #1e4f41;">'
+      + esc(label) + '</a></td></tr></table>';
+
+    const start  = el.selectionStart ?? el.value.length;
+    const before = start > 0 && el.value[start - 1] !== '\n' ? '\n' : '';
+    const end    = el.selectionEnd ?? el.value.length;
+    const after  = end < el.value.length && el.value[end] !== '\n' ? '\n' : '';
+    insertAtCursor(el, before + html + after);
+  });
+
+  // Dispatches a real "input" event so the live preview and the unsaved-changes/disable-Send
+  // tracking above both pick it up, same as typing would.
+  function insertAtCursor(el, text) {
     const start = el.selectionStart ?? el.value.length;
     const end   = el.selectionEnd ?? el.value.length;
-    el.value = el.value.slice(0, start) + '_firstName_' + el.value.slice(end);
+    el.value = el.value.slice(0, start) + text + el.value.slice(end);
     el.focus();
-    el.selectionStart = el.selectionEnd = start + '_firstName_'.length;
+    el.selectionStart = el.selectionEnd = start + text.length;
     el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  }
 
   // ── Only a saved draft can be sent — disable Send the instant anything changes, since
   // sending always uses whatever was last actually saved. ─────────────────────────────
