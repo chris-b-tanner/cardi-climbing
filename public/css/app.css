@@ -719,6 +719,7 @@ p + p { margin-top: 1rem; }
   margin-bottom: 1.25rem;
 }
 .page-hero__sub { font-size: 1.05rem; }
+.page-hero p { max-width: none; }
 
 /* ── News ───────────────────────────────────────────── */
 .news-list { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -1104,3 +1105,9 @@ p + p { margin-top: 1rem; }
   background: none; border: none; padding: 0; font: inherit; color: inherit;
   text-decoration: underline; cursor: pointer;
 }
+/* ── Sponsorship ────────────────────────────────────── */
+.sponsorship__doc {
+  display: block; width: 100%; height: 80vh; min-height: 480px;
+  border: 1px solid var(--border); background: var(--white);
+}
+.sponsorship__doc-link { margin-top: 1rem; }

@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'sponsorship_meta_title'|trans }}{% endblock %}
+{% block meta_description %}{{ 'sponsorship_meta_desc'|trans }}{% endblock %}
+{% block canonical_url %}https://www.cardiganclimbing.org/sponsorship{% endblock %}
+{% block og_url %}https://www.cardiganclimbing.org/sponsorship{% endblock %}
+{% block og_title %}{{ 'sponsorship_meta_title'|trans }}{% endblock %}
+{% block og_description %}{{ 'sponsorship_meta_desc'|trans }}{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <h1 class="page-hero__h1">{{ 'sponsorship_h1'|trans }}</h1>
+    <p class="page-hero__sub">{{ 'sponsorship_intro'|trans }}</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <iframe class="sponsorship__doc" src="{{ docEmbedUrl }}" title="{{ 'sponsorship_doc_title'|trans }}" loading="lazy"></iframe>
+    <p class="sponsorship__doc-link">
+      <a href="{{ docUrl }}" target="_blank" rel="noopener" class="btn btn--teal">{{ 'sponsorship_doc_btn'|trans }}</a>
+    </p>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap adv__cta-block">
+    <p>{{ 'sponsorship_cta'|trans }}</p>
+    <a href="mailto:hello@cardiganclimbing.org?subject={{ 'sponsorship_cta_subject'|trans|url_encode }}" class="btn btn--teal">{{ 'adv_cta_btn'|trans }}</a>
+  </div>
+</section>
+{% endblock %}
