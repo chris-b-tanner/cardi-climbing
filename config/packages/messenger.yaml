@@ -13,6 +13,7 @@ framework:
 
         routing:
             'App\Message\SendBulkEmailMessage': bulk_email
+            'App\Message\SendScheduledNoteEmailMessage': bulk_email
 
 # when@test:
 #    framework:

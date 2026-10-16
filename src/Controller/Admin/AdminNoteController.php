@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\Note;
 use App\Entity\User;
+use App\Message\SendScheduledNoteEmailMessage;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
@@ -20,6 +21,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -47,7 +50,7 @@ class AdminNoteController extends AbstractController
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
-    public function add(Request $request, string $noteableType, int $noteableId, EntityManagerInterface $em): Response
+    public function add(Request $request, string $noteableType, int $noteableId, EntityManagerInterface $em, MessageBusInterface $bus): Response
     {
         if (!in_array($noteableType, self::TYPES, true)) {
             throw $this->createNotFoundException('Unknown note type.');
@@ -82,9 +85,29 @@ class AdminNoteController extends AbstractController
             return $this->redirectForNoteable($noteableType, $noteableId);
         }
 
+        // "Schedule" beside "Email {address}": the note is saved now, and the email
+        // queued on the bulk_email transport to go out at the chosen UK date/time — see
+        // SendScheduledNoteEmailMessageHandler. Must be in the future.
+        $scheduledFor = null;
+        if ($wantsEmail && $request->request->getBoolean('scheduleEmail')) {
+            $scheduledFor = \DateTimeImmutable::createFromFormat(
+                '!Y-m-d H:i',
+                trim($request->request->get('scheduleDate', '')) . ' ' . trim($request->request->get('scheduleTime', '')),
+                new \DateTimeZone('Europe/London'),
+            ) ?: null;
+
+            if ($scheduledFor === null || $scheduledFor <= new \DateTimeImmutable()) {
+                $this->addFlash('error', 'Pick a date and time in the future to schedule this email. Nothing was saved or sent.');
+                return $this->redirectForNoteable($noteableType, $noteableId);
+            }
+
+            $scheduledFor = $scheduledFor->setTimezone(new \DateTimeZone('UTC'));
+        }
+
         // Files picked on the add-note form go straight into the email (see
-        // ContactQuickEmailMailer) and are never stored. Ignored unless the note is being emailed.
-        $attachments = $wantsEmail ? array_values(array_filter($request->files->all('attachments'))) : [];
+        // ContactQuickEmailMailer) and are never stored. Ignored unless the note is being emailed
+        // now: a scheduled send happens in a later process, after the uploads are gone.
+        $attachments = $wantsEmail && !$scheduledFor ? array_values(array_filter($request->files->all('attachments'))) : [];
 
         if ($attachments && ($attachmentError = $this->contactQuickEmailMailer->attachmentError($attachments))) {
             $this->addFlash('error', $attachmentError . ' Nothing was saved or sent.');
@@ -118,6 +141,7 @@ class AdminNoteController extends AbstractController
             if ($wantsEmail) {
                 $note->setEmailSubject($subject);
                 $note->setEmailRef(EmailOpenTracking::newRef());
+                $note->setEmailScheduledFor($scheduledFor);
             }
 
             if ($request->request->getBoolean('pinned')) {
@@ -134,7 +158,14 @@ class AdminNoteController extends AbstractController
                 $target = $this->noteableResolver->resolve($note, absolute: true);
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
 
-                if ($wantsEmail) {
+                if ($wantsEmail && $scheduledFor) {
+                    $bus->dispatch(
+                        new SendScheduledNoteEmailMessage($note->getId(), $previousThreadNote?->getId()),
+                        [DelayStamp::delayUntil($scheduledFor)],
+                    );
+                    $this->addFlash('success', 'Note added. Email to ' . $noteable->getEmail() . ' scheduled for '
+                        . $scheduledFor->setTimezone(new \DateTimeZone('Europe/London'))->format('j M Y, H:i') . '.');
+                } elseif ($wantsEmail) {
                     $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef());
                     $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
                     $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');

@@ -16,6 +16,11 @@
   named right at the top of the page, so a personalisation placeholder buys nothing. Ticking the
   checkbox also reveals a file picker: picked files are attached to the email and not stored (see
   ContactQuickEmailMailer). Their names are appended to the note's text as "Attachments: …".
+  There's also a "Schedule" checkbox beside "Email {address}" (shown once that's ticked): it
+  reveals a UK date and time above the submit button, and the note is saved straight away while
+  the email waits on the bulk_email queue until then (see SendScheduledNoteEmailMessageHandler).
+  Attachments aren't offered on a scheduled send, since uploads aren't kept. Until it goes out the
+  note shows a "Scheduled" pill, and deleting the note cancels the send.
   Optional `showForm` (default true) — pass false to list existing notes without the add-note form.
 #}
 {% if showForm ?? true %}
@@ -45,6 +50,17 @@
       <ul class="note-attachments-list" style="list-style:none;padding:0;margin:0.4rem 0 0;font-size:0.8rem;"></ul>
       <p class="note-attachments-summary" style="font-size:0.75rem;color:var(--muted);margin:0.3rem 0 0;"></p>
     </div>
+    <div class="form-group note-email-schedule" id="note-schedule-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
+      <label style="text-transform:none;font-size:0.8rem;color:var(--black);">
+        <i class="bi bi-clock"></i> Send on <span style="color:var(--muted);font-weight:400;">(UK time; goes out on the email queue's next run after this)</span>
+      </label>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <input type="date" name="scheduleDate" id="note-schedule-date-{{ noteableType }}-{{ noteableId }}" class="form-control"
+               min="{{ 'now'|date('Y-m-d') }}" style="width:auto;">
+        <input type="time" name="scheduleTime" id="note-schedule-time-{{ noteableType }}-{{ noteableId }}" class="form-control"
+               value="09:00" style="width:auto;">
+      </div>
+    </div>
   {% endif %}
   <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
     <button type="submit" id="note-submit-{{ noteableType }}-{{ noteableId }}" class="btn btn--teal btn--sm">Add note</button>
@@ -56,6 +72,10 @@
       <label style="flex-direction:row;align-items:center;gap:0.4rem;display:flex;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
         <input type="checkbox" name="emailContact" value="1" id="note-email-toggle-{{ noteableType }}-{{ noteableId }}" style="width:1rem;height:1rem;accent-color:var(--teal);">
         Email {{ contactEmail }}
+      </label>
+      <label id="note-schedule-toggle-label-{{ noteableType }}-{{ noteableId }}" style="flex-direction:row;align-items:center;gap:0.4rem;display:none;text-transform:none;font-size:0.8rem;color:var(--black);cursor:pointer;">
+        <input type="checkbox" name="scheduleEmail" value="1" id="note-schedule-toggle-{{ noteableType }}-{{ noteableId }}" style="width:1rem;height:1rem;accent-color:var(--teal);">
+        Schedule
       </label>
     {% endif %}
   </div>
@@ -115,7 +135,9 @@
           {% if note.completed %}
             · Completed {{ note.completedAt|date('j M Y') }}{% if note.completedBy %} by {{ note.completedBy.displayName }}{% endif %}
           {% endif %}
-          {% if note.emailOpenedAt %}
+          {% if note.emailScheduledFor %}
+            · <span class="status-pill status-pill--unopened" title="Waiting on the email queue. Delete this note to cancel the send."><i class="bi bi-clock"></i> Scheduled for {{ note.emailScheduledFor|date('j M Y, H:i') }}</span>
+          {% elseif note.emailOpenedAt %}
             · <span class="status-pill status-pill--opened" title="Opened {{ note.emailOpenCount }} time{{ note.emailOpenCount == 1 ? '' : 's' }}, per Postmark — Apple Mail can report an open the recipient never made"><i class="bi bi-envelope-open"></i> Opened {{ note.emailOpenedAt|date('j M Y, H:i') }}{% if note.emailOpenCount > 1 %} ({{ note.emailOpenCount }}×){% endif %}</span>
           {% elseif note.emailRef %}
             · <span class="status-pill status-pill--unopened">Not opened yet</span>
@@ -172,6 +194,11 @@
       const fileInput  = attachWrap ? attachWrap.querySelector('input[type="file"]') : null;
       const fileSummary = attachWrap ? attachWrap.querySelector('.note-attachments-summary') : null;
       const fileList    = attachWrap ? attachWrap.querySelector('.note-attachments-list') : null;
+      const scheduleToggle = document.getElementById('note-schedule-toggle-' + suffix);
+      const scheduleLabel  = document.getElementById('note-schedule-toggle-label-' + suffix);
+      const scheduleWrap   = document.getElementById('note-schedule-wrap-' + suffix);
+      const scheduleDate   = document.getElementById('note-schedule-date-' + suffix);
+      const scheduleTime   = document.getElementById('note-schedule-time-' + suffix);
       if (!toggle || !input || !content || !submit) return;
 
       // A file input's own selection is replaced, not added to, each time the picker is reopened,
@@ -265,19 +292,60 @@
       const baseRows  = content.rows;
       const baseLabel = submit.textContent;
 
-      toggle.addEventListener('change', () => {
-        wrap.style.display = toggle.checked ? 'block' : 'none';
-        input.required = toggle.checked;
-        content.rows = toggle.checked ? baseRows * 2 : baseRows;
-        submit.textContent = toggle.checked ? 'Send email' : baseLabel;
+      const isScheduled = () => !!(scheduleToggle && scheduleToggle.checked);
+
+      // Attachments only go with an email sent right now — a scheduled one is sent by a later
+      // process, after the uploads are gone (see AdminNoteController::add()).
+      function updateEmailOptions() {
+        submit.textContent = !toggle.checked ? baseLabel : (isScheduled() ? 'Schedule email' : 'Send email');
+        if (scheduleWrap) {
+          scheduleWrap.style.display = isScheduled() ? 'block' : 'none';
+          scheduleDate.required = scheduleTime.required = isScheduled();
+        }
         if (attachWrap) {
-          attachWrap.style.display = toggle.checked ? 'block' : 'none';
-          if (!toggle.checked) {
-            picked = []; // a plain note never carries attachments
+          const showAttachments = toggle.checked && !isScheduled();
+          attachWrap.style.display = showAttachments ? 'block' : 'none';
+          if (!showAttachments) {
+            picked = []; // a plain note or a scheduled email never carries attachments
             syncInput();
             updateFileSummary();
           }
         }
+      }
+
+      if (scheduleToggle) {
+        scheduleToggle.addEventListener('change', () => {
+          if (scheduleToggle.checked && !scheduleDate.value) {
+            // Defaults to tomorrow (at the time field's own 09:00 default).
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            scheduleDate.value = [tomorrow.getFullYear(), String(tomorrow.getMonth() + 1).padStart(2, '0'), String(tomorrow.getDate()).padStart(2, '0')].join('-');
+          }
+          updateEmailOptions();
+          if (scheduleToggle.checked) scheduleDate.focus();
+        });
+
+        // Checked again server-side, but saves a round trip that would lose the typed note.
+        toggle.form.addEventListener('submit', (e) => {
+          if (!toggle.checked || !isScheduled()) return;
+          const when = new Date(scheduleDate.value + 'T' + scheduleTime.value);
+          if (!scheduleDate.value || !scheduleTime.value || isNaN(when) || when <= new Date()) {
+            e.preventDefault();
+            alert('Pick a date and time in the future to schedule this email.');
+            scheduleDate.focus();
+          }
+        });
+      }
+
+      toggle.addEventListener('change', () => {
+        wrap.style.display = toggle.checked ? 'block' : 'none';
+        input.required = toggle.checked;
+        content.rows = toggle.checked ? baseRows * 2 : baseRows;
+        if (scheduleLabel) {
+          scheduleLabel.style.display = toggle.checked ? 'flex' : 'none';
+          if (!toggle.checked) scheduleToggle.checked = false;
+        }
+        updateEmailOptions();
 
         if (toggle.checked) {
           // Defaults to "Re: {whatever the thread's last message used}" — never overwrites

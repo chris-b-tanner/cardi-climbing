@@ -94,6 +94,15 @@ class Note
     #[ORM\Column(options: ['default' => 0])]
     private int $emailOpenCount = 0;
 
+    /**
+     * When a quick email scheduled from the add-note form (see AdminNoteController::add()) is due to
+     * go out, in UTC. Set while it's still waiting on the bulk_email queue
+     * (SendScheduledNoteEmailMessageHandler), and cleared once it's sent — so a non-null value
+     * always means "not sent yet". Deleting the note before then cancels the send.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $emailScheduledFor = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -275,6 +284,17 @@ class Note
             $this->emailOpenedAt = $openedAt;
         }
         $this->emailOpenCount++;
+        return $this;
+    }
+
+    public function getEmailScheduledFor(): ?\DateTimeImmutable
+    {
+        return $this->emailScheduledFor;
+    }
+
+    public function setEmailScheduledFor(?\DateTimeImmutable $emailScheduledFor): static
+    {
+        $this->emailScheduledFor = $emailScheduledFor;
         return $this;
     }
 }
