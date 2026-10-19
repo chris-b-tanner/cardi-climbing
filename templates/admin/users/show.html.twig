@@ -147,7 +147,7 @@
       <div class="card__label">Email</div>
       <div class="card__value">
         {% if user.email %}
-          <a href="{{ path('app_admin_email_compose', {userId: user.id}) }}" style="color:var(--teal);">{{ user.email }}</a>
+          <a href="#" onclick="alert('To email {{ user.displayName|e('js') }}, open the Notes / Email tab below.'); return false;" style="color:var(--teal);">{{ user.email }}</a>
         {% elseif not user.email2 and not user.email3 %}
           —
         {% endif %}
