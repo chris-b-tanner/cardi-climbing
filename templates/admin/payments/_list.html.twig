@@ -40,7 +40,7 @@
                 Donation
               {% endif %}
             </td>
-            <td class="admin-table__muted">{{ payment.method|capitalize }}</td>
+            <td class="admin-table__muted">{{ payment.method == 'bacs' ? 'BACS' : payment.method|capitalize }}</td>
             <td class="admin-table__muted" style="text-align:right;">£{{ payment.amount }}</td>
             <td><span class="status-pill{{ pillClass }}">{{ payment.statusLabel }}</span></td>
             <td class="admin-table__muted" style="font-size:0.78rem;">{{ payment.stripePaymentIntentId ?: '—' }}</td>

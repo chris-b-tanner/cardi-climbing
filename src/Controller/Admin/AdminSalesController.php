@@ -149,6 +149,28 @@ class AdminSalesController extends AbstractController
     }
 
     /**
+     * Standalone printable invoice for this sale (no admin chrome), printed or saved as a PDF from
+     * the browser — same approach as the members print page. The sale's own ID is the payment
+     * reference, and the footer carries the club's bank details for BACS payment.
+     */
+    #[Route('/{id}/invoice', name: 'app_admin_sale_invoice', requirements: ['id' => '\d+'])]
+    public function invoice(SalesOrder $order): Response
+    {
+        $paid = 0.0;
+        foreach ($order->getPayments() as $payment) {
+            if (in_array($payment->getStatus(), [Payment::STATUS_SUCCEEDED, Payment::STATUS_PARTIALLY_REFUNDED], true)) {
+                $paid += (float) $payment->getAmount() - (float) $payment->getTotalRefunded();
+            }
+        }
+
+        return $this->render('admin/sales/invoice.html.twig', [
+            'order'     => $order,
+            'paid'      => number_format($paid, 2, '.', ''),
+            'amountDue' => number_format(max(0, (float) $order->getTotal() - $paid), 2, '.', ''),
+        ]);
+    }
+
+    /**
      * Only a still-open draft can be deleted, and only if every payment against it is still
      * pending or failed (a completed/succeeded/refunded payment means this is a real financial
      * record, kept even if the order itself never got marked complete). A pending/failed payment
@@ -664,6 +686,28 @@ class AdminSalesController extends AbstractController
         }
 
         $this->addFlash('success', 'Order completed — cash payment recorded.');
+
+        return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+    }
+
+    #[Route('/{id}/complete-bacs', name: 'app_admin_sale_complete_bacs', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function completeBacs(Request $request, SalesOrder $order, SalesOrderService $salesOrderService): Response
+    {
+        if (!$this->assertOpenAndValid($request, $order)) {
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        try {
+            $salesOrderService->completeWithBacs($order, $admin);
+        } catch (\LogicException $e) {
+            $this->addFlash('error', $e->getMessage());
+            return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
+        }
+
+        $this->addFlash('success', 'Order completed — BACS payment recorded.');
 
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }

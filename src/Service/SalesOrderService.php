@@ -36,13 +36,25 @@ class SalesOrderService
     /** Completes an order paid in cash — the cash has already changed hands, so the Payment is recorded as succeeded immediately. */
     public function completeWithCash(SalesOrder $order, User $takenBy): Payment
     {
+        return $this->completeWithManualPayment($order, $takenBy, Payment::METHOD_CASH);
+    }
+
+    /** Completes an order paid by BACS transfer — recorded once the transfer has arrived in the club's account, so, like cash, the Payment is succeeded immediately. */
+    public function completeWithBacs(SalesOrder $order, User $takenBy): Payment
+    {
+        return $this->completeWithManualPayment($order, $takenBy, Payment::METHOD_BACS);
+    }
+
+    /** A payment taken outside Stripe (cash, BACS) — nothing to wait on, so the order completes straight away. */
+    private function completeWithManualPayment(SalesOrder $order, User $takenBy, string $method): Payment
+    {
         $this->assertDraft($order);
 
         $payment = new Payment();
         $payment->setUser($order->getUser());
         $payment->setOrder($order);
         $payment->setAmount($order->getTotal());
-        $payment->setMethod(Payment::METHOD_CASH);
+        $payment->setMethod($method);
         $payment->setTakenBy($takenBy);
         $payment->setSucceededAt(new \DateTimeImmutable());
 

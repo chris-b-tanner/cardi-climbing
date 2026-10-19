@@ -15,6 +15,7 @@ class Payment
     public const METHOD_ONLINE   = 'online';
     public const METHOD_TERMINAL = 'terminal';
     public const METHOD_CASH     = 'cash';
+    public const METHOD_BACS     = 'bacs';
 
     public const STATUS_PENDING             = 'pending';
     public const STATUS_SUCCEEDED           = 'succeeded';

@@ -23,6 +23,7 @@
     <option value="online"{{ currentMethod == 'online' ? ' selected' : '' }}>Online</option>
     <option value="terminal"{{ currentMethod == 'terminal' ? ' selected' : '' }}>Terminal</option>
     <option value="cash"{{ currentMethod == 'cash' ? ' selected' : '' }}>Cash</option>
+    <option value="bacs"{{ currentMethod == 'bacs' ? ' selected' : '' }}>BACS</option>
   </select>
   <input type="date" id="search-from" value="{{ currentFrom }}" aria-label="From date">
   <input type="date" id="search-to" value="{{ currentTo }}" aria-label="To date">

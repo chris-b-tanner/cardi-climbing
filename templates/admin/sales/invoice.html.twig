@@ -1,0 +1,163 @@
+{#
+  Printable invoice for one sale — see AdminSalesController::invoice(). Standalone page (no admin
+  chrome) like admin/users/print.html.twig: the browser's own print dialog prints it or saves it
+  as a PDF. The sale ID doubles as the payment reference, and the footer carries the club's bank
+  details for paying by BACS. Not a VAT invoice: no VAT number or VAT breakdown is shown.
+#}
+{% set customer = order.user %}
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Invoice {{ order.id }} — Y Wal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      padding: 2rem;
+      max-width: 52rem;
+      margin: 0 auto;
+    }
+    .print-bar {
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .print-bar button, .print-bar a {
+      font-family: inherit; font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #fff; color: #1a1a1a;
+      text-decoration: none; cursor: pointer;
+    }
+    .print-bar button { background: #2a9d8f; color: #fff; border-color: #2a9d8f; }
+
+    .invoice-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; margin-bottom: 2rem; }
+    .invoice-head img { height: 4.5rem; width: auto; }
+    .invoice-title { text-align: right; }
+    .invoice-title h1 { font-size: 1.75rem; letter-spacing: 0.02em; margin-bottom: 0.5rem; }
+    .meta { font-size: 0.9375rem; line-height: 1.6; }
+    .meta dt { display: inline; color: #6b7280; }
+    .meta dd { display: inline; font-weight: 600; margin-left: 0.35rem; }
+    .meta dd::after { content: ''; display: block; }
+
+    .label {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280; margin-bottom: 0.35rem;
+    }
+    .bill-to { font-size: 0.9375rem; line-height: 1.5; margin-bottom: 2rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+    th, td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280; background: #f9fafb;
+    }
+    .num { text-align: right; white-space: nowrap; }
+    .detail { display: block; font-size: 0.8125rem; color: #6b7280; }
+
+    .totals { margin: 1rem 0 0 auto; width: 18rem; font-size: 0.9375rem; }
+    .totals div { display: flex; justify-content: space-between; padding: 0.3rem 0.75rem; }
+    .totals .due { font-weight: 700; font-size: 1.05rem; border-top: 2px solid #1a1a1a; margin-top: 0.3rem; padding-top: 0.5rem; }
+    .status { margin-top: 1rem; text-align: right; font-weight: 600; color: #2a9d8f; }
+    .status--cancelled { color: #b91c1c; }
+
+    footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #e5e7eb; font-size: 0.875rem; line-height: 1.6; }
+    footer p { margin-bottom: 0.75rem; }
+    .bank { display: grid; grid-template-columns: max-content 1fr; column-gap: 1.25rem; }
+    .bank dt { color: #6b7280; }
+    .bank dd { font-weight: 600; }
+
+    @media print {
+      body { padding: 0; max-width: none; }
+      .print-bar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <a href="{{ path('app_admin_sale_show', {id: order.id}) }}">&larr; Back to sale</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+
+  <div class="invoice-head">
+    <img src="/images/y-wal-colour-logo.png" alt="Y Wal">
+    <div class="invoice-title">
+      <h1>Invoice</h1>
+      <dl class="meta">
+        <dt>Reference</dt><dd>{{ order.id }}</dd>
+        <dt>Date</dt><dd>{{ order.createdAt|date('j F Y') }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="bill-to">
+    <div class="label">Bill to</div>
+    {{ customer.displayName }}<br>
+    {% for line in [customer.addressLine1, customer.addressLine2, customer.town, customer.postcode] %}
+      {%- if line %}{{ line }}<br>{% endif -%}
+    {% endfor %}
+    {% if customer.email %}{{ customer.email }}{% endif %}
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit price</th>
+        <th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in order.rows %}
+        <tr>
+          <td>
+            {{ row.product.name }}
+            {% if row.product.variantValue %}<span class="detail">{{ row.product.variantValue }}</span>{% endif %}
+            {% if row.occurrenceDate %}<span class="detail">{{ row.occurrenceDate|date('D j M Y') }}</span>{% endif %}
+            {% if row.product.requiresBeneficiary %}<span class="detail">For: {{ row.effectiveBeneficiary.displayName }}</span>{% endif %}
+            {% if row.note %}<span class="detail">{{ row.note }}</span>{% endif %}
+          </td>
+          <td class="num">{{ row.qty }}</td>
+          <td class="num">£{{ row.chargedPrice }}</td>
+          <td class="num">£{{ row.lineTotal }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" style="color:#6b7280;">No items on this sale.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div><span>Total</span><span>£{{ order.total }}</span></div>
+    {% if paid > 0 %}
+      <div><span>Paid</span><span>−£{{ paid }}</span></div>
+    {% endif %}
+    <div class="due"><span>Amount due</span><span>£{{ order.status == 'cancelled' ? '0.00' : amountDue }}</span></div>
+  </div>
+
+  {% if order.status == 'cancelled' %}
+    <p class="status status--cancelled">This sale was cancelled.</p>
+  {% elseif amountDue == '0.00' and order.status == 'complete' %}
+    <p class="status">Paid in full — thank you.</p>
+  {% endif %}
+
+  <footer>
+    {% if order.status != 'cancelled' and amountDue != '0.00' %}
+      <p>To pay by bank transfer, please use <strong>{{ order.id }}</strong> as the payment reference.</p>
+    {% endif %}
+    <dl class="bank">
+      <dt>Account name</dt><dd>Cardigan Climbing CIC</dd>
+      <dt>Bank</dt><dd>Virgin Money</dd>
+      <dt>Sort code</dt><dd>82-12-08</dd>
+      <dt>Account number</dt><dd>80255937</dd>
+      <dt>Reference</dt><dd>{{ order.id }}</dd>
+    </dl>
+  </footer>
+
+</body>
+</html>

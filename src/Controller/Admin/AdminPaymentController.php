@@ -68,7 +68,7 @@ class AdminPaymentController extends AbstractController
                     trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? '')),
                     $user->getEmail(),
                     $payment->getOrder() ? 'Sale #' . $payment->getOrder()->getId() : ($payment->isDonation() ? 'Donation' : 'Booking'),
-                    ucfirst($payment->getMethod()),
+                    $payment->getMethod() === Payment::METHOD_BACS ? 'BACS' : ucfirst($payment->getMethod()),
                     $payment->getAmount(),
                     strtoupper($payment->getCurrency()),
                     $payment->getStatusLabel(),
@@ -120,7 +120,7 @@ class AdminPaymentController extends AbstractController
     private function parseMethod(Request $request): string
     {
         $method = $request->query->get('method', '');
-        $valid  = [Payment::METHOD_ONLINE, Payment::METHOD_TERMINAL, Payment::METHOD_CASH];
+        $valid  = [Payment::METHOD_ONLINE, Payment::METHOD_TERMINAL, Payment::METHOD_CASH, Payment::METHOD_BACS];
 
         return in_array($method, $valid, true) ? $method : '';
     }

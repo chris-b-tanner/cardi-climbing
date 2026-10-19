@@ -12,9 +12,14 @@
     <a href="{{ path('app_admin_sales') }}" class="page-header__crumb">Sales</a> &raquo;
     Sale #{{ order.id }} — <a href="{{ path('app_admin_user_show', {id: order.user.id}) }}" class="admin-table__link">{{ memberName }}</a> <span class="status-pill {{ pillClass }}">{{ order.statusLabel }}</span>
   </h1>
+  {% if order.rows is not empty %}
+    <div class="btn-row">
+      <a href="{{ path('app_admin_sale_invoice', {id: order.id}) }}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener"><i class="bi bi-printer"></i> Print invoice</a>
+    </div>
+  {% endif %}
 </div>
 
-<div class="member-columns{{ order.status != 'draft' ? ' member-columns--single' : '' }}">
+<div class="member-columns {{ order.status == 'draft' ? 'member-columns--halves' : 'member-columns--single' }}">
   {% if order.status == 'draft' %}
   <div>
     <div class="page-header" style="margin-bottom:0.75rem;">
@@ -229,6 +234,11 @@
                 <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
                 <button type="submit" class="btn btn--ghost" style="width:100%;"><i class="bi bi-cash"></i> Cash</button>
               </form>
+              <form method="post" action="{{ path('app_admin_sale_complete_bacs', {id: order.id}) }}" style="flex:1;"
+                    onsubmit="return confirm('Only record BACS once the transfer has arrived in the bank account. Complete this order?');">
+                <input type="hidden" name="_csrf_token" value="{{ csrfToken }}">
+                <button type="submit" class="btn btn--ghost" style="width:100%;"><i class="bi bi-bank"></i> BACS</button>
+              </form>
             </div>
           </div>
         </div>
@@ -238,7 +248,7 @@
     {% if order.payments is not empty %}
       <div class="card" style="margin-top:1rem;">
         <div class="card__label">Payments</div>
-        {% set methodLabels = {'cash': 'Cash', 'terminal': 'Card', 'online': 'Online'} %}
+        {% set methodLabels = {'cash': 'Cash', 'bacs': 'BACS', 'terminal': 'Card', 'online': 'Online'} %}
         {% for payment in order.payments %}
           <div style="font-size:0.875rem;padding:0.3rem 0;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
             £{{ payment.amount }} · {{ methodLabels[payment.method] ?? payment.method }} · {{ payment.statusLabel }}
