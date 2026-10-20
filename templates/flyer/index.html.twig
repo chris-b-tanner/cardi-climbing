@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{#
+  Landing page for printed flyers — see FlyerController. The message is the flyer_* strings in
+  translations/messages.{en,cy}.yaml and the button's destination is FlyerController::CTA_URL;
+  change those to point the flyers at a new campaign.
+#}
+
+{% block title %}{{ 'flyer_meta_title'|trans }}{% endblock %}
+{% block meta_description %}{{ 'flyer_meta_desc'|trans }}{% endblock %}
+{% block canonical_url %}https://www.cardiganclimbing.org/flyer{% endblock %}
+{% block og_url %}https://www.cardiganclimbing.org/flyer{% endblock %}
+{% block og_title %}{{ 'flyer_meta_title'|trans }}{% endblock %}
+{% block og_description %}{{ 'flyer_meta_desc'|trans }}{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <p class="hero__label">{{ 'flyer_label'|trans }}</p>
+    <h1 class="page-hero__h1">{{ 'flyer_h1'|trans }}</h1>
+    <p class="page-hero__sub">{{ 'flyer_intro'|trans }}</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap flyer__body">
+    <a href="{{ ctaUrl }}" class="flyer__media" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+      <img src="/images/cf-vid.png" alt="" width="400" height="227">
+    </a>
+    <div class="flyer__text">
+      <p>{{ 'flyer_body'|trans }}</p>
+      <div class="flyer__actions">
+        <a href="{{ ctaUrl }}" class="btn btn--teal" target="_blank" rel="noopener">{{ 'flyer_cta'|trans }}</a>
+        <a href="{{ path('app_home') }}" class="btn btn--outline">{{ 'flyer_more'|trans }}</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

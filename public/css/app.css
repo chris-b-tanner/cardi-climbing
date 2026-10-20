@@ -1111,3 +1111,14 @@ p + p { margin-top: 1rem; }
   border: 1px solid var(--border); background: var(--white);
 }
 .sponsorship__doc-link { margin-top: 1rem; }
+
+/* ── Flyer landing page ─────────────────────────────── */
+.flyer__body { display: flex; flex-wrap: wrap; align-items: center; gap: 2rem 3rem; }
+.flyer__media { flex: 0 1 400px; display: block; }
+.flyer__media img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15); }
+.flyer__text { flex: 1 1 320px; min-width: 0; }
+.flyer__text p { font-size: 1.05rem; max-width: 56ch; }
+.flyer__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+@media (max-width: 639px) {
+  .flyer__actions .btn { width: 100%; justify-content: center; text-align: center; }
+}

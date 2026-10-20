@@ -1,0 +1,16 @@
+Y WAL — {{ author.displayName|upper }} MENTIONED YOU
+====================================================
+
+{{ target.label }}
+{% if target.company is defined and target.company %}{{ target.company }}
+{% endif %}
+{{ note.content }}
+
+Added:  {{ note.createdAt|date('j M Y, H:i') }} by {{ author.displayName }}
+{% if target.url %}
+View {{ typeLabel }}: {{ target.url }}
+{% endif %}
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+hello@cardiganclimbing.org | https://www.cardiganclimbing.org

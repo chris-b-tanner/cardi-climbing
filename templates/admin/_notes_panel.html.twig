@@ -21,6 +21,9 @@
   the email waits on the bulk_email queue until then (see SendScheduledNoteEmailMessageHandler).
   Attachments aren't offered on a scheduled send, since uploads aren't kept. Until it goes out the
   note shows a "Scheduled" pill, and deleting the note cancels the send.
+  Typing "@" in the note textarea searches the team (app_admin_note_staff_list) and inserts
+  "@{name}". Each pick is also submitted as mentions[], and everyone still named in the text when
+  it's saved gets an email (see AdminNoteController::notifyMentions() / NoteMentionMailer).
   Optional `showForm` (default true) — pass false to list existing notes without the add-note form.
 #}
 {% if showForm ?? true %}
@@ -32,9 +35,12 @@
              placeholder="Subject line for this email…" data-last-subject="{{ lastEmailSubject|default('') }}">
     </div>
   {% endif %}
-  <div class="form-group" style="margin-bottom:0.5rem;">
-    <textarea id="note-content-{{ noteableType }}-{{ noteableId }}" name="content" class="form-control" rows="3"
-              placeholder="Add a note…" style="resize:vertical;"></textarea>
+  <div class="form-group" style="margin-bottom:0.5rem;position:relative;">
+    <textarea id="note-content-{{ noteableType }}-{{ noteableId }}" name="content" class="form-control note-mention-input" rows="3"
+              placeholder="Add a note… type @ to mention a team member" style="resize:vertical;"
+              data-staff-url="{{ path('app_admin_note_staff_list') }}" data-current-user-id="{{ app.user.id }}"></textarea>
+    <div class="note-mention-menu" role="listbox" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;margin-top:2px;max-height:220px;overflow-y:auto;background:var(--white, #fff);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 6px 18px rgba(0,0,0,0.12);"></div>
+    <div class="note-mention-ids"></div>
   </div>
   {% if contactEmail is defined and contactEmail %}
     {% set attachmentExtensions = constant('App\\Service\\Mailer\\ContactQuickEmailMailer::ATTACHMENT_EXTENSIONS') %}
@@ -357,6 +363,135 @@
         } else {
           input.value = '';
           content.focus();
+        }
+      });
+    });
+
+    // "@" mentions — see the comment at the top of this file. The list is fetched once, the first
+    // time "@" is typed, and filtered by any word in the name starting with what follows the "@".
+    let staffPromise = null;
+    function loadStaff(url) {
+      staffPromise ??= fetch(url, {headers: {'Accept': 'application/json'}})
+        .then((response) => response.ok ? response.json() : [])
+        .catch(() => []);
+      return staffPromise;
+    }
+
+    document.querySelectorAll('.note-mention-input').forEach((textarea) => {
+      if (textarea.dataset.mentionReady) return;
+      textarea.dataset.mentionReady = '1';
+
+      const group  = textarea.parentElement;
+      const menu   = group.querySelector('.note-mention-menu');
+      const idsBox = group.querySelector('.note-mention-ids');
+      const currentUserId = Number(textarea.dataset.currentUserId);
+      const emailToggle   = document.getElementById('note-email-toggle-' + textarea.id.slice('note-content-'.length));
+      const picked = new Map(); // id → name
+      let matches = [];
+      let active  = 0;
+      let start   = -1; // index of the "@" being completed
+
+      // The "@" and whatever's been typed after it, up to the caret — up to two words, so
+      // "@Jo Sm" can still narrow a full name. Must start the text or follow whitespace, so an
+      // email address in the note never opens the menu.
+      function currentQuery() {
+        const before = textarea.value.slice(0, textarea.selectionStart);
+        const match  = before.match(/(?:^|\s)@([^\s@]*(?: [^\s@]*)?)$/);
+        if (!match) return null;
+        return {start: before.length - match[1].length - 1, text: match[1].toLowerCase()};
+      }
+
+      function hide() {
+        menu.style.display = 'none';
+        matches = [];
+        start = -1;
+      }
+
+      function render() {
+        menu.replaceChildren(...matches.map((person, index) => {
+          const option = document.createElement('div');
+          option.setAttribute('role', 'option');
+          option.textContent = person.name;
+          option.style.cssText = 'padding:0.4rem 0.65rem;font-size:0.875rem;cursor:pointer;'
+            + (index === active ? 'background:var(--teal);color:#fff;' : '');
+          option.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // keep focus (and the caret) in the textarea
+            choose(person);
+          });
+          return option;
+        }));
+        menu.style.display = matches.length ? 'block' : 'none';
+      }
+
+      function choose(person) {
+        const caret = textarea.selectionStart;
+        const insert = '@' + person.name + ' ';
+        textarea.value = textarea.value.slice(0, start) + insert + textarea.value.slice(caret);
+        const newCaret = start + insert.length;
+        textarea.setSelectionRange(newCaret, newCaret);
+        picked.set(person.id, person.name);
+        syncIds();
+        hide();
+        textarea.focus();
+      }
+
+      function syncIds() {
+        idsBox.replaceChildren(...[...picked.keys()].map((id) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'mentions[]';
+          input.value = id;
+          return input;
+        }));
+      }
+
+      async function update() {
+        const query = currentQuery();
+        if (!query) { hide(); return; }
+
+        const staff = await loadStaff(textarea.dataset.staffUrl);
+        // Typing may have moved on while the list loaded.
+        const latest = currentQuery();
+        if (!latest || latest.start !== query.start) return;
+
+        start = latest.start;
+        matches = staff
+          .filter((person) => person.id !== currentUserId)
+          .filter((person) => {
+            if (latest.text === '') return true;
+            const name = person.name.toLowerCase();
+            return name.startsWith(latest.text) || name.split(/\s+/).some((word) => word.startsWith(latest.text));
+          })
+          .slice(0, 8);
+        active = 0;
+        render();
+      }
+
+      textarea.addEventListener('input', update);
+      textarea.addEventListener('click', update);
+      textarea.addEventListener('blur', () => setTimeout(hide, 100));
+      textarea.addEventListener('keydown', (e) => {
+        if (menu.style.display === 'none' || !matches.length) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          active = (active + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length;
+          render();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          choose(matches[active]);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          hide();
+        }
+      });
+
+      // A note ticked to "Email {address}" goes to the member exactly as typed, mentions included.
+      textarea.form.addEventListener('submit', (e) => {
+        if (!emailToggle || !emailToggle.checked) return;
+        const named = [...picked.values()].filter((name) => textarea.value.includes('@' + name));
+        if (named.length && !confirm('This note is being emailed to the member, and it mentions ' + named.join(', ')
+            + '. They will see the mention too. Send it anyway?')) {
+          e.preventDefault();
         }
       });
     });

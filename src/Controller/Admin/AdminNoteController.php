@@ -16,6 +16,7 @@ use App\Service\Mailer\ContactQuickEmailMailer;
 use App\Service\Mailer\EmailOpenTracking;
 use App\Service\NoteableResolver;
 use App\Service\Mailer\NoteAssignmentMailer;
+use App\Service\Mailer\NoteMentionMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -47,6 +48,7 @@ class AdminNoteController extends AbstractController
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
         private readonly ContactNoteMailer $contactNoteMailer,
         private readonly ContactQuickEmailMailer $contactQuickEmailMailer,
+        private readonly NoteMentionMailer $noteMentionMailer,
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
@@ -151,6 +153,8 @@ class AdminNoteController extends AbstractController
             $em->persist($note);
             $em->flush();
 
+            $this->notifyMentions($note, $request->request->all('mentions'), $content, $admin);
+
             // Keep whoever's handling this contact in the loop — see ContactNoteMailer. Only
             // member notes carry an assignee at all; the other four noteable types have nothing
             // to check here.
@@ -174,6 +178,36 @@ class AdminNoteController extends AbstractController
         }
 
         return $this->redirectForNoteable($noteableType, $noteableId);
+    }
+
+    /**
+     * Emails each team member "@"-mentioned in a new note — see NoteMentionMailer. The picker in
+     * _notes_panel.html.twig submits the id of everyone chosen from its list as mentions[]; each is
+     * kept only if they're still on the team and "@{their name}" is still in the text, so a mention
+     * picked and then deleted before saving doesn't notify anyone. The author is never notified
+     * about their own note.
+     *
+     * @param array<mixed> $mentionIds
+     */
+    private function notifyMentions(Note $note, array $mentionIds, string $content, User $author): void
+    {
+        $target = null;
+        $ids    = array_unique(array_filter(array_map('intval', $mentionIds)));
+
+        foreach ($ids as $id) {
+            $mentioned = $this->userRepository->find($id);
+            if (!$mentioned || !$mentioned->isStaff() || $mentioned === $author) {
+                continue;
+            }
+
+            $name = $mentioned->getDisplayName() ?: $mentioned->getEmail();
+            if (!$name || !str_contains($content, '@' . $name)) {
+                continue;
+            }
+
+            $target ??= $this->noteableResolver->resolve($note, absolute: true);
+            $this->noteMentionMailer->sendMentioned($note, $target, $mentioned, $author);
+        }
     }
 
     private static function formatSize(int $bytes): string
