@@ -30,12 +30,14 @@
   .field input[type="text"],
   .field input[type="email"],
   .field input[type="tel"],
-  .field input[type="date"] {
+  .field input[type="date"],
+  .field select {
     width: 100%; padding: 0.6rem 0.75rem;
     border: 1px solid #e5e7eb; border-radius: 6px;
     font-size: 0.9375rem; font-family: inherit; color: #1a1a1a;
   }
-  .field input:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
+  .field select { background: #fff; }
+  .field input:focus, .field select:focus { outline: 2px solid #2a9d8f; outline-offset: 1px; border-color: transparent; }
 
   label.optin-label {
     display: flex; align-items: center; gap: 0.5rem;
@@ -194,9 +196,17 @@
 
         {% include 'account/_profile_fields.html.twig' with {user: user} %}
 
-        {% if publicTags is not empty %}
         <div class="account-card">
           <div class="account-card__title">Communication preferences</div>
+          <div class="field">
+            <label for="communicationLanguage">Preferred language</label>
+            <select id="communicationLanguage" name="communicationLanguage">
+              {% for code, label in constant('App\\Entity\\User::COMMUNICATION_LANGUAGES') %}
+                <option value="{{ code }}"{% if user.communicationLanguage == code %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if publicTags is not empty %}
           <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem;">
             Choose which updates you'd like to receive. Requires "Keep me updated about Y Wal news" (above) to be ticked.
           </p>
@@ -213,8 +223,8 @@
               </label>
             </div>
           {% endfor %}
+          {% endif %}
         </div>
-        {% endif %}
 
         {% if user.dependents is not empty %}
         <div class="account-card">

@@ -85,6 +85,11 @@ class AccountController extends AbstractController
                 $user->setEmail($newEmail);
                 $user->setOptIn($newOptIn);
 
+                $language = $request->request->get('communicationLanguage');
+                if (array_key_exists($language, User::COMMUNICATION_LANGUAGES)) {
+                    $user->setCommunicationLanguage($language);
+                }
+
                 // Only ever touches public tags — never removes a non-public tag staff may have
                 // assigned internally, since those never appear as a checkbox here at all.
                 foreach ($publicTags as $tag) {

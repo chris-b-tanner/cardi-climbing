@@ -20,6 +20,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public const ROLE_TEAM   = 'ROLE_TEAM';
     public const ROLE_MEMBER = 'ROLE_MEMBER';
 
+    public const COMMUNICATION_LANGUAGES = [
+        'en' => 'English',
+        'cy' => 'Cymraeg (Welsh)',
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -56,6 +61,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(options: ['default' => true])]
     private bool $optIn = true;
+
+    /** Language the member wants emails and other communications in — one of the COMMUNICATION_LANGUAGES keys. */
+    #[ORM\Column(length: 2, options: ['default' => 'en'])]
+    private string $communicationLanguage = 'en';
 
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $phone = null;
@@ -354,6 +363,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setOptIn(bool $optIn): static
     {
         $this->optIn = $optIn;
+        return $this;
+    }
+
+    public function getCommunicationLanguage(): string
+    {
+        return $this->communicationLanguage;
+    }
+
+    public function setCommunicationLanguage(string $communicationLanguage): static
+    {
+        $this->communicationLanguage = $communicationLanguage;
         return $this;
     }
 
