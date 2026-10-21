@@ -1,0 +1,20 @@
+Y WAL — Purchase order {{ po.number }}
+======================================
+
+Hello{% if supplier.firstName %} {{ supplier.firstName }}{% endif %},
+{% if message %}
+
+{{ message }}
+{% endif %}
+
+Please find our purchase order {{ po.number }} attached (£{{ po.grossTotal }} including VAT{% if po.expectedAt %}, needed by {{ po.expectedAt|date('d M Y') }}{% endif %}).
+Please quote {{ po.number }} on your delivery note and invoice.
+
+Thanks,
+{{ sentBy.displayName }}
+
+Reply to this email with any questions about the order.
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+hello@cardiganclimbing.org | https://www.cardiganclimbing.org

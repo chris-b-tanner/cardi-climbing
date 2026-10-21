@@ -65,6 +65,7 @@
   {key: 'product', label: 'Products', singular: 'product', icon: 'bi-tag'},
   {key: 'order', label: 'Sales', singular: 'sale', icon: 'bi-receipt'},
   {key: 'asset', label: 'Assets', singular: 'asset', icon: 'bi-box2'},
+  {key: 'purchase_order', label: 'Purchasing', singular: 'purchase order', icon: 'bi-cart'},
 ] %}
 {% set typesByKey = {} %}
 {% for t in types %}
@@ -74,7 +75,7 @@
 {% if items is empty %}
   <div class="empty">
     <strong>Nothing pinned</strong>
-    Pin a note on a member, booking, event, product, order, or asset to add it here.
+    Pin a note on a member, booking, event, product, order, asset, or purchase order to add it here.
   </div>
 {% else %}
   <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">

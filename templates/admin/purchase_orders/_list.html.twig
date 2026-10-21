@@ -1,0 +1,39 @@
+{% if purchaseOrders is empty %}
+  <div class="empty">
+    <strong>No purchase orders here</strong>
+    {{ filters.q or filters.supplier or filters.from or filters.to ? 'Try a different search or filter.' : 'Raise one with "New purchase order".' }}
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>PO</th>
+          <th>Supplier</th>
+          <th>Raised</th>
+          <th>Expected</th>
+          <th>Status</th>
+          <th style="text-align:right;">Total (inc VAT)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for po in purchaseOrders %}
+          <tr{% if po.overdue %} style="background:#fef2f2;"{% endif %}>
+            <td data-label="PO">
+              <a href="{{ path('app_admin_purchase_order_show', {id: po.id}) }}" class="admin-table__link">{{ po.number }}</a>
+              {% if po.supplierReference %}<div style="font-size:0.72rem;color:var(--muted);">{{ po.supplierReference }}</div>{% endif %}
+            </td>
+            <td class="admin-table__muted" data-label="Supplier">{{ po.supplier.supplierName }}</td>
+            <td class="admin-table__muted" data-label="Raised">
+              {{ po.createdAt|date('d M Y') }}
+              {% if po.createdBy %}<div style="font-size:0.72rem;">{{ po.createdBy.displayName }}</div>{% endif %}
+            </td>
+            <td class="admin-table__muted" data-label="Expected">{{ po.expectedAt ? po.expectedAt|date('d M Y') : '—' }}</td>
+            <td data-label="Status">{% include 'admin/purchase_orders/_status_pill.html.twig' %}</td>
+            <td class="admin-table__muted" style="text-align:right;" data-label="Total">£{{ po.grossTotal }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

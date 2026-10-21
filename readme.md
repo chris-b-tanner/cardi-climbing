@@ -271,6 +271,31 @@ cost and replacement value, dispose of assets (all of a batch, or just some of i
 The insurance report (Assets > Insurance report) lists every current asset with its replacement 
 value, by category and by location, ready to print.
 
+Assets can also be created when a purchase order delivery is received (see Purchasing).
+
+## Purchasing
+Purchase orders (Purchasing in the main menu) are how we buy stock and other things for the centre.
+
+Suppliers are ordinary contacts in People with the Supplier box ticked on their edit form (admins 
+only). Use the Suppliers filter on the People list to find them. A supplier's contact page has a 
+Purchase orders tab.
+
+The steps:
+1. Anyone on the team raises a draft, picks the supplier and adds lines: stock items (which go into 
+   stock when they arrive) or other items such as holds, tools or cleaning supplies.
+2. Submit it for approval. Every order needs an admin's approval; an admin can approve their own.
+3. An admin emails it to the supplier from the order page, or places it by phone or online and 
+   marks it as ordered.
+4. When the delivery arrives, whoever unpacks it clicks Receive delivery and enters what actually 
+   came. Part deliveries are fine. Stock goes straight into stock, and other items can be added to 
+   the asset register at the same time.
+5. Upload the supplier's invoice to the order.
+
+A stock product's cost price is the average of what the stock on hand cost, updated on every 
+delivery. Returns to a supplier are recorded by an admin as a "remove stock" adjustment with a note.
+
+The spend report shows spend by category, supplier and month, with a CSV export.
+
 ## Emails
 Transactional emails are sent immediately via PostMark Transactional stream, 
 for bulk emails we use the PostMark Broadcast stream, with a queue system.

@@ -1,0 +1,11 @@
+{% set pillClass = {
+  draft: '',
+  submitted: 'status-pill--pending',
+  approved: 'status-pill--waiting',
+  ordered: 'status-pill--waiting',
+  part_received: 'status-pill--pending',
+  received: 'status-pill--published',
+  cancelled: 'status-pill--cancelled',
+}[po.status] ?? '' %}
+<span class="status-pill {{ pillClass }}">{{ po.statusLabel }}</span>
+{% if po.overdue %}<span class="status-pill status-pill--cancelled" title="Expected {{ po.expectedAt|date('d M Y') }}">Overdue</span>{% endif %}

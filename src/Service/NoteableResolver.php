@@ -6,6 +6,7 @@ use App\Entity\Note;
 use App\Entity\User;
 use App\Repository\AssetRepository;
 use App\Repository\AttendeeRepository;
+use App\Repository\PurchaseOrderRepository;
 use App\Repository\EventRepository;
 use App\Repository\ProductRepository;
 use App\Repository\SalesOrderRepository;
@@ -22,6 +23,7 @@ class NoteableResolver
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
         private readonly AssetRepository $assetRepository,
+        private readonly PurchaseOrderRepository $purchaseOrderRepository,
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {}
 
@@ -32,7 +34,7 @@ class NoteableResolver
      *
      * `person` is the User the note is about — the member, the booker, or the sale's customer — for
      * callers that need more than their name (e.g. their Tag entities, for coloured badges); absent
-     * for event/product/asset notes and deleted records.
+     * for event/product/asset/purchase order notes and deleted records.
      *
      * @return array{label: string, url: ?string, company?: ?string, tags?: string[], person?: User}
      */
@@ -47,6 +49,7 @@ class NoteableResolver
             Note::TYPE_PRODUCT => $this->resolveProduct($id, $absolute),
             Note::TYPE_ORDER => $this->resolveOrder($id, $absolute),
             Note::TYPE_ASSET => $this->resolveAsset($id, $absolute),
+            Note::TYPE_PURCHASE_ORDER => $this->resolvePurchaseOrder($id, $absolute),
             default => ['label' => 'Unknown record', 'url' => null],
         };
     }
@@ -135,6 +138,19 @@ class NoteableResolver
         return [
             'label' => $asset->getName() . ($asset->getLocation() ? ' — ' . $asset->getLocation() : ''),
             'url'   => $this->url('app_admin_asset_show', ['id' => $id], $absolute),
+        ];
+    }
+
+    private function resolvePurchaseOrder(int $id, bool $absolute): array
+    {
+        $purchaseOrder = $this->purchaseOrderRepository->find($id);
+        if (!$purchaseOrder) {
+            return ['label' => 'Purchase order #' . $id . ' (deleted)', 'url' => null];
+        }
+
+        return [
+            'label' => $purchaseOrder->getNumber() . ' — ' . $purchaseOrder->getSupplier()->getSupplierName(),
+            'url'   => $this->url('app_admin_purchase_order_show', ['id' => $id], $absolute),
         ];
     }
 

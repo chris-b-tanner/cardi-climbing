@@ -181,6 +181,7 @@
     .member-columns--thirds { grid-template-columns: 1fr 2fr; }
     .member-columns--halves { grid-template-columns: 1fr 1fr; }
     .member-columns--single { grid-template-columns: 1fr; }
+    .member-columns--two-thirds { grid-template-columns: 2fr 1fr; }
     @media (max-width: 900px) { .member-columns { grid-template-columns: 1fr; } }
     /* Grid items default to min-width:auto, which takes on their content's min-content size —
        a wide table or a minmax()-tracked grid nested inside would otherwise force this column
@@ -473,6 +474,16 @@
         <a href="{{ path('app_admin_payments') }}"
            class="admin-nav__link{{ currentRoute starts with 'app_admin_payment' ? ' is-active' : '' }}">
           <i class="bi bi-credit-card"></i> Payments
+        </a>
+      </li>
+      <li>
+        <a href="{{ path('app_admin_purchase_orders') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_purchase_order' ? ' is-active' : '' }}">
+          <i class="bi bi-cart"></i> Purchasing
+          {% if is_granted('ROLE_ADMIN') %}
+            {% set poAwaiting = purchase_orders_awaiting_approval() %}
+            {% if poAwaiting %}<span class="admin-nav__badge" title="{{ poAwaiting }} awaiting approval">{{ poAwaiting }}</span>{% endif %}
+          {% endif %}
         </a>
       </li>
       <li>

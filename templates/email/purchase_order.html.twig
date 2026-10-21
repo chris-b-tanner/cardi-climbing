@@ -1,0 +1,36 @@
+{% extends 'email/layout.html.twig' %}
+
+{% block emailTitle %}Purchase order {{ po.number }} — Y Wal{% endblock %}
+
+{% block emailBody %}
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 8px;">
+    Purchase order {{ po.number }}
+  </h1>
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 28px;">
+    Y Wal &mdash; Cardigan Climbing CIC
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Hello{% if supplier.firstName %} {{ supplier.firstName }}{% endif %},
+  </p>
+
+  {% if message %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;white-space:pre-line;">{{ message }}</p>
+  {% endif %}
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Please find our purchase order <strong style="color:#141414;">{{ po.number }}</strong> attached
+    (<strong style="color:#141414;">£{{ po.grossTotal }}</strong> including VAT{% if po.expectedAt %}, needed by {{ po.expectedAt|date('d M Y') }}{% endif %}).
+    Please quote {{ po.number }} on your delivery note and invoice.
+  </p>
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#5a5857;line-height:1.7;margin:0 0 16px;">
+    Thanks,<br>{{ sentBy.displayName }}
+  </p>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;color:#9a9895;line-height:1.6;margin:0;">
+    Reply to this email with any questions about the order.
+  </p>
+{% endblock %}

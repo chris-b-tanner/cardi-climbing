@@ -26,6 +26,21 @@ class Product
     public const VAT_ZERO     = 'zero';
     public const VAT_EXEMPT   = 'exempt';
 
+    /** UK VAT rate per code, as a fraction. Used for purchase order totals; sales don't break VAT out. */
+    public const VAT_RATES = [
+        self::VAT_STANDARD => 0.20,
+        self::VAT_REDUCED  => 0.05,
+        self::VAT_ZERO     => 0.0,
+        self::VAT_EXEMPT   => 0.0,
+    ];
+
+    public const VAT_LABELS = [
+        self::VAT_STANDARD => 'Standard rate',
+        self::VAT_REDUCED  => 'Reduced rate',
+        self::VAT_ZERO     => 'Zero rated',
+        self::VAT_EXEMPT   => 'Exempt',
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]

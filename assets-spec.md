@@ -1,4 +1,4 @@
-# Asset register spec — steps 1–3 built
+# Asset register spec — built
 
 ## Goal
 
@@ -52,7 +52,7 @@ admins can change them, following the same rule as sales and purchase prices.
 | `status` | string(20) | `in_use` / `in_storage` / `out_of_service` / `disposed` |
 | `acquisitionType` | string(20) | `purchased` / `donated` / `other` |
 | `acquiredAt` | ?date | Null if not known (older kit) |
-| `supplier` | ?ManyToOne `Supplier` | From `purchase-orders-spec.md` |
+| `supplier` | ?ManyToOne `User` | A contact with `isSupplier` set (see `purchase-orders-spec.md`) |
 | `purchaseOrderLine` | ?ManyToOne `PurchaseOrderLine` | Set when created from a PO receipt |
 | `purchaseCost` | ?decimal(10,2) | Net total actually paid for this entry (not per unit). Null for donated or unknown. |
 | `replacementValue` | ?decimal(10,2) | Net total to replace it today, for insurance. Defaults to `purchaseCost`. |
@@ -175,7 +175,7 @@ check records, task notes, failed-check handling and the dashboard are all in
 - **Insurance report:** current assets grouped by category and by location, with replacement
   values and the date each was last valued. Print view and CSV export.
 - **PO page:** lines show the assets created from them.
-- **Supplier page:** lists assets bought from that supplier.
+- **Supplier contact page:** lists assets bought from that supplier.
 
 ## Permissions
 
@@ -202,9 +202,8 @@ Following the rule that only admins change money:
 
 ## Build order
 
-Steps 1–3 are built (October 2026). `Asset.supplier` and `Asset.purchaseOrderLine` don't exist yet:
-they're added with step 4, alongside the `Supplier` and `PurchaseOrderLine` entities from
-`purchase-orders-spec.md`.
+All four steps are built (October 2026). Step 4 came with purchase orders. The asset page links
+back to the supplier and PO; the PO page doesn't yet list the assets each line created.
 
 
 1. `Asset` and `AssetFile`, the register list, the asset page and the hand-entry form, with

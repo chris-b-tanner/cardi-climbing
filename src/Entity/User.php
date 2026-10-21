@@ -77,6 +77,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $website = null;
 
+    /** A supplier we buy from on purchase orders — shown in the PO supplier picker. Admin-only. See purchase-orders-spec.md. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isSupplier = false;
+
+    /** Our account number with this supplier. Only shown while isSupplier is ticked. */
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $supplierAccountReference = null;
+
     /** 6-digit door-disarm PIN for a keyholder (someone who can already open a self-access door with a physical key) — see door-access-spec.md § Keyholder disarm PIN. Never triggers the relay; only suppresses the unexpected-open alarm briefly. Null for everyone else. */
     #[ORM\Column(length: 6, nullable: true, unique: true)]
     private ?string $keyholderPin = null;
@@ -441,6 +449,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getWebsite(): ?string { return $this->website; }
     public function setWebsite(?string $website): static { $this->website = $website; return $this; }
+
+    public function isSupplier(): bool { return $this->isSupplier; }
+    public function setIsSupplier(bool $isSupplier): static { $this->isSupplier = $isSupplier; return $this; }
+
+    public function getSupplierAccountReference(): ?string { return $this->supplierAccountReference; }
+    public function setSupplierAccountReference(?string $supplierAccountReference): static { $this->supplierAccountReference = $supplierAccountReference; return $this; }
+
+    /** How a supplier is named on purchase orders: the company, falling back to the person's name. */
+    public function getSupplierName(): string { return $this->company ?: $this->getDisplayName(); }
 
     public function getKeyholderPin(): ?string { return $this->keyholderPin; }
     public function setKeyholderPin(?string $keyholderPin): static { $this->keyholderPin = $keyholderPin; return $this; }

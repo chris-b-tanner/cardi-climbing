@@ -117,12 +117,13 @@
         </tfoot>
       </table>
     {% endmacro %}
+    {% import _self as report %}
 
     <h2>By category</h2>
     {% for label, group in byCategory %}
       <div class="group">
         <h3>{{ label }}</h3>
-        {{ _self.group_table(group) }}
+        {{ report.group_table(group) }}
       </div>
     {% endfor %}
 
@@ -130,7 +131,7 @@
     {% for label, group in byLocation %}
       <div class="group">
         <h3>{{ label }}</h3>
-        {{ _self.group_table(group) }}
+        {{ report.group_table(group) }}
       </div>
     {% endfor %}
   {% endif %}

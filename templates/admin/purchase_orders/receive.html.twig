@@ -1,0 +1,95 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Receive delivery — {{ po.number }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <a href="{{ path('app_admin_purchase_orders') }}" class="page-header__crumb">Purchasing</a> &raquo;
+    <a href="{{ path('app_admin_purchase_order_show', {id: po.id}) }}" class="page-header__crumb">{{ po.number }}</a> &raquo; Receive delivery
+  </h1>
+  <a href="{{ path('app_admin_purchase_order_show', {id: po.id}) }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+<p style="font-size:0.875rem;color:var(--muted);margin:0 0 1rem;">
+  From {{ po.supplier.supplierName }}. Each line starts at the quantity still to come — change it to what actually arrived,
+  or 0 if it didn't. Stock goes straight into stock at the price on the order.
+</p>
+
+<form method="post" action="{{ path('app_admin_purchase_order_receive', {id: po.id}) }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_receive_' ~ po.id) }}">
+
+  <div class="card">
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right;">Ordered</th>
+            <th style="text-align:right;">Received so far</th>
+            <th style="width:7rem;">Arrived now</th>
+            <th>Asset register</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in po.lines %}
+            {% set outstanding = line.qtyOutstanding %}
+            <tr>
+              <td data-label="Item">
+                {{ line.description }}
+                <div style="font-size:0.72rem;color:var(--muted);">
+                  {{ line.stockLine ? 'Stock · SKU ' ~ line.stockProduct.sku : line.categoryLabel }}
+                </div>
+              </td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Ordered">{{ line.qty }}</td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Received so far">{{ line.qtyReceived }}</td>
+              <td data-label="Arrived now">
+                {% if outstanding > 0 %}
+                  <input type="number" name="qty[{{ line.id }}]" class="form-control" min="0" max="{{ outstanding }}" step="1" value="{{ outstanding }}">
+                {% else %}
+                  <span style="color:var(--green);font-size:0.85rem;">All in</span>
+                {% endif %}
+              </td>
+              <td data-label="Asset register" style="font-size:0.8rem;">
+                {% if line.stockLine %}
+                  <span style="color:var(--muted);">Stock — not an asset</span>
+                {% elseif outstanding > 0 %}
+                  <label style="display:flex;align-items:center;gap:0.35rem;font-weight:normal;text-transform:none;">
+                    <input type="checkbox" name="asset[]" value="{{ line.id }}"{{ line.usuallyAnAsset ? ' checked' : '' }} style="width:auto;">
+                    Add to asset register
+                  </label>
+                  {% if line.qty > 1 %}
+                    <label style="display:flex;align-items:center;gap:0.35rem;font-weight:normal;text-transform:none;margin-top:0.25rem;">
+                      <input type="checkbox" name="individual[]" value="{{ line.id }}" style="width:auto;">
+                      Track individually (one asset each)
+                    </label>
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="detail-grid" style="margin-top:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="receivedAt">Arrived on</label>
+        <input type="date" id="receivedAt" name="receivedAt" class="form-control" value="{{ 'today'|date('Y-m-d') }}" max="{{ 'today'|date('Y-m-d') }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="receive-note">Note (optional)</label>
+        <input type="text" id="receive-note" name="note" class="form-control" maxlength="255" placeholder="e.g. 2 arrived damaged, chasing">
+      </div>
+    </div>
+    <p style="font-size:0.75rem;color:var(--muted);margin:0.75rem 0 0;">
+      If more arrived than was ordered, receive the ordered amount here and add the extra as a stock adjustment on the product.
+      "Track individually" makes one asset per unit, so each can have its own serial number.
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Record delivery</button>
+    <a href="{{ path('app_admin_purchase_order_show', {id: po.id}) }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

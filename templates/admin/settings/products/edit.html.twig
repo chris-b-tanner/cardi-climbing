@@ -195,6 +195,54 @@
 
 <div>
   {% if product.productType == 'stock' and product.stockProduct %}
+    {% if onOrder is not empty %}
+      <div class="card">
+        <div class="card__label" style="margin-bottom:0.6rem;">On order</div>
+        <ul style="margin:0;padding:0;list-style:none;font-size:0.875rem;line-height:1.8;">
+          {% for line in onOrder %}
+            <li>
+              <strong>{{ line.qtyOutstanding }}</strong> on
+              <a href="{{ path('app_admin_purchase_order_show', {id: line.purchaseOrder.id}) }}" class="admin-table__link">{{ line.purchaseOrder.number }}</a>
+              from {{ line.purchaseOrder.supplier.supplierName }}
+              {% if line.purchaseOrder.expectedAt %}<span style="color:var(--muted);">, due {{ line.purchaseOrder.expectedAt|date('d M') }}</span>{% endif %}
+              {% if line.purchaseOrder.status == 'approved' %}<span style="color:var(--muted);"> (approved, not yet placed)</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if purchases is not empty %}
+      <div class="card">
+        <div class="card__label" style="margin-bottom:0.6rem;">Purchase and cost history</div>
+        <div class="table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Received</th>
+                <th>PO</th>
+                <th style="text-align:right;">Qty</th>
+                <th style="text-align:right;">Unit cost</th>
+                <th style="text-align:right;">Average after</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for receipt in purchases %}
+                <tr>
+                  <td class="admin-table__muted">{{ receipt.receivedAt|date('d M Y') }}</td>
+                  <td><a href="{{ path('app_admin_purchase_order_show', {id: receipt.line.purchaseOrder.id}) }}" class="admin-table__link">{{ receipt.line.purchaseOrder.number }}</a></td>
+                  <td class="admin-table__muted" style="text-align:right;">{{ receipt.qty }}</td>
+                  <td class="admin-table__muted" style="text-align:right;">£{{ receipt.line.unitCost }}</td>
+                  <td class="admin-table__muted" style="text-align:right;">{{ receipt.averageCostAfter is not null ? '£' ~ receipt.averageCostAfter : '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:0.72rem;color:var(--muted);margin:0.5rem 0 0;">The cost price is the average of what the stock on hand cost, updated on every purchase order delivery.</p>
+      </div>
+    {% endif %}
+
     <div class="card">
       <div class="card__label" style="margin-bottom:0.75rem;">Inventory audit trail</div>
       {% set movements = product.stockProduct.inventoryMovements %}

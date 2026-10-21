@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 11px;
+    margin: 0;
+  }
+  .header {
+    border-bottom: 3px solid #b0bd80;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+  }
+  .header .brand {
+    font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .header .brand span { color: #b0bd80; }
+  .header .org { color: #6b6966; margin-top: 4px; line-height: 1.5; }
+  h1 {
+    font-size: 20px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: -0.01em; margin: 0 0 4px;
+  }
+  .subtitle {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #b0bd80; margin: 0 0 18px;
+  }
+  table.parties { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  table.parties td { vertical-align: top; width: 50%; padding: 0 12px 0 0; line-height: 1.5; }
+  .label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #9a9895; margin-bottom: 3px;
+  }
+  table.meta { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  table.meta td { padding: 6px 8px; border-bottom: 1px solid #e4e2dc; }
+  table.meta td.label-cell { color: #9a9895; width: 130px; }
+  table.meta td.value { font-weight: 600; }
+  table.lines { width: 100%; border-collapse: collapse; }
+  table.lines th {
+    text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #9a9895; border-bottom: 2px solid #e4e2dc; padding: 6px 6px;
+  }
+  table.lines td { padding: 7px 6px; border-bottom: 1px solid #e4e2dc; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .muted { color: #9a9895; font-size: 10px; }
+  table.totals { width: 45%; margin-left: 55%; border-collapse: collapse; margin-top: 12px; }
+  table.totals td { padding: 5px 6px; }
+  table.totals tr.grand td { font-weight: 700; font-size: 13px; border-top: 2px solid #1a1a1a; }
+  .footer {
+    margin-top: 30px; padding-top: 12px; border-top: 1px solid #e4e2dc;
+    font-size: 10px; color: #9a9895; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">Y <span>WAL</span></div>
+    <div class="org">
+      Cardigan Climbing CIC &middot; Cardigan (Aberteifi), Ceredigion, Wales<br>
+      hello@cardiganclimbing.org &middot; www.cardiganclimbing.org
+    </div>
+  </div>
+
+  <h1>Purchase order {{ po.number }}</h1>
+  <div class="subtitle">{{ po.approvedAt ? 'Approved ' ~ po.approvedAt|date('d M Y') : po.statusLabel }}</div>
+
+  {% set supplier = po.supplier %}
+  <table class="parties">
+    <tr>
+      <td>
+        <div class="label">Supplier</div>
+        <strong>{{ supplier.supplierName }}</strong><br>
+        {% if supplier.company and (supplier.firstName or supplier.lastName) %}{{ supplier.displayName }}<br>{% endif %}
+        {% if supplier.addressLine1 %}{{ supplier.addressLine1 }}<br>{% endif %}
+        {% if supplier.addressLine2 %}{{ supplier.addressLine2 }}<br>{% endif %}
+        {% if supplier.town or supplier.postcode %}{{ supplier.town }} {{ supplier.postcode }}<br>{% endif %}
+        {% if supplier.email %}{{ supplier.email }}<br>{% endif %}
+        {% if supplier.phone %}{{ supplier.phone|uk_phone }}{% endif %}
+      </td>
+      <td>
+        <table class="meta">
+          <tr><td class="label-cell">PO number</td><td class="value">{{ po.number }}</td></tr>
+          {% if supplier.supplierAccountReference %}
+            <tr><td class="label-cell">Our account</td><td class="value">{{ supplier.supplierAccountReference }}</td></tr>
+          {% endif %}
+          {% if po.supplierReference %}
+            <tr><td class="label-cell">Your reference</td><td class="value">{{ po.supplierReference }}</td></tr>
+          {% endif %}
+          <tr><td class="label-cell">Date</td><td class="value">{{ (po.approvedAt ?? po.createdAt)|date('d M Y') }}</td></tr>
+          {% if po.expectedAt %}
+            <tr><td class="label-cell">Delivery by</td><td class="value">{{ po.expectedAt|date('d M Y') }}</td></tr>
+          {% endif %}
+          {% if po.approvedBy %}
+            <tr><td class="label-cell">Approved by</td><td class="value">{{ po.approvedBy.displayName }}</td></tr>
+          {% endif %}
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Your code</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit (net)</th>
+        <th class="num">Net</th>
+        <th class="num">VAT</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in po.lines %}
+        <tr>
+          <td>
+            {{ line.description }}
+            {% if line.stockLine %}<div class="muted">Our SKU {{ line.stockProduct.sku }}</div>{% endif %}
+          </td>
+          <td>{{ line.supplierCode ?: '—' }}</td>
+          <td class="num">{{ line.qty }}</td>
+          <td class="num">£{{ line.unitCost }}</td>
+          <td class="num">£{{ line.netTotal }}</td>
+          <td class="num">£{{ line.vat }}</td>
+        </tr>
+      {% endfor %}
+      {% if po.deliveryCharge > 0 %}
+        <tr>
+          <td>Delivery</td>
+          <td>—</td>
+          <td class="num"></td>
+          <td class="num"></td>
+          <td class="num">£{{ po.deliveryCharge }}</td>
+          <td class="num">£{{ po.deliveryVat }}</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Net</td><td class="num">£{{ po.netTotal }}</td></tr>
+    <tr><td>VAT</td><td class="num">£{{ po.vatTotal }}</td></tr>
+    <tr class="grand"><td>Total</td><td class="num">£{{ po.grossTotal }}</td></tr>
+  </table>
+
+  <div class="footer">
+    Please quote {{ po.number }} on your delivery note and invoice, and send invoices to hello@cardiganclimbing.org.
+  </div>
+</body>
+</html>

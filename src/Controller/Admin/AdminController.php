@@ -14,6 +14,7 @@ use App\Repository\AccessCardRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\CertificationRepository;
 use App\Repository\NoteRepository;
+use App\Repository\PurchaseOrderRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserFileRepository;
 use App\Repository\UserRepository;
@@ -47,14 +48,14 @@ class AdminController extends AbstractController
     #[Route('/users', name: 'app_admin_users')]
     public function users(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly] = $this->resolveUserFilters($request);
         $context        = $request->query->get('context', '') === 'new_sale' ? 'new_sale' : '';
         // Carried through from the event view's "Add attendee" button so the sale created from
         // the "Choose" form below already knows which event/occurrence to add as a line item.
         $eventId        = $context === 'new_sale' ? (int) $request->query->get('eventId', 0) : 0;
         $occurrenceDate = $context === 'new_sale' ? trim($request->query->get('occurrenceDate', '')) : '';
 
-        $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId);
+        $users     = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly);
         $parentIds = $userRepository->findParentIds();
 
         // Filtered by a tag with a reminder interval: anyone overdue a contact under it is pinned to
@@ -101,6 +102,7 @@ class AdminController extends AbstractController
             'currentDir'     => $dir,
             'currentHasMemo' => $hasMemo,
             'currentAssignedToId' => $assignedToId,
+            'currentSuppliersOnly' => $suppliersOnly,
             'context'        => $context,
             'eventId'        => $eventId,
             'occurrenceDate' => $occurrenceDate,
@@ -115,11 +117,11 @@ class AdminController extends AbstractController
     #[Route('/users/print', name: 'app_admin_users_print')]
     public function printUsers(Request $request, UserRepository $userRepository, TagRepository $tagRepository): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly] = $this->resolveUserFilters($request);
         $tag = $tagId !== null ? $tagRepository->find($tagId) : null;
 
         return $this->render('admin/users/print.html.twig', [
-            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId),
+            'users'        => $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly),
             'currentQuery' => $query,
             'tag'          => $tag,
         ]);
@@ -129,8 +131,8 @@ class AdminController extends AbstractController
     #[Route('/users/export.csv', name: 'app_admin_users_export')]
     public function exportUsers(Request $request, UserRepository $userRepository, UkPhoneFormatter $ukPhoneFormatter): Response
     {
-        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId] = $this->resolveUserFilters($request);
-        $users = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId);
+        [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly] = $this->resolveUserFilters($request);
+        $users = $userRepository->search($query, $tagId, null, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly);
 
         $handle = fopen('php://temp', 'r+');
         fputcsv($handle, ['ID', 'Name', 'Email', 'Phone', 'Tags']);
@@ -171,7 +173,9 @@ class AdminController extends AbstractController
             default => (int) $assignedToRaw,
         };
 
-        return [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId];
+        $suppliersOnly = $request->query->getBoolean('suppliers');
+
+        return [$query, $tagId, $sort, $dir, $hasMemo, $assignedToId, $suppliersOnly];
     }
 
     #[Route('/users/new', name: 'app_admin_user_new', methods: ['GET', 'POST'])]
@@ -250,7 +254,7 @@ class AdminController extends AbstractController
     }
 
     #[Route('/users/{id}', name: 'app_admin_user_show', requirements: ['id' => '\d+'])]
-    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository, AccessCardRepository $accessCardRepository, UserFileRepository $userFileRepository): Response
+    public function showUser(User $user, UserRepository $userRepository, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, TagRepository $tagRepository, AccessCardRepository $accessCardRepository, UserFileRepository $userFileRepository, PurchaseOrderRepository $purchaseOrderRepository): Response
     {
         $duplicates = ($user->getFirstName() && $user->getLastName())
             ? $userRepository->findByFullName($user->getFirstName(), $user->getLastName(), $user->getId())
@@ -269,6 +273,8 @@ class AdminController extends AbstractController
             'accessCard'       => $accessCardRepository->findCurrentForUser($user),
             'lastEmailSubject' => $lastEmailThreadNote?->getEmailSubject(),
             'files'            => $userFileRepository->findForUser($user),
+            // Kept for a contact that's no longer ticked as a supplier, so its old orders stay reachable.
+            'purchaseOrders'   => $purchaseOrderRepository->findForSupplier($user),
         ]);
     }
 
@@ -557,6 +563,18 @@ class AdminController extends AbstractController
                 } else {
                     $user->setKeyholderPin($keyholderPin);
                 }
+
+                // Supplier flag and account number — admin-only, like the other purchasing controls.
+                // Unticking keeps the account number, so ticking it again later restores it.
+                $user->setIsSupplier($request->request->has('isSupplier'));
+                $accountReference = trim($request->request->get('supplierAccountReference', ''));
+                if (mb_strlen($accountReference) > 100) {
+                    $this->addFlash('error', 'Keep the supplier account number under 100 characters.');
+                    return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                }
+                if ($user->isSupplier()) {
+                    $user->setSupplierAccountReference($accountReference !== '' ? $accountReference : null);
+                }
             }
 
             if ($canHaveDependents) {
@@ -756,6 +774,15 @@ class AdminController extends AbstractController
             'UPDATE user_certification SET user_id = :p WHERE user_id = :s',
             ['p' => $primaryId, 's' => $secondaryId]
         );
+        // A supplier merged into another contact keeps its purchase history.
+        $em->getConnection()->executeStatement(
+            'UPDATE purchase_order SET supplier_id = :p WHERE supplier_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId]
+        );
+        $em->getConnection()->executeStatement(
+            'UPDATE asset SET supplier_id = :p WHERE supplier_id = :s',
+            ['p' => $primaryId, 's' => $secondaryId]
+        );
 
         // Clear identity map so re-fetched secondary has empty notes/bookings/certifications collections
         $em->clear();
@@ -776,6 +803,8 @@ class AdminController extends AbstractController
         if (!$primary->getTown()      && $secondary->getTown())        $primary->setTown($secondary->getTown());
         if (!$primary->getPostcode()  && $secondary->getPostcode())    $primary->setPostcode($secondary->getPostcode());
         if ($secondary->isOptIn()) $primary->setOptIn(true);
+        if ($secondary->isSupplier()) $primary->setIsSupplier(true);
+        if (!$primary->getSupplierAccountReference() && $secondary->getSupplierAccountReference()) $primary->setSupplierAccountReference($secondary->getSupplierAccountReference());
 
         // Collect all unique emails from secondary not already on primary
         $existingEmails = array_filter([$primary->getEmail(), $primary->getEmail2(), $primary->getEmail3()]);
@@ -803,7 +832,7 @@ class AdminController extends AbstractController
 
     #[Route('/users/{id}/delete', name: 'app_admin_user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function deleteUser(Request $request, User $user, EntityManagerInterface $em, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository): Response
+    public function deleteUser(Request $request, User $user, EntityManagerInterface $em, AttendeeRepository $attendeeRepository, NoteRepository $noteRepository, PurchaseOrderRepository $purchaseOrderRepository): Response
     {
         if (!$this->isCsrfTokenValid('delete_user_' . $user->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
@@ -822,6 +851,11 @@ class AdminController extends AbstractController
 
         if ($attendeeRepository->findAllForUser($user) || !$user->getPayments()->isEmpty()) {
             $this->addFlash('error', 'Cannot delete a member with bookings or payments on record — archive them instead.');
+            return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+        }
+
+        if ($purchaseOrderRepository->findForSupplier($user) !== []) {
+            $this->addFlash('error', 'Cannot delete a supplier with purchase orders on record — archive them instead.');
             return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
         }
 

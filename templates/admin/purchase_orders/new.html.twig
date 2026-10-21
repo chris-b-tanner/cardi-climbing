@@ -1,0 +1,78 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New purchase order — Purchasing{% endblock %}
+
+{% set vatLabels = constant('App\\Entity\\Product::VAT_LABELS') %}
+
+{% block content %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_purchase_orders') }}" class="page-header__crumb">Purchasing</a> &raquo; New purchase order</h1>
+  <a href="{{ path('app_admin_purchase_orders') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+{% if suppliers is empty %}
+  <div class="empty">
+    <strong>No suppliers yet</strong>
+    {% if is_granted('ROLE_ADMIN') %}
+      Open the supplier's contact in <a href="{{ path('app_admin_users') }}" class="admin-table__link">People</a> (or add them), edit it and tick <em>Supplier</em>.
+    {% else %}
+      Ask an admin to tick <em>Supplier</em> on the supplier's contact in People.
+    {% endif %}
+  </div>
+{% else %}
+  <form method="post" action="{{ path('app_admin_purchase_order_new') }}" novalidate>
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_purchase_order_new') }}">
+
+    <div class="card">
+      <div class="form-group">
+        <label for="supplierId">Supplier</label>
+        {% set chosen = app.request.request.get('supplierId', selectedSupplierId) %}
+        <select id="supplierId" name="supplierId" class="form-control" required>
+          <option value="">Choose a supplier…</option>
+          {% for supplier in suppliers %}
+            <option value="{{ supplier.id }}"{{ chosen == supplier.id ? ' selected' : '' }}>{{ supplier.supplierName }}</option>
+          {% endfor %}
+        </select>
+        <p style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">
+          Suppliers are contacts in People with <em>Supplier</em> ticked{{ is_granted('ROLE_ADMIN') ? '' : ' (by an admin)' }}.
+        </p>
+      </div>
+      <div class="detail-grid">
+        <div class="form-group">
+          <label for="supplierReference">Their quote or order reference</label>
+          <input type="text" id="supplierReference" name="supplierReference" class="form-control" maxlength="100"
+                 value="{{ app.request.request.get('supplierReference') }}" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="expectedAt">Expected delivery</label>
+          <input type="date" id="expectedAt" name="expectedAt" class="form-control" value="{{ app.request.request.get('expectedAt') }}">
+        </div>
+      </div>
+      <div class="detail-grid">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="deliveryCharge">Delivery charge (£, net)</label>
+          <input type="number" id="deliveryCharge" name="deliveryCharge" class="form-control" step="0.01" min="0"
+                 value="{{ app.request.request.get('deliveryCharge', '0.00') }}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="deliveryVatCode">Delivery VAT</label>
+          {% set chosenVat = app.request.request.get('deliveryVatCode', 'standard') %}
+          <select id="deliveryVatCode" name="deliveryVatCode" class="form-control">
+            {% for code, label in vatLabels %}
+              <option value="{{ code }}"{{ chosenVat == code ? ' selected' : '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--teal">Create draft</button>
+      <a href="{{ path('app_admin_purchase_orders') }}" class="btn btn--ghost">Cancel</a>
+    </div>
+  </form>
+{% endif %}
+{% endblock %}

@@ -2,6 +2,7 @@
 
 namespace App\Twig;
 
+use App\Repository\PurchaseOrderRepository;
 use App\Service\AvatarUploader;
 use App\Service\ProductImageUploader;
 use App\Service\UkPhoneFormatter;
@@ -19,6 +20,7 @@ class AppExtension extends AbstractExtension
         private readonly UkPhoneFormatter $ukPhoneFormatter,
         private readonly AvatarUploader $avatarUploader,
         private readonly ProductImageUploader $productImageUploader,
+        private readonly PurchaseOrderRepository $purchaseOrderRepository,
     ) {}
 
     public function getFunctions(): array
@@ -27,6 +29,7 @@ class AppExtension extends AbstractExtension
             new TwigFunction('unsubscribe_url', $this->unsubscribeUrl(...)),
             new TwigFunction('avatar_url', $this->avatarUploader->getUrl(...)),
             new TwigFunction('product_image_url', $this->productImageUploader->getUrl(...)),
+            new TwigFunction('purchase_orders_awaiting_approval', $this->purchaseOrderRepository->countAwaitingApproval(...)),
         ];
     }
 

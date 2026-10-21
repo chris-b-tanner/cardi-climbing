@@ -1,0 +1,69 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Spend report — Purchasing{% endblock %}
+
+{% macro spend_table(title, rows, total, formatKey) %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">{{ title }}</div>
+    {% if rows is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;margin:0;">Nothing in this period.</p>
+    {% else %}
+      <div class="table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th style="text-align:right;">Net</th>
+              <th style="text-align:right;">Gross</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for key, amounts in rows %}
+              <tr>
+                <td>{{ formatKey == 'month' ? (key ~ '-01')|date('M Y') : key }}</td>
+                <td class="admin-table__muted" style="text-align:right;">£{{ amounts.net|number_format(2, '.', ',') }}</td>
+                <td class="admin-table__muted" style="text-align:right;">£{{ amounts.gross|number_format(2, '.', ',') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th style="text-align:right;">£{{ total.net|number_format(2, '.', ',') }}</th>
+              <th style="text-align:right;">£{{ total.gross|number_format(2, '.', ',') }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+{% import _self as spend %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_purchase_orders') }}" class="page-header__crumb">Purchasing</a> &raquo; Spend report</h1>
+  <a href="{{ path('app_admin_purchase_orders_spend_export', {from: from|date('Y-m-d'), to: to|date('Y-m-d'), supplier: supplierId}) }}" class="btn btn--ghost btn--sm">Export CSV</a>
+</div>
+
+<form method="get" action="{{ path('app_admin_purchase_orders_spend') }}" class="filter-form">
+  <input type="date" name="from" value="{{ from|date('Y-m-d') }}" aria-label="From">
+  <input type="date" name="to" value="{{ to|date('Y-m-d') }}" aria-label="To">
+  <select name="supplier" aria-label="Filter by supplier">
+    <option value="">All suppliers</option>
+    {% for supplier in suppliers %}
+      <option value="{{ supplier.id }}"{{ supplierId == supplier.id ? ' selected' : '' }}>{{ supplier.supplierName }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn--ghost btn--sm">Show</button>
+</form>
+
+<p style="font-size:0.8rem;color:var(--muted);margin:0;">
+  {{ report.count }} approved order{{ report.count == 1 ? '' : 's' }} between {{ from|date('d M Y') }} and {{ to|date('d M Y') }},
+  counted by the date each was approved. Cancelled orders and unapproved drafts aren't included. Stock bought to sell is shown as one
+  "{{ constant('App\\Entity\\PurchaseOrderLine::STOCK_CATEGORY_LABEL') }}" category.
+</p>
+
+{{ spend.spend_table('By category', report.byCategory, report.total, 'category') }}
+{{ spend.spend_table('By supplier', report.bySupplier, report.total, 'supplier') }}
+{{ spend.spend_table('By month', report.byMonth, report.total, 'month') }}
+{% endblock %}

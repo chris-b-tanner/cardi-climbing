@@ -110,6 +110,17 @@
           alarm for a few seconds. Leave blank for everyone else.
         </p>
       </div>
+      <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-weight:normal;text-transform:none;">
+          <input type="checkbox" id="isSupplier" name="isSupplier" value="1"{{ user.supplier ? ' checked' : '' }} style="width:auto;">
+          Supplier — we buy from them on purchase orders
+        </label>
+        <div id="supplier-fields" style="margin-top:0.6rem;{{ user.supplier ? '' : 'display:none;' }}">
+          <label for="supplierAccountReference">Our account number with them</label>
+          <input type="text" id="supplierAccountReference" name="supplierAccountReference" class="form-control"
+                 value="{{ user.supplierAccountReference }}" maxlength="100" autocomplete="off" style="max-width:16rem;">
+        </div>
+      </div>
     {% endif %}
   </div>
 
@@ -240,6 +251,14 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  (function () {
+    const box    = document.getElementById('isSupplier');
+    const fields = document.getElementById('supplier-fields');
+    if (!box || !fields) return; // not an admin
+    box.addEventListener('change', () => { fields.style.display = box.checked ? '' : 'none'; });
+  })();
+</script>
 {% include 'admin/users/_contact_validation.html.twig' with {formId: 'edit-member-form'} %}
 <script>
   (function () {

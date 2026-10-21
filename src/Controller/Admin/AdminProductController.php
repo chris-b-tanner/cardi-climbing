@@ -16,6 +16,8 @@ use App\Repository\EventRepository;
 use App\Repository\MembershipTypeRepository;
 use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
+use App\Repository\PurchaseOrderLineRepository;
+use App\Repository\PurchaseOrderReceiptRepository;
 use App\Repository\StockProductRepository;
 use App\Service\ProductImageUploader;
 use Doctrine\ORM\EntityManagerInterface;
@@ -130,6 +132,8 @@ class AdminProductController extends AbstractController
         EventRepository $eventRepository,
         NoteRepository $noteRepository,
         EntityManagerInterface $em,
+        PurchaseOrderLineRepository $purchaseOrderLineRepository,
+        PurchaseOrderReceiptRepository $purchaseOrderReceiptRepository,
     ): Response {
         $error = null;
 
@@ -165,6 +169,8 @@ class AdminProductController extends AbstractController
             'membershipTypes' => $membershipTypeRepository->findBy([], ['name' => 'ASC']),
             'events'          => $eventRepository->findAllOrdered(),
             'notes'           => $noteRepository->findForNoteable(Note::TYPE_PRODUCT, $product->getId()),
+            'onOrder'         => $product->getStockProduct() ? $purchaseOrderLineRepository->findOnOrder($product->getStockProduct()) : [],
+            'purchases'       => $product->getStockProduct() ? $purchaseOrderReceiptRepository->findForStockProduct($product->getStockProduct()) : [],
         ]);
     }
 
@@ -223,11 +229,16 @@ class AdminProductController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'app_admin_settings_product_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, Product $product, EntityManagerInterface $em, NoteRepository $noteRepository): Response
+    public function delete(Request $request, Product $product, EntityManagerInterface $em, NoteRepository $noteRepository, PurchaseOrderLineRepository $purchaseOrderLineRepository): Response
     {
         if (!$this->isCsrfTokenValid('admin_product_delete_' . $product->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
             return $this->redirectToRoute('app_home');
+        }
+
+        if ($product->getStockProduct() && $purchaseOrderLineRepository->existsForStockProduct($product->getStockProduct())) {
+            $this->addFlash('error', 'This product is on purchase orders, so it can\'t be deleted — make it inactive instead.');
+            return $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $product->getId()]);
         }
 
         $pinnedCount = $noteRepository->countPinnedFor(Note::TYPE_PRODUCT, $product->getId());

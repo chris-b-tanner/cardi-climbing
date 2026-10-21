@@ -1,0 +1,612 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}{{ po.number }} — Purchasing{% endblock %}
+
+{% set vatLabels      = constant('App\\Entity\\Product::VAT_LABELS') %}
+{% set categoryLabels = constant('App\\Entity\\PurchaseOrderLine::CATEGORY_LABELS') %}
+{% set isAdmin        = is_granted('ROLE_ADMIN') %}
+{% set isRaiser       = po.createdBy and po.createdBy == app.user %}
+{% set editable       = po.editable %}
+{% set closed         = po.status in ['received', 'cancelled'] %}
+{% set showReceived   = po.status in ['ordered', 'part_received', 'received'] %}
+{% set costEditable   = isAdmin and po.status in ['approved', 'ordered', 'part_received'] %}
+{% set linesToken     = csrf_token('admin_po_lines_' ~ po.id) %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <a href="{{ path('app_admin_purchase_orders') }}" class="page-header__crumb">Purchasing</a> &raquo; {{ po.number }}
+    <span style="font-size:0.7rem;vertical-align:middle;margin-left:0.4rem;">{% include 'admin/purchase_orders/_status_pill.html.twig' %}</span>
+  </h1>
+  <a href="{{ path('app_admin_purchase_order_pdf', {id: po.id}) }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+</div>
+
+{% if po.status == 'cancelled' %}
+  <div class="flash flash--error">
+    Cancelled {{ po.cancelledAt|date('d M Y') }}{% if po.cancelledBy %} by {{ po.cancelledBy.displayName }}{% endif %}: {{ po.cancelReason }}
+  </div>
+{% endif %}
+
+<div class="member-columns member-columns--two-thirds">
+<div>
+
+{# ── Summary ─────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Supplier</div>
+      <div class="card__value">
+        <a href="{{ path('app_admin_user_show', {id: po.supplier.id}) }}" class="admin-table__link">{{ po.supplier.supplierName }}</a>
+        {% if po.supplier.supplierAccountReference %}<div style="font-size:0.75rem;color:var(--muted);">Account {{ po.supplier.supplierAccountReference }}</div>{% endif %}
+        {% if po.supplier.email %}<div style="font-size:0.75rem;color:var(--muted);">{{ po.supplier.email }}</div>{% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Their reference</div>
+      <div class="card__value">{{ po.supplierReference ?: '—' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Expected delivery</div>
+      <div class="card__value"{% if po.overdue %} style="color:var(--red);font-weight:600;"{% endif %}>
+        {{ po.expectedAt ? po.expectedAt|date('d M Y') : '—' }}{% if po.overdue %} (overdue){% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Total</div>
+      <div class="card__value">£{{ po.grossTotal }} <span style="color:var(--muted);">inc VAT</span></div>
+    </div>
+  </div>
+
+  <div class="card__label" style="margin:1rem 0 0.4rem;">History</div>
+  <ul class="po-history">
+    <li>Raised {{ po.createdAt|date('d M Y, H:i') }}{% if po.createdBy %} by {{ po.createdBy.displayName }}{% endif %}</li>
+    {% if po.submittedAt %}<li>Submitted {{ po.submittedAt|date('d M Y, H:i') }}{% if po.submittedBy %} by {{ po.submittedBy.displayName }}{% endif %}</li>{% endif %}
+    {% if po.approvedAt %}<li>Approved {{ po.approvedAt|date('d M Y, H:i') }}{% if po.approvedBy %} by {{ po.approvedBy.displayName }}{% endif %}</li>{% endif %}
+    {% if po.orderedAt %}<li>Ordered {{ po.orderedAt|date('d M Y, H:i') }}{% if po.orderedBy %} by {{ po.orderedBy.displayName }}{% endif %}</li>{% endif %}
+    {% for receipt in po.receipts|slice(0, 1) %}<li>Last delivery {{ receipt.receivedAt|date('d M Y') }}</li>{% endfor %}
+  </ul>
+</div>
+
+{# ── Actions for the current status ─────────────────────────────────── #}
+{% if not closed %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Next step</div>
+
+    {% if po.status == 'draft' %}
+      {% if po.lines is empty %}
+        <p style="font-size:0.875rem;color:var(--muted);margin:0;">Add what you're ordering below, then submit it for approval.</p>
+      {% else %}
+        <div class="btn-row">
+          <form method="post" action="{{ path('app_admin_purchase_order_submit', {id: po.id}) }}" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_submit_' ~ po.id) }}">
+            <button type="submit" class="btn btn--teal btn--sm">Submit for approval</button>
+          </form>
+          {% if isAdmin and isRaiser %}
+            <form method="post" action="{{ path('app_admin_purchase_order_submit', {id: po.id}) }}" style="display:inline;">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_submit_' ~ po.id) }}">
+              <input type="hidden" name="approve" value="1">
+              <button type="submit" class="btn btn--ghost btn--sm">Submit and approve</button>
+            </form>
+          {% endif %}
+        </div>
+        <p style="font-size:0.75rem;color:var(--muted);margin:0.5rem 0 0;">Every order needs an admin's approval before it's placed.</p>
+      {% endif %}
+
+    {% elseif po.status == 'submitted' %}
+      {% if isAdmin %}
+        <div class="btn-row" style="margin-bottom:0.75rem;">
+          <form method="post" action="{{ path('app_admin_purchase_order_approve', {id: po.id}) }}" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_approve_' ~ po.id) }}">
+            <button type="submit" class="btn btn--teal btn--sm">Approve</button>
+          </form>
+        </div>
+        <details class="po-action">
+          <summary>Reject…</summary>
+          <form method="post" action="{{ path('app_admin_purchase_order_reject', {id: po.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_reject_' ~ po.id) }}">
+            <div class="form-group">
+              <label for="reject-reason">Why? (sent to {{ po.createdBy ? po.createdBy.displayName : 'whoever raised it' }})</label>
+              <textarea id="reject-reason" name="reason" class="form-control" rows="2" required></textarea>
+            </div>
+            <button type="submit" class="btn btn--danger btn--sm">Reject and send back</button>
+          </form>
+        </details>
+      {% else %}
+        <p style="font-size:0.875rem;color:var(--muted);margin:0 0 0.75rem;">Waiting for an admin to approve it.</p>
+      {% endif %}
+      {% if isRaiser or isAdmin %}
+        <form method="post" action="{{ path('app_admin_purchase_order_pull_back', {id: po.id}) }}" style="margin-top:0.75rem;">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_pull_back_' ~ po.id) }}">
+          <button type="submit" class="btn btn--ghost btn--sm">Pull back to draft to change it</button>
+        </form>
+      {% endif %}
+
+    {% elseif po.status == 'approved' %}
+      {% if isAdmin %}
+        <details class="po-action" open>
+          <summary>Email to supplier</summary>
+          <form method="post" action="{{ path('app_admin_purchase_order_email', {id: po.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_email_' ~ po.id) }}">
+            {% if po.supplier.email %}
+              <p style="font-size:0.8rem;color:var(--muted);margin:0 0 0.5rem;">Sends the PDF to {{ po.supplier.email }}, with replies to you, and marks it ordered.</p>
+              <div class="form-group">
+                <label for="email-message">Message (optional)</label>
+                <textarea id="email-message" name="message" class="form-control" rows="2"></textarea>
+              </div>
+              <button type="submit" class="btn btn--teal btn--sm">Send</button>
+            {% else %}
+              <p style="font-size:0.8rem;color:var(--muted);margin:0;">{{ po.supplier.supplierName }} has no email address. Add one to their contact, or place it another way and mark it ordered.</p>
+            {% endif %}
+          </form>
+        </details>
+        <details class="po-action">
+          <summary>Mark as ordered (phone, website…)</summary>
+          <form method="post" action="{{ path('app_admin_purchase_order_mark_ordered', {id: po.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_mark_ordered_' ~ po.id) }}">
+            <div class="form-group">
+              <label for="ordered-how">How (optional)</label>
+              <input type="text" id="ordered-how" name="how" class="form-control" maxlength="100" placeholder="e.g. by phone, on their website">
+            </div>
+            <div class="detail-grid">
+              <div class="form-group">
+                <label for="ordered-reference">Their order reference</label>
+                <input type="text" id="ordered-reference" name="supplierReference" class="form-control" maxlength="100" value="{{ po.supplierReference }}">
+              </div>
+              <div class="form-group">
+                <label for="ordered-expected">Expected delivery</label>
+                <input type="date" id="ordered-expected" name="expectedAt" class="form-control" value="{{ po.expectedAt ? po.expectedAt|date('Y-m-d') : '' }}">
+              </div>
+            </div>
+            <button type="submit" class="btn btn--teal btn--sm">Mark as ordered</button>
+          </form>
+        </details>
+      {% else %}
+        <p style="font-size:0.875rem;color:var(--muted);margin:0;">Approved — an admin will place it with the supplier.</p>
+      {% endif %}
+
+    {% elseif po.awaitingDelivery %}
+      <a href="{{ path('app_admin_purchase_order_receive', {id: po.id}) }}" class="btn btn--teal btn--sm">Receive delivery</a>
+      {% if isAdmin and po.status == 'ordered' and po.supplier.email %}
+        <details class="po-action" style="margin-top:0.75rem;">
+          <summary>Email to supplier again</summary>
+          <form method="post" action="{{ path('app_admin_purchase_order_email', {id: po.id}) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_email_' ~ po.id) }}">
+            <div class="form-group">
+              <label for="email-again-message">Message (optional)</label>
+              <textarea id="email-again-message" name="message" class="form-control" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn--ghost btn--sm">Send to {{ po.supplier.email }}</button>
+          </form>
+        </details>
+      {% endif %}
+    {% endif %}
+
+    {% if isAdmin and po.cancellable %}
+      <details class="po-action" style="margin-top:1rem;border-top:1px solid var(--border);padding-top:0.75rem;">
+        <summary>Cancel this order…</summary>
+        <form method="post" action="{{ path('app_admin_purchase_order_cancel', {id: po.id}) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_cancel_' ~ po.id) }}">
+          <div class="form-group">
+            <label for="cancel-reason">Reason</label>
+            <input type="text" id="cancel-reason" name="reason" class="form-control" maxlength="255" required>
+          </div>
+          <button type="submit" class="btn btn--danger btn--sm">Cancel order</button>
+        </form>
+      </details>
+    {% endif %}
+  </div>
+{% endif %}
+
+{# ── Lines ───────────────────────────────────────────────────────────── #}
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Lines <span style="text-transform:none;letter-spacing:0;font-weight:normal;">(prices net of VAT)</span></div>
+
+  {% if po.lines is empty %}
+    <p style="color:var(--muted);font-size:0.875rem;">Nothing on this order yet.</p>
+  {% else %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right;">Qty</th>
+            {% if showReceived %}<th style="text-align:right;">Received</th>{% endif %}
+            <th style="text-align:right;">Unit</th>
+            <th>VAT</th>
+            <th style="text-align:right;">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in po.lines %}
+            <tr>
+              <td data-label="Item">
+                {% if line.stockLine %}
+                  <a href="{{ path('app_admin_settings_product_edit', {id: line.stockProduct.product.id}) }}" class="admin-table__link">{{ line.description }}</a>
+                  <div style="font-size:0.72rem;color:var(--muted);">Stock &middot; SKU {{ line.stockProduct.sku }}</div>
+                {% else %}
+                  {{ line.description }}
+                  <div style="font-size:0.72rem;color:var(--muted);">{{ line.categoryLabel }}</div>
+                {% endif %}
+                {% if line.supplierCode %}<div style="font-size:0.72rem;color:var(--muted);">Their code {{ line.supplierCode }}</div>{% endif %}
+
+                {% if editable %}
+                  <details class="po-line-edit">
+                    <summary>Edit</summary>
+                    <form method="post" action="{{ path('app_admin_purchase_order_line_update', {id: po.id, lineId: line.id}) }}">
+                      <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+                      {% if not line.stockLine %}
+                        <div class="form-group">
+                          <label>Description</label>
+                          <input type="text" name="description" class="form-control" maxlength="255" value="{{ line.description }}" required>
+                        </div>
+                        <div class="form-group">
+                          <label>Category</label>
+                          <select name="category" class="form-control">
+                            {% for key, label in categoryLabels %}
+                              <option value="{{ key }}"{{ line.category == key ? ' selected' : '' }}>{{ label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      {% endif %}
+                      <div class="detail-grid">
+                        <div class="form-group">
+                          <label>Qty</label>
+                          <input type="number" name="qty" class="form-control" min="1" step="1" value="{{ line.qty }}" required>
+                        </div>
+                        <div class="form-group">
+                          <label>Unit cost (£, net)</label>
+                          <input type="number" name="unitCost" class="form-control" min="0" step="0.01" value="{{ line.unitCost }}" required>
+                        </div>
+                        <div class="form-group">
+                          <label>VAT</label>
+                          <select name="vatCode" class="form-control">
+                            {% for code, label in vatLabels %}
+                              <option value="{{ code }}"{{ line.vatCode == code ? ' selected' : '' }}>{{ label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="form-group">
+                          <label>Their code</label>
+                          <input type="text" name="supplierCode" class="form-control" maxlength="100" value="{{ line.supplierCode }}">
+                        </div>
+                      </div>
+                      <div class="btn-row">
+                        <button type="submit" class="btn btn--teal btn--sm">Save</button>
+                      </div>
+                    </form>
+                    <form method="post" action="{{ path('app_admin_purchase_order_line_remove', {id: po.id, lineId: line.id}) }}" onsubmit="return confirm('Remove this line?');" style="margin-top:0.5rem;">
+                      <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+                      <button type="submit" class="btn btn--ghost btn--sm">Remove line</button>
+                    </form>
+                  </details>
+                {% elseif costEditable and line.receipts is empty %}
+                  <details class="po-line-edit">
+                    <summary>Change cost</summary>
+                    <form method="post" action="{{ path('app_admin_purchase_order_line_cost', {id: po.id, lineId: line.id}) }}">
+                      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_line_cost_' ~ po.id) }}">
+                      <div class="form-group">
+                        <label>New unit cost (£, net)</label>
+                        <input type="number" name="unitCost" class="form-control" min="0" step="0.01" value="{{ line.unitCost }}" required>
+                      </div>
+                      <div class="form-group">
+                        <label>Reason (required)</label>
+                        <input type="text" name="reason" class="form-control" maxlength="200" placeholder="e.g. price rise on their invoice" required>
+                      </div>
+                      <button type="submit" class="btn btn--teal btn--sm">Change cost</button>
+                    </form>
+                  </details>
+                {% endif %}
+              </td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Qty">{{ line.qty }}</td>
+              {% if showReceived %}
+                <td style="text-align:right;{{ line.qtyOutstanding == 0 ? 'color:var(--green);' : '' }}" data-label="Received">{{ line.qtyReceived }}</td>
+              {% endif %}
+              <td class="admin-table__muted" style="text-align:right;" data-label="Unit">£{{ line.unitCost }}</td>
+              <td class="admin-table__muted" data-label="VAT">{{ line.vatCodeLabel }}</td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Net">£{{ line.netTotal }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <table class="po-totals">
+    {% if po.deliveryCharge > 0 %}<tr><td>Delivery ({{ vatLabels[po.deliveryVatCode]|lower }})</td><td>£{{ po.deliveryCharge }}</td></tr>{% endif %}
+    <tr><td>Net</td><td>£{{ po.netTotal }}</td></tr>
+    <tr><td>VAT</td><td>£{{ po.vatTotal }}</td></tr>
+    <tr class="po-totals__grand"><td>Total</td><td>£{{ po.grossTotal }}</td></tr>
+  </table>
+
+  {% if editable %}
+    <div style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
+      <div class="pos-tabs" id="add-line-tabs" style="margin-bottom:0.75rem;">
+        <button type="button" class="pos-tab is-active" data-panel="stock">Add stock item</button>
+        <button type="button" class="pos-tab" data-panel="nonstock">Add other item</button>
+      </div>
+
+      <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" data-add-panel="stock" novalidate>
+        <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+        <input type="hidden" name="kind" value="stock">
+        {% if stockProducts is empty %}
+          <p style="font-size:0.875rem;color:var(--muted);margin:0;">There are no stock products yet. Add them under Settings &raquo; Products, or use "Add other item".</p>
+        {% else %}
+          <div class="form-group">
+            <label for="stock-filter">Product</label>
+            <input type="search" id="stock-filter" class="form-control" placeholder="Filter by name or SKU…" autocomplete="off" style="margin-bottom:0.4rem;">
+            <select id="stock-product" name="productId" class="form-control" size="6" required>
+              {% for product in stockProducts %}
+                {% set sp = product.stockProduct %}
+                {% if sp %}
+                  <option value="{{ product.id }}" data-cost="{{ sp.costPrice }}" data-vat="{{ product.vatCode }}"
+                          data-search="{{ (product.name ~ ' ' ~ product.variantValue ~ ' ' ~ sp.sku)|lower }}">
+                    {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %} — {{ sp.sku }} — {{ sp.currentStock }} in stock{% if not product.isActive %} — inactive{% endif %}
+                  </option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="detail-grid">
+            <div class="form-group">
+              <label for="stock-qty">Qty</label>
+              <input type="number" id="stock-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
+            </div>
+            <div class="form-group">
+              <label for="stock-cost">Unit cost (£, net)</label>
+              <input type="number" id="stock-cost" name="unitCost" class="form-control" min="0" step="0.01" placeholder="Current average cost">
+            </div>
+            <div class="form-group">
+              <label for="stock-vat">VAT</label>
+              <select id="stock-vat" name="vatCode" class="form-control">
+                {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="stock-code">Their code</label>
+              <input type="text" id="stock-code" name="supplierCode" class="form-control" maxlength="100">
+            </div>
+          </div>
+          <button type="submit" class="btn btn--teal btn--sm">Add line</button>
+        {% endif %}
+      </form>
+
+      <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" data-add-panel="nonstock" style="display:none;" novalidate>
+        <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+        <input type="hidden" name="kind" value="nonstock">
+        <div class="form-group">
+          <label for="ns-description">Description</label>
+          <input type="text" id="ns-description" name="description" class="form-control" maxlength="255" placeholder="e.g. Large volumes set, 5 pcs" required>
+        </div>
+        <div class="detail-grid">
+          <div class="form-group">
+            <label for="ns-category">Category</label>
+            <select id="ns-category" name="category" class="form-control">
+              {% for key, label in categoryLabels %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ns-qty">Qty</label>
+            <input type="number" id="ns-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label for="ns-cost">Unit cost (£, net)</label>
+            <input type="number" id="ns-cost" name="unitCost" class="form-control" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="ns-vat">VAT</label>
+            <select id="ns-vat" name="vatCode" class="form-control">
+              {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="ns-code">Their code</label>
+          <input type="text" id="ns-code" name="supplierCode" class="form-control" maxlength="100">
+        </div>
+        <button type="submit" class="btn btn--teal btn--sm">Add line</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+
+{# ── Details (header fields) ─────────────────────────────────────────── #}
+{% if not closed %}
+  <div class="card" style="margin-top:1.25rem;">
+    <details{% if editable %} open{% endif %}>
+      <summary class="card__label" style="cursor:pointer;">Order details</summary>
+      <form method="post" action="{{ path('app_admin_purchase_order_details', {id: po.id}) }}" style="margin-top:0.75rem;" novalidate>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_details_' ~ po.id) }}">
+        {% if editable %}
+          <div class="form-group">
+            <label for="details-supplier">Supplier</label>
+            <select id="details-supplier" name="supplierId" class="form-control">
+              {% for supplier in suppliers %}
+                <option value="{{ supplier.id }}"{{ supplier == po.supplier ? ' selected' : '' }}>{{ supplier.supplierName }}</option>
+              {% endfor %}
+              {% if po.supplier not in suppliers %}<option value="{{ po.supplier.id }}" selected>{{ po.supplier.supplierName }} (no longer a supplier)</option>{% endif %}
+            </select>
+          </div>
+        {% endif %}
+        <div class="detail-grid">
+          <div class="form-group">
+            <label for="details-reference">Their reference</label>
+            <input type="text" id="details-reference" name="supplierReference" class="form-control" maxlength="100" value="{{ po.supplierReference }}">
+          </div>
+          <div class="form-group">
+            <label for="details-expected">Expected delivery</label>
+            <input type="date" id="details-expected" name="expectedAt" class="form-control" value="{{ po.expectedAt ? po.expectedAt|date('Y-m-d') : '' }}">
+          </div>
+          {% if editable %}
+            <div class="form-group">
+              <label for="details-delivery">Delivery charge (£, net)</label>
+              <input type="number" id="details-delivery" name="deliveryCharge" class="form-control" min="0" step="0.01" value="{{ po.deliveryCharge }}">
+            </div>
+            <div class="form-group">
+              <label for="details-delivery-vat">Delivery VAT</label>
+              <select id="details-delivery-vat" name="deliveryVatCode" class="form-control">
+                {% for code, label in vatLabels %}
+                  <option value="{{ code }}"{{ po.deliveryVatCode == code ? ' selected' : '' }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn--ghost btn--sm">Save details</button>
+      </form>
+    </details>
+  </div>
+{% endif %}
+
+{# ── Deliveries ──────────────────────────────────────────────────────── #}
+{% set receipts = po.receipts %}
+{% if receipts is not empty %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Deliveries</div>
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Item</th>
+            <th style="text-align:right;">Qty</th>
+            <th>By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for receipt in receipts %}
+            <tr>
+              <td class="admin-table__muted" data-label="Date">{{ receipt.receivedAt|date('d M Y') }}</td>
+              <td data-label="Item">
+                {{ receipt.line.description }}
+                {% if receipt.note %}<div style="font-size:0.72rem;color:var(--muted);">{{ receipt.note }}</div>{% endif %}
+              </td>
+              <td class="admin-table__muted" style="text-align:right;" data-label="Qty">{{ receipt.qty }}</td>
+              <td class="admin-table__muted" data-label="By">{{ receipt.receivedBy ? receipt.receivedBy.displayName : '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+{# ── Invoices ────────────────────────────────────────────────────────── #}
+{% if po.status not in ['draft', 'submitted'] %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Supplier invoices</div>
+    {% if po.invoices is empty %}
+      <p style="color:var(--muted);font-size:0.875rem;">No invoices uploaded yet.</p>
+    {% else %}
+      <div class="table-scroll" style="margin-bottom:1rem;">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Date</th>
+              <th>Uploaded</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in po.invoices %}
+              <tr>
+                <td data-label="Invoice">
+                  <a href="{{ path('app_admin_purchase_order_invoice_download', {id: po.id, invoiceId: invoice.id}) }}" class="admin-table__link">{{ invoice.invoiceNumber ?: invoice.originalFilename }}</a>
+                  <div style="font-size:0.72rem;color:var(--muted);">{{ invoice.formattedSize }}</div>
+                </td>
+                <td class="admin-table__muted" data-label="Date">{{ invoice.invoiceDate ? invoice.invoiceDate|date('d M Y') : '—' }}</td>
+                <td class="admin-table__muted" data-label="Uploaded">
+                  {{ invoice.uploadedAt|date('d M Y') }}{% if invoice.uploadedBy %} &middot; {{ invoice.uploadedBy.displayName }}{% endif %}
+                </td>
+                <td>
+                  {% if isAdmin %}
+                    <form method="post" action="{{ path('app_admin_purchase_order_invoice_delete', {id: po.id, invoiceId: invoice.id}) }}" onsubmit="return confirm('Remove this invoice?');" style="display:inline;">
+                      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_invoice_delete_' ~ invoice.id) }}">
+                      <button type="submit" class="btn btn--ghost btn--sm">Delete</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    <form method="post" action="{{ path('app_admin_purchase_order_invoice_upload', {id: po.id}) }}" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_invoice_upload_' ~ po.id) }}">
+        <div class="detail-grid">
+          <div class="form-group">
+            <label for="invoice-number">Invoice number</label>
+            <input type="text" id="invoice-number" name="invoiceNumber" class="form-control" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label for="invoice-date">Invoice date</label>
+            <input type="date" id="invoice-date" name="invoiceDate" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="invoice-file">File (PDF or photo, up to 15MB)</label>
+          <input type="file" id="invoice-file" name="file" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn--ghost btn--sm">Upload invoice</button>
+      </form>
+  </div>
+{% endif %}
+
+</div>
+<div>
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.6rem;">Notes and history</div>
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'purchase_order', noteableId: po.id} %}
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .po-history { list-style: none; margin: 0; padding: 0; font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
+  .po-action { margin-bottom: 0.6rem; }
+  .po-action > summary, .po-line-edit > summary {
+    cursor: pointer; font-size: 0.85rem; color: var(--teal-dk); font-weight: 600; margin-bottom: 0.5rem;
+  }
+  .po-line-edit { margin-top: 0.4rem; }
+  .po-line-edit > summary { font-size: 0.75rem; font-weight: normal; margin-bottom: 0.4rem; }
+  .po-line-edit form { margin-top: 0.4rem; }
+  .po-totals { margin: 0.75rem 0 0 auto; border-collapse: collapse; font-size: 0.875rem; }
+  .po-totals td { padding: 0.2rem 0 0.2rem 1.5rem; text-align: right; color: var(--muted); }
+  .po-totals__grand td { color: var(--black); font-weight: 700; border-top: 1px solid var(--border); padding-top: 0.4rem; }
+</style>
+<script>
+  (function () {
+    const tabs = document.querySelectorAll('#add-line-tabs .pos-tab');
+    if (!tabs.length) return; // not a draft
+
+    tabs.forEach(tab => tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      document.querySelectorAll('[data-add-panel]').forEach(panel => {
+        panel.style.display = panel.dataset.addPanel === tab.dataset.panel ? '' : 'none';
+      });
+    }));
+
+    // Stock product picker: filter the list as you type, and suggest the product's VAT rate and
+    // current average cost when one's picked.
+    const filter  = document.getElementById('stock-filter');
+    const select  = document.getElementById('stock-product');
+    const cost    = document.getElementById('stock-cost');
+    const vat     = document.getElementById('stock-vat');
+    if (!filter || !select) return;
+
+    filter.addEventListener('input', () => {
+      const q = filter.value.trim().toLowerCase();
+      [...select.options].forEach(opt => { opt.hidden = q !== '' && !opt.dataset.search.includes(q); });
+    });
+
+    select.addEventListener('change', () => {
+      const opt = select.selectedOptions[0];
+      if (!opt) return;
+      cost.placeholder = 'Average cost £' + opt.dataset.cost;
+      vat.value = opt.dataset.vat;
+    });
+  })();
+</script>
+{% endblock %}

@@ -65,6 +65,9 @@
                     <a href="{{ path('app_admin_user_show', {id: user.id}) }}#family" class="family-icon"
                        title="Has dependents"><i class="bi bi-people-fill"></i></a>
                   {% endif %}
+                  {% if user.supplier %}
+                    <span class="status-pill status-pill--waiting" style="font-size:0.62rem;margin-left:0.25rem;vertical-align:middle;">Supplier</span>
+                  {% endif %}
                   {% if hasName and user.company %}
                     <div class="admin-table__muted" style="font-size:0.78rem;">{{ user.company }}</div>
                   {% endif %}

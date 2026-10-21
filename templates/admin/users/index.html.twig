@@ -29,6 +29,10 @@
     <input type="checkbox" id="show-memo"{% if currentHasMemo %} checked{% endif %} style="width:1rem;height:1rem;accent-color:var(--teal);">
     Show memo
   </label>
+  <label class="people-supplier-toggle" style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--muted);white-space:nowrap;">
+    <input type="checkbox" id="suppliers-only"{% if currentSuppliersOnly %} checked{% endif %} style="width:1rem;height:1rem;accent-color:var(--teal);">
+    Suppliers
+  </label>
   <select id="search-tag" aria-label="Filter by tag">
     <option value="">All tags</option>
     {% for tag in tags %}
@@ -112,6 +116,7 @@
 <script>
   const searchInput   = document.getElementById('search-q');
   const showMemoCheck = document.getElementById('show-memo');
+  const suppliersOnlyCheck = document.getElementById('suppliers-only');
   const tagSelect     = document.getElementById('search-tag');
   const assignedToSelect = document.getElementById('search-assigned-to');
   const tagDescBox    = document.getElementById('tag-description');
@@ -195,6 +200,7 @@
     if (tagSelect.value)   params.set('tag', tagSelect.value);
     if (assignedToSelect.value) params.set('assignedTo', assignedToSelect.value);
     if (showMemoCheck.checked) params.set('hasMemo', '1');
+    if (suppliersOnlyCheck.checked) params.set('suppliers', '1');
     if (currentSort !== 'name') params.set('sort', currentSort);
     if (currentDir !== 'asc')   params.set('dir', currentDir);
     if (context) params.set('context', context);
@@ -241,6 +247,7 @@
   updateTagDescription();
 
   assignedToSelect.addEventListener('change', fetchResults);
+  suppliersOnlyCheck.addEventListener('change', fetchResults);
 
   // Both a display toggle (reveals the memo column — `results` itself is never replaced, only its
   // innerHTML is, on each fetch, so the class survives without needing to be re-applied) and a

@@ -1,4 +1,4 @@
-# Purchase orders spec — not yet implemented
+# Purchase orders spec — built
 
 ## Goal
 
@@ -14,7 +14,7 @@ marked "(decided)", and **Out of scope** near the end lists what's deliberately 
 
 ## Approach in one paragraph
 
-A `PurchaseOrder` from a `Supplier` holds `PurchaseOrderLine`s. A line is either a **stock line**,
+A `PurchaseOrder` from a supplier (an existing `User` contact flagged as a supplier) holds `PurchaseOrderLine`s. A line is either a **stock line**,
 linked to a `StockProduct`, or a **non-stock line**: free text plus a spending category. Deliveries
 are recorded as `PurchaseOrderReceipt`s against lines, so a part delivery is just a receipt for
 less than the ordered quantity. For a stock line, each receipt also writes an `InventoryMovement`
@@ -31,7 +31,9 @@ system, as for safety checks, so none of that is rebuilt.
 - `InventoryMovement` already has `REASON_PURCHASE`, but nothing uses it. Stock only comes in
   through `AdminProductController`'s add/remove form (ROLE_ADMIN, note required), which records
   `REASON_ADJUSTMENT` at the product's current `costPrice`.
-- There's no supplier concept anywhere in the codebase.
+- There's no supplier concept anywhere in the codebase. But `User` is already a full contact
+  record (company, emails, phone, website, address, memo, files, tags, notes and email threads),
+  so suppliers are users with a flag rather than a new entity (decided; see Suppliers).
 - `Note` attaches to five record types (member, attendee, event, product, order) via
   `noteableType` + `noteableId`. `assets-spec.md` adds a sixth (`asset`) the same way; this adds
   another.
@@ -40,7 +42,8 @@ system, as for safety checks, so none of that is rebuilt.
 
 ## Concepts
 
-- **Supplier**: who we buy from. "Rockcity Holds", "Tiso", "Screwfix".
+- **Supplier**: who we buy from. "Rockcity Holds", "Tiso", "Screwfix". A `User` with
+  `isSupplier` ticked.
 - **Purchase order (PO)**: one order to one supplier, with a human-readable number
   (`PO-0001`).
 - **Line**: one thing on the order, with a quantity and a net unit cost. Either a stock line
@@ -50,26 +53,41 @@ system, as for safety checks, so none of that is rebuilt.
 
 ## Data model
 
-### `Supplier`
+### Suppliers: a flag on `User` (decided)
+
+There's no `Supplier` entity. A supplier is an ordinary contact in People with a **Supplier**
+checkbox ticked, so it gets everything a contact already has: company name, contact name, emails,
+phone, website, address, memo, files, tags, an assignee, watchers, and the notes panel with email
+threads (handy for chasing a delivery). Two new columns on `User`:
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | string(150) | |
-| `contactName` | ?string(150) | |
-| `email` | ?string(255) | Where the PO is emailed, if it's sent from the system (see Sending) |
-| `phone` | ?string(30) | Formatted with `UkPhoneFormatter` like other phone numbers |
-| `website` | ?string(255) | |
-| `accountReference` | ?string(100) | Our account number with them |
-| `notes` | ?text | Delivery quirks, minimum order, payment terms |
-| `active` | bool | Inactive suppliers drop out of the picker but keep their history |
-| `createdAt`, `createdBy` | | |
+| `isSupplier` | bool, default false | The checkbox on the contact's edit form. Shows the contact in the PO supplier picker. |
+| `supplierAccountReference` | ?string(100) | Our account number with them. Shown and edited only when `isSupplier` is ticked. |
+
+How the existing fields map:
+
+- **Name:** the picker and the PO show `company`, falling back to the person's name, the same as
+  `getDisplayNameWithCompany()`.
+- **Email:** the PO is emailed to the contact's main `email` (see Sending).
+- **Notes** (delivery quirks, minimum order, payment terms): the contact's memo and notes.
+- **Inactive:** untick the checkbox. They drop out of the supplier picker, and their existing POs
+  still link to them. A soft-deleted contact (`deletedAt`) keeps its POs the same way.
+
+**Bulk emails treat suppliers like anyone else** (decided). Ticking **Supplier** doesn't change
+`optIn`, and the bulk-email audiences don't look at `isSupplier`: an opted-in supplier gets bulk
+emails, and an opted-out one doesn't. New contacts are opted in by default, so untick opt-in on a
+supplier who shouldn't get newsletters.
+
+**People list:** a "Suppliers" filter next to the existing tag filter, and a small "Supplier"
+badge on the contact page and in search results.
 
 ### `PurchaseOrder`
 
 | Field | Type | Notes |
 |---|---|---|
 | `number` | string(20), unique | `PO-0001`, assigned when the order is first saved |
-| `supplier` | ManyToOne `Supplier` | |
+| `supplier` | ManyToOne `User` | Must have `isSupplier` set when the PO is created. Not cleared if the box is later unticked. |
 | `status` | string(20) | See Lifecycle |
 | `supplierReference` | ?string(100) | Their order or quote number |
 | `expectedAt` | ?date | Expected delivery date |
@@ -119,7 +137,7 @@ which already exists.
 ### Changes to existing entities
 
 - `InventoryMovement` gets nothing new: the receipt points at it. The movement's `reason` is
-  `purchase`, `netPrice` is the line's `unitCost`, `note` is `"{PO number} — {supplier}"`, and
+  `purchase`, `netPrice` is the line's `unitCost`, `note` is the PO number, and
   `createdBy` is whoever received it. Stock value therefore reflects the price actually paid, not
   whatever `costPrice` happened to be.
 - `StockProduct.costPrice` becomes a **weighted average cost**, updated on every receipt (see
@@ -219,7 +237,7 @@ Details:
   totals, the approver's name) rendered with Dompdf from a Twig template, the same way as
   `CertificationPdfGenerator`. Download it from the PO page whatever the supplier's ordering
   method.
-- **Email**: "Email to supplier" on an approved PO sends the PDF to `Supplier.email` with a short
+- **Email**: "Email to supplier" on an approved PO sends the PDF to the supplier contact's `email` with a short
   covering message, via a new `PurchaseOrderMailer` following the existing mailer pattern, and
   marks the PO `ordered`. The email is logged as a note on the PO, like other system emails.
 - Many orders will be placed on a supplier's website or over the phone. "Mark ordered" without
@@ -266,8 +284,8 @@ added later if needed.
 - **PO page:** status and history (raised, submitted, approved, ordered, received, each with who
   and when), lines with ordered and received quantities, totals, the action buttons for the
   current status, receipts, invoices, and the notes panel (`noteableType: 'purchase_order'`).
-- **Supplier pages:** under Settings, next to Products: list, create/edit, deactivate. Each
-  supplier page lists its POs.
+- **Supplier contact page:** no separate supplier pages. A supplier's contact page in People gets
+  a **Purchase orders** tab listing its POs, alongside its existing notes and files.
 - **Product page:** a stock product shows its open POs ("8 on order, due 4 Nov") and its purchase
   history.
 - **Spend report:** total spend by category, supplier and month, net and gross, with a CSV
@@ -282,7 +300,9 @@ Following the rule that only admins change money on sales orders:
 - **ROLE_TEAM:** create and edit draft POs, submit them, receive deliveries, upload invoices, add
   notes, view everything.
 - **ROLE_ADMIN:** everything the team can do, plus approve, reject, mark ordered, email to a
-  supplier, cancel, edit an approved line's cost, and manage suppliers.
+  supplier, cancel, and edit an approved line's cost.
+- **Supplier checkbox and account reference:** ROLE_ADMIN only, matching the rule that suppliers
+  are managed by admins. Anyone who can already edit a contact can still edit its other details.
 - **Every PO needs an admin's approval, whatever its value** (decided). There's no threshold below
   which a PO approves itself.
 - **An admin can approve their own PO** (decided). To save a pointless second step, an admin
@@ -306,7 +326,26 @@ Following the rule that only admins change money on sales orders:
 
 ## Build order
 
-1. `Supplier` entity and its settings pages.
+All seven steps are built (October 2026). Choices made while building:
+
+- **List tabs:** Awaiting approval, Drafts, Open, Received, Cancelled, All. Drafts got their own tab
+  so unsubmitted orders don't get lost. Admins land on Awaiting approval when anything is waiting.
+- **Spend report** counts each PO from the date it was **approved**, and leaves out cancelled orders
+  and unapproved drafts. It defaults to the calendar year to date. The CSV has one row per line, plus
+  one per delivery charge.
+- **VAT rates** for PO totals live in `Product::VAT_RATES` (standard 20%, reduced 5%, zero and
+  exempt 0%). Sales still don't break VAT out.
+- **The PDF** has our name, email and website but no delivery address, since none is stored in the
+  system yet.
+- **The supplier email** goes from the usual sending address with replies to the admin who sent it.
+- **Receipts** record the average cost after each delivery (`averageCostAfter`) for the cost
+  history on the product page.
+- A stock product that's on any PO can't be deleted (make it inactive instead), and a supplier with
+  POs can't be hard-deleted (archive instead). Merging contacts moves POs and assets to the
+  surviving contact.
+
+1. `User.isSupplier` and `supplierAccountReference`, the checkbox on the contact form, and the
+   People filter and badge.
 2. `PurchaseOrder` and `PurchaseOrderLine`, numbering, the draft editor with stock and non-stock
    lines, and the list page.
 3. Lifecycle: submit, approve, reject, mark ordered, cancel, with the approval task note and

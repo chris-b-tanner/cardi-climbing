@@ -63,14 +63,19 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     /**
      * @param 'id'|'name'|'email' $sort
      * @param ?int $assignedToId 0 means "unassigned"; null means no filter on assignment.
+     * @param bool $suppliersOnly only contacts flagged as suppliers (User::$isSupplier)
      */
-    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc', bool $hasMemo = false, ?int $assignedToId = null): array
+    public function search(string $query = '', ?int $tagId = null, ?int $limit = null, string $sort = 'name', string $dir = 'asc', bool $hasMemo = false, ?int $assignedToId = null, bool $suppliersOnly = false): array
     {
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.tags', 't')
             ->leftJoin('u.parent', 'p')
             ->addSelect('t')
             ->addSelect('p');
+
+        if ($suppliersOnly) {
+            $qb->andWhere('u.isSupplier = true');
+        }
 
         if ($hasMemo) {
             $qb->andWhere("u.memo IS NOT NULL AND u.memo != ''");
@@ -141,6 +146,20 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /** @return User[] Contacts flagged as suppliers (and not archived), by company or name — for the purchase order supplier picker. */
+    public function findSuppliers(): array
+    {
+        $suppliers = $this->createQueryBuilder('u')
+            ->where('u.isSupplier = true')
+            ->andWhere('u.deletedAt IS NULL')
+            ->getQuery()
+            ->getResult();
+
+        usort($suppliers, static fn (User $a, User $b) => strcasecmp($a->getSupplierName(), $b->getSupplierName()));
+
+        return $suppliers;
     }
 
     /** Everyone with an active keyholder disarm PIN — see door-access-spec.md § Keyholder disarm PIN. */

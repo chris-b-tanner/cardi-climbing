@@ -10,6 +10,7 @@ use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
 use App\Repository\ProductRepository;
+use App\Repository\PurchaseOrderRepository;
 use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\ContactNoteMailer;
@@ -30,14 +31,14 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Generic add/pin/delete for Notes attached to any of the six noteable types — shared by the
- * Member, Attendee, Event, Product, Order, and Asset admin pages rather than one set of actions per type.
+ * Generic add/pin/delete for Notes attached to any of the seven noteable types — shared by the
+ * Member, Attendee, Event, Product, Order, Asset, and Purchase order admin pages rather than one set of actions per type.
  */
 #[Route('/admin/notes')]
 #[IsGranted('ROLE_TEAM')]
 class AdminNoteController extends AbstractController
 {
-    private const TYPES = [Note::TYPE_MEMBER, Note::TYPE_ATTENDEE, Note::TYPE_EVENT, Note::TYPE_PRODUCT, Note::TYPE_ORDER, Note::TYPE_ASSET];
+    private const TYPES = [Note::TYPE_MEMBER, Note::TYPE_ATTENDEE, Note::TYPE_EVENT, Note::TYPE_PRODUCT, Note::TYPE_ORDER, Note::TYPE_ASSET, Note::TYPE_PURCHASE_ORDER];
 
     public function __construct(
         private readonly UserRepository $userRepository,
@@ -46,6 +47,7 @@ class AdminNoteController extends AbstractController
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
         private readonly AssetRepository $assetRepository,
+        private readonly PurchaseOrderRepository $purchaseOrderRepository,
         private readonly NoteRepository $noteRepository,
         private readonly NoteableResolver $noteableResolver,
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
@@ -276,6 +278,11 @@ class AdminNoteController extends AbstractController
             return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
         }
 
+        if ($this->isApprovalTask($note)) {
+            $this->addFlash('error', 'This is a purchase order\'s approval task — approve or reject the order to clear it.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
+        }
+
         /** @var User $admin */
         $admin = $this->getUser();
 
@@ -299,6 +306,11 @@ class AdminNoteController extends AbstractController
         if (!$this->isCsrfTokenValid('note_complete_' . $note->getId(), $request->request->get('_csrf_token'))) {
             $this->addFlash('error', 'Access denied.');
             return $this->redirectToRoute('app_home');
+        }
+
+        if ($this->isApprovalTask($note)) {
+            $this->addFlash('error', 'This is a purchase order\'s approval task — approve or reject the order to clear it.');
+            return $this->redirectForNoteable($note->getNoteableType(), $note->getNoteableId());
         }
 
         /** @var User $admin */
@@ -359,6 +371,13 @@ class AdminNoteController extends AbstractController
         ));
     }
 
+    /** A purchase order's "Approval needed" note can only be cleared by approving or rejecting the order (see PurchaseOrderService). */
+    private function isApprovalTask(Note $note): bool
+    {
+        return $note->getNoteableType() === Note::TYPE_PURCHASE_ORDER
+            && $this->purchaseOrderRepository->findByApprovalTask($note) !== null;
+    }
+
     private function findNoteable(string $type, int $id): ?object
     {
         return match ($type) {
@@ -368,6 +387,7 @@ class AdminNoteController extends AbstractController
             Note::TYPE_PRODUCT => $this->productRepository->find($id),
             Note::TYPE_ORDER => $this->salesOrderRepository->find($id),
             Note::TYPE_ASSET => $this->assetRepository->find($id),
+            Note::TYPE_PURCHASE_ORDER => $this->purchaseOrderRepository->find($id),
         };
     }
 
@@ -380,6 +400,7 @@ class AdminNoteController extends AbstractController
             Note::TYPE_PRODUCT => $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $id]),
             Note::TYPE_ORDER => $this->redirectToRoute('app_admin_sale_show', ['id' => $id]),
             Note::TYPE_ASSET => $this->redirectToRoute('app_admin_asset_show', ['id' => $id]),
+            Note::TYPE_PURCHASE_ORDER => $this->redirectToRoute('app_admin_purchase_order_show', ['id' => $id]),
         };
     }
 }

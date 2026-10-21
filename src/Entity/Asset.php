@@ -121,6 +121,16 @@ class Asset
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $acquiredAt = null;
 
+    /** Who it was bought from — a contact with isSupplier set. Set automatically when created from a PO receipt. */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $supplier = null;
+
+    /** The purchase order line this was received on, when it came from a PO. */
+    #[ORM\ManyToOne(targetEntity: PurchaseOrderLine::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?PurchaseOrderLine $purchaseOrderLine = null;
+
     /** Net total actually paid for this entry (not per unit). Null for donated or unknown. */
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
     private ?string $purchaseCost = null;
@@ -289,6 +299,28 @@ class Asset
     public function setAcquiredAt(?\DateTimeImmutable $acquiredAt): static
     {
         $this->acquiredAt = $acquiredAt;
+        return $this;
+    }
+
+    public function getSupplier(): ?User
+    {
+        return $this->supplier;
+    }
+
+    public function setSupplier(?User $supplier): static
+    {
+        $this->supplier = $supplier;
+        return $this;
+    }
+
+    public function getPurchaseOrderLine(): ?PurchaseOrderLine
+    {
+        return $this->purchaseOrderLine;
+    }
+
+    public function setPurchaseOrderLine(?PurchaseOrderLine $purchaseOrderLine): static
+    {
+        $this->purchaseOrderLine = $purchaseOrderLine;
         return $this;
     }
 

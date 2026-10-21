@@ -47,6 +47,18 @@
         {{ asset.acquisitionTypeLabel }}{% if asset.acquiredAt %}, {{ asset.acquiredAt|date('d M Y') }}{% endif %}
       </div>
     </div>
+    {% if asset.supplier or asset.purchaseOrderLine %}
+      <div>
+        <div class="card__label">Bought from</div>
+        <div class="card__value">
+          {% if asset.supplier %}<a href="{{ path('app_admin_user_show', {id: asset.supplier.id}) }}" class="admin-table__link">{{ asset.supplier.supplierName }}</a>{% endif %}
+          {% if asset.purchaseOrderLine %}
+            {% set po = asset.purchaseOrderLine.purchaseOrder %}
+            <div style="font-size:0.75rem;"><a href="{{ path('app_admin_purchase_order_show', {id: po.id}) }}" class="admin-table__link">{{ po.number }}</a></div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
     <div>
       <div class="card__label">Warranty until</div>
       <div class="card__value">

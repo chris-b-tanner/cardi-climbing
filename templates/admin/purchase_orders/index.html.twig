@@ -1,0 +1,92 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Purchasing{% endblock %}
+
+{% set tabs = [
+  {key: 'awaiting', label: 'Awaiting approval'},
+  {key: 'drafts', label: 'Drafts'},
+  {key: 'open', label: 'Open'},
+  {key: 'received', label: 'Received'},
+  {key: 'cancelled', label: 'Cancelled'},
+  {key: 'all', label: 'All'},
+] %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Purchasing</h1>
+  <div style="display:flex;gap:0.5rem;">
+    <a href="{{ path('app_admin_purchase_orders_spend') }}" class="btn btn--ghost btn--sm">Spend report</a>
+    <a href="{{ path('app_admin_purchase_order_new') }}" class="btn btn--teal btn--sm">+ New purchase order</a>
+  </div>
+</div>
+
+<div class="pos-tabs" id="status-tabs">
+  {% for tab in tabs %}
+    <button type="button" class="pos-tab{{ filters.tab == tab.key ? ' is-active' : '' }}" data-tab="{{ tab.key }}">
+      {{ tab.label }}{% if tab.key == 'awaiting' and awaitingCount %} ({{ awaitingCount }}){% endif %}
+    </button>
+  {% endfor %}
+</div>
+
+<div class="filter-form">
+  <input type="search" id="search-q" placeholder="PO number, reference, item…" style="flex:0 1 15rem;"
+         value="{{ filters.q }}" aria-label="Search purchase orders" autocomplete="off">
+  <select id="search-supplier" aria-label="Filter by supplier">
+    <option value="">All suppliers</option>
+    {% for supplier in suppliers %}
+      <option value="{{ supplier.id }}"{{ filters.supplier == supplier.id ? ' selected' : '' }}>{{ supplier.supplierName }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" id="search-from" value="{{ filters.from ? filters.from|date('Y-m-d') : '' }}" aria-label="Raised from">
+  <input type="date" id="search-to" value="{{ filters.to ? filters.to|date('Y-m-d') : '' }}" aria-label="Raised to">
+</div>
+
+<div id="results">
+  {% include 'admin/purchase_orders/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput   = document.getElementById('search-q');
+  const supplierInput = document.getElementById('search-supplier');
+  const fromInput     = document.getElementById('search-from');
+  const toInput       = document.getElementById('search-to');
+  const tabs          = document.querySelectorAll('#status-tabs .pos-tab');
+  const results       = document.getElementById('results');
+  const endpoint      = '{{ path('app_admin_purchase_orders') }}';
+  let currentTab      = '{{ filters.tab }}';
+  let debounce;
+
+  function fetchResults() {
+    const params = new URLSearchParams();
+    params.set('tab', currentTab);
+    if (searchInput.value)   params.set('q', searchInput.value);
+    if (supplierInput.value) params.set('supplier', supplierInput.value);
+    if (fromInput.value)     params.set('from', fromInput.value);
+    if (toInput.value)       params.set('to', toInput.value);
+
+    const qs = params.toString();
+    history.replaceState(null, '', `?${qs}`);
+
+    fetch(`${endpoint}?${qs}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+  [supplierInput, fromInput, toInput].forEach(el => el.addEventListener('change', fetchResults));
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentTab = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      fetchResults();
+    });
+  });
+</script>
+{% endblock %}
