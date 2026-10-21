@@ -13,6 +13,7 @@ use App\Repository\SalesOrderRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\ContactNoteMailer;
 use App\Service\Mailer\ContactQuickEmailMailer;
+use App\Service\Mailer\ContactWatchMailer;
 use App\Service\Mailer\EmailOpenTracking;
 use App\Service\NoteableResolver;
 use App\Service\Mailer\NoteAssignmentMailer;
@@ -49,6 +50,7 @@ class AdminNoteController extends AbstractController
         private readonly ContactNoteMailer $contactNoteMailer,
         private readonly ContactQuickEmailMailer $contactQuickEmailMailer,
         private readonly NoteMentionMailer $noteMentionMailer,
+        private readonly ContactWatchMailer $contactWatchMailer,
     ) {}
 
     #[Route('/{noteableType}/{noteableId}', name: 'app_admin_note_add', requirements: ['noteableId' => '\d+'], methods: ['POST'])]
@@ -150,6 +152,12 @@ class AdminNoteController extends AbstractController
                 $note->pin($admin);
             }
 
+            // Emailing someone (now or scheduled) starts you watching them, so you hear about
+            // their reply and anything else that happens on them — see ContactWatchMailer.
+            if ($wantsEmail) {
+                $noteable->addWatcher($admin);
+            }
+
             $em->persist($note);
             $em->flush();
 
@@ -162,6 +170,12 @@ class AdminNoteController extends AbstractController
                 $target = $this->noteableResolver->resolve($note, absolute: true);
                 $this->contactNoteMailer->sendNoteAdded($note, $noteable, $target, $admin);
 
+                // Watchers hear about a quick email as an email sent (once it actually goes out —
+                // SendScheduledNoteEmailMessageHandler does it for a scheduled one), not as a note.
+                if (!$wantsEmail) {
+                    $this->contactWatchMailer->notifyNoteAdded($noteable, $note, $admin);
+                }
+
                 if ($wantsEmail && $scheduledFor) {
                     $bus->dispatch(
                         new SendScheduledNoteEmailMessage($note->getId(), $previousThreadNote?->getId()),
@@ -171,6 +185,7 @@ class AdminNoteController extends AbstractController
                         . $scheduledFor->setTimezone(new \DateTimeZone('Europe/London'))->format('j M Y, H:i') . '.');
                 } elseif ($wantsEmail) {
                     $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef());
+                    $this->contactWatchMailer->notifyEmailSent($noteable, $subject, $noteContent, $admin);
                     $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
                     $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');
                 }

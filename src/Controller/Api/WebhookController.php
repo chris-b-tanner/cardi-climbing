@@ -6,6 +6,7 @@ use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\EmailOpenTracking;
 use App\Service\Mailer\ContactReplyMailer;
+use App\Service\Mailer\ContactWatchMailer;
 use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,6 +41,7 @@ class WebhookController extends AbstractController
         UserService $userService,
         UserRepository $userRepository,
         ContactReplyMailer $contactReplyMailer,
+        ContactWatchMailer $contactWatchMailer,
     ): JsonResponse {
         if (!hash_equals($this->webhookSecret, $secret)) {
             return new JsonResponse(['error' => 'Unauthorized'], 401);
@@ -66,6 +68,7 @@ class WebhookController extends AbstractController
                     $subject = trim($payload['Subject'] ?? '') ?: null;
                     $userService->addNote($trackedUser, 'Email reply: ' . $replyText, null, null, $subject);
                     $contactReplyMailer->sendReplyNotification($trackedUser, $replyText);
+                    $contactWatchMailer->notifyReply($trackedUser, $replyText);
                 }
                 return new JsonResponse(['status' => 'noted', 'id' => $trackedUser->getId()]);
             }
@@ -91,6 +94,7 @@ class WebhookController extends AbstractController
         if ($user !== null) {
             if ($textBody !== '') {
                 $userService->addNote($user, $textBody);
+                $contactWatchMailer->notifyReply($user, $textBody);
             }
             return new JsonResponse(['status' => 'noted', 'id' => $user->getId()]);
         }

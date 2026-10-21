@@ -1,0 +1,50 @@
+{% extends 'email/layout.html.twig' %}
+
+{% set heading = {
+  note:  'New note on a contact you\'re watching',
+  reply: 'A contact you\'re watching replied',
+  sent:  'Email sent to a contact you\'re watching',
+}[kind] %}
+
+{% block emailTitle %}{{ heading }}{% endblock %}
+
+{% block emailBody %}
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#b0bd80;margin:0 0 8px;">
+    {{ heading }}
+  </p>
+  <h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;color:#141414;margin:0 0 20px;">
+    {{ contact.displayName }}
+  </h1>
+
+  {% if emailSubject %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#141414;margin:0 0 12px;">
+      {{ emailSubject }}
+    </p>
+  {% endif %}
+
+  {% if text %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#141414;line-height:1.7;white-space:pre-wrap;margin:0 0 24px;background:#f6f6f3;border-radius:8px;padding:16px 18px;">{{ text }}</p>
+  {% endif %}
+
+  {% if actor %}
+    <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#5a5857;margin:0 0 28px;">
+      {{ kind == 'sent' ? 'Sent' : 'Added' }} by {{ actor.displayName }}
+    </p>
+  {% endif %}
+
+  <table role="presentation" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="border-radius:8px;background-color:#1e4f41;">
+        <a href="{{ contactUrl }}" style="display:inline-block;padding:12px 26px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+          View contact
+        </a>
+      </td>
+    </tr>
+  </table>
+
+  <hr style="border:none;border-top:1px solid #e4e2dc;margin:28px 0;">
+
+  <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9895;line-height:1.6;margin:0;">
+    You're getting this because you're watching {{ contact.displayName }}. Click "Watching" on their contact page to stop.
+  </p>
+{% endblock %}

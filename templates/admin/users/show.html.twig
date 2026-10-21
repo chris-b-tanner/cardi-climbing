@@ -97,6 +97,28 @@
                   data-csrf="{{ csrf_token('admin_user_assign_' ~ user.id) }}"
                   style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;color:var(--teal-dk);text-decoration:underline;cursor:pointer;">Assign</button>
         {% endif %}
+        {# Watchers — see ContactWatchMailer. Each team member toggles themselves. #}
+        <span style="margin-left:0.6rem;display:flex;align-items:center;gap:0.25rem;">
+          {% for watcher in user.watchers %}
+            {% set watcherAvatarUrl = avatar_url(watcher) %}
+            {% if watcherAvatarUrl %}
+              <img src="{{ watcherAvatarUrl }}" alt="{{ watcher.displayName }}" title="Watching: {{ watcher.displayName }}" style="width:1.4rem;height:1.4rem;border-radius:50%;object-fit:cover;flex-shrink:0;">
+            {% else %}
+              <span title="Watching: {{ watcher.displayName }}" style="width:1.4rem;height:1.4rem;border-radius:50%;background:#eef2f1;color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;">
+                {{ watcher.displayName|slice(0, 1)|upper }}
+              </span>
+            {% endif %}
+          {% endfor %}
+          <form method="post" action="{{ path('app_admin_user_watch', {id: user.id}) }}" style="margin:0;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_user_watch_' ~ user.id) }}">
+            {% set watching = user.isWatchedBy(app.user) %}
+            <button type="submit"
+                    title="{{ watching ? 'Stop getting emails about this contact' : 'Get emailed about new notes, replies and emails sent to this contact' }}"
+                    style="border:none;background:none;padding:0;font:inherit;font-size:0.8rem;{% if watching %}font-weight:600;{% endif %}color:var(--teal-dk);text-decoration:underline;cursor:pointer;">
+              <i class="bi {{ watching ? 'bi-eye-fill' : 'bi-eye' }}"></i> {{ watching ? 'Watching' : 'Watch' }}
+            </button>
+          </form>
+        </span>
       </div>
       <p id="tag-error" class="flash flash--error" style="display:none;margin-top:0.6rem;margin-bottom:0;width:100%;"></p>
     </div>

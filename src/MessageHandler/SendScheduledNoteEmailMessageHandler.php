@@ -7,6 +7,7 @@ use App\Message\SendScheduledNoteEmailMessage;
 use App\Repository\NoteRepository;
 use App\Repository\UserRepository;
 use App\Service\Mailer\ContactQuickEmailMailer;
+use App\Service\Mailer\ContactWatchMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -30,6 +31,7 @@ final class SendScheduledNoteEmailMessageHandler
         private readonly NoteRepository $noteRepository,
         private readonly UserRepository $userRepository,
         private readonly ContactQuickEmailMailer $contactQuickEmailMailer,
+        private readonly ContactWatchMailer $contactWatchMailer,
     ) {}
 
     public function __invoke(SendScheduledNoteEmailMessage $message): void
@@ -56,5 +58,7 @@ final class SendScheduledNoteEmailMessageHandler
 
         $note->setEmailScheduledFor(null);
         $this->em->flush();
+
+        $this->contactWatchMailer->notifyEmailSent($contact, $note->getEmailSubject() ?? '', $note->getContent(), $note->getAddedBy());
     }
 }

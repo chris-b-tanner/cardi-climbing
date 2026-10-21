@@ -173,6 +173,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\JoinColumn(name: 'assigned_to_id', onDelete: 'SET NULL')]
     private ?User $assignedTo = null;
 
+    /**
+     * Team members following this contact — each is emailed about new team notes, replies from
+     * the contact, and emails sent to them by someone else (see ContactWatchMailer). Unlike
+     * assignedTo there can be any number. Toggled from "Watch" on the contact view, and switched
+     * on automatically for whoever sends this contact a one-to-one email.
+     */
+    #[ORM\ManyToMany(targetEntity: self::class)]
+    #[ORM\JoinTable(name: 'user_watcher')]
+    #[ORM\JoinColumn(name: 'user_id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'watcher_id', onDelete: 'CASCADE')]
+    private Collection $watchers;
+
     /** Who added this contact, if it was an admin action (see UserService::createContact()) — null for self-registration and other member-initiated signups. */
     #[ORM\ManyToOne(targetEntity: self::class)]
     #[ORM\JoinColumn(name: 'created_by_id', onDelete: 'SET NULL')]
@@ -191,6 +203,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->creditLedgerEntries = new ArrayCollection();
         $this->dependents     = new ArrayCollection();
         $this->accessCards    = new ArrayCollection();
+        $this->watchers       = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -616,6 +629,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getAssignedTo(): ?User { return $this->assignedTo; }
     public function setAssignedTo(?User $assignedTo): static { $this->assignedTo = $assignedTo; return $this; }
+
+    /** @return Collection<int, User> */
+    public function getWatchers(): Collection { return $this->watchers; }
+    public function isWatchedBy(User $user): bool { return $this->watchers->contains($user); }
+
+    public function addWatcher(User $user): static
+    {
+        if (!$this->watchers->contains($user)) {
+            $this->watchers->add($user);
+        }
+        return $this;
+    }
+
+    public function removeWatcher(User $user): static
+    {
+        $this->watchers->removeElement($user);
+        return $this;
+    }
 
     public function getCreatedBy(): ?User { return $this->createdBy; }
     public function setCreatedBy(?User $createdBy): static { $this->createdBy = $createdBy; return $this; }

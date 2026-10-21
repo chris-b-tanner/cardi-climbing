@@ -1,0 +1,25 @@
+{% set heading = {
+  note:  'NEW NOTE ON A CONTACT YOU\'RE WATCHING',
+  reply: 'A CONTACT YOU\'RE WATCHING REPLIED',
+  sent:  'EMAIL SENT TO A CONTACT YOU\'RE WATCHING',
+}[kind] %}
+Y WAL — {{ heading }}
+====================================================
+
+{{ contact.displayName }}
+{% if emailSubject %}
+Subject: {{ emailSubject }}
+{% endif %}
+{% if text %}
+{{ text }}
+{% endif %}
+{% if actor %}
+{{ kind == 'sent' ? 'Sent' : 'Added' }} by {{ actor.displayName }}
+{% endif %}
+View contact: {{ contactUrl }}
+
+You're getting this because you're watching {{ contact.displayName }}. Click "Watching" on their contact page to stop.
+
+---
+Y Wal | Cardigan (Aberteifi), Ceredigion, Wales
+hello@cardiganclimbing.org | https://www.cardiganclimbing.org

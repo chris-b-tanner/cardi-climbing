@@ -404,6 +404,12 @@ class AdminEmailController extends AbstractController
             $queued++;
         }
 
+        // Sending a contact a one-to-one email starts the sender watching them — see
+        // ContactWatchMailer. Not for event/certification/tag sends, which can reach hundreds.
+        if ($email->getAudienceType() === Email::AUDIENCE_USER && $queued === 1) {
+            $recipients[0]->addWatcher($sender);
+        }
+
         $email->markSent($sender);
         $email->setSentCount($queued);
         $em->flush();

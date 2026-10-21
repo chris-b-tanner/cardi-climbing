@@ -419,6 +419,31 @@ class AdminController extends AbstractController
         return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
     }
 
+    /** Starts or stops the current team member watching this contact — see ContactWatchMailer. */
+    #[Route('/users/{id}/watch', name: 'app_admin_user_watch', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function watch(Request $request, User $user, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('admin_user_watch_' . $user->getId(), $request->request->get('_csrf_token'))) {
+            $this->addFlash('error', 'Access denied.');
+            return $this->redirectToRoute('app_home');
+        }
+
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        if ($user->isWatchedBy($admin)) {
+            $user->removeWatcher($admin);
+            $this->addFlash('success', 'You\'re no longer watching ' . $user->getDisplayName() . '.');
+        } else {
+            $user->addWatcher($admin);
+            $this->addFlash('success', 'You\'re now watching ' . $user->getDisplayName() . ' — you\'ll be emailed about new notes, replies and emails sent to them.');
+        }
+
+        $em->flush();
+
+        return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
+    }
+
     /** Quick "they said yes" action for the opted-out prompt on the contact view — staff asks the member directly, then records it here, same GDPR paper trail as opting in via the edit form. */
     #[Route('/users/{id}/opt-in', name: 'app_admin_user_opt_in', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function optIn(Request $request, User $user, UserService $userService, EntityManagerInterface $em): Response

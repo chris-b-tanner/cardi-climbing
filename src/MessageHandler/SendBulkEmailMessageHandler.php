@@ -6,6 +6,7 @@ use App\Entity\Email;
 use App\Entity\User;
 use App\Message\SendBulkEmailMessage;
 use App\Repository\UserRepository;
+use App\Service\Mailer\ContactWatchMailer;
 use App\Service\Mailer\EmailOpenTracking;
 use App\Service\Mailer\EmailPlaceholders;
 use App\Service\UserService;
@@ -35,6 +36,7 @@ final class SendBulkEmailMessageHandler
         private readonly UserService $userService,
         private readonly EmailPlaceholders $emailPlaceholders,
         private readonly AppExtension $appExtension,
+        private readonly ContactWatchMailer $contactWatchMailer,
         #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
         #[Autowire('%env(POSTMARK_BROADCAST_STREAM)%')] private readonly string $broadcastStream,
@@ -99,6 +101,13 @@ final class SendBulkEmailMessageHandler
             $this->userService->addNote($user, 'Emailed: ' . $email->getSubject(), $sender, $email, emailRef: $emailRef);
         } catch (\Throwable $e) {
             error_log('Email #' . $email->getId() . ' failed for user ' . $user->getId() . ': ' . $e->getMessage());
+            return;
+        }
+
+        // Tag/everyone broadcasts (newsletters etc.) aren't passed on to watchers — one would
+        // otherwise email each watcher once per contact they watch.
+        if ($isFixedAudience) {
+            $this->contactWatchMailer->notifyEmailSent($user, $email->getSubject(), null, $sender);
         }
     }
 }
