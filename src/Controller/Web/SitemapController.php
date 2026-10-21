@@ -13,8 +13,8 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
  * /sitemap.xml, as referenced from robots.txt — the public pages plus every published news post
  * and every published event that still has an occurrence to come. Events link to their shareable
  * landing page (app_event_landing), which is the URL that page declares as canonical. Pages behind
- * a login, one-off flows (cart, password reset, unsubscribe) and noindex pages (/routes) are left
- * out.
+ * a login (including /shop), one-off flows (cart, password reset, unsubscribe) and noindex pages
+ * (/routes) are left out.
  */
 class SitemapController extends AbstractController
 {
@@ -22,7 +22,6 @@ class SitemapController extends AbstractController
         'app_home',
         'app_events',
         'app_news',
-        'app_shop',
         'app_donate',
         'app_sponsorship',
         'app_roles',
