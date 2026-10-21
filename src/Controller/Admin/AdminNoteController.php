@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\Note;
 use App\Entity\User;
 use App\Message\SendScheduledNoteEmailMessage;
+use App\Repository\AssetRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\NoteRepository;
@@ -29,14 +30,14 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Generic add/pin/delete for Notes attached to any of the five noteable types — shared by the
- * Member, Attendee, Event, Product, and Order admin pages rather than one set of actions per type.
+ * Generic add/pin/delete for Notes attached to any of the six noteable types — shared by the
+ * Member, Attendee, Event, Product, Order, and Asset admin pages rather than one set of actions per type.
  */
 #[Route('/admin/notes')]
 #[IsGranted('ROLE_TEAM')]
 class AdminNoteController extends AbstractController
 {
-    private const TYPES = [Note::TYPE_MEMBER, Note::TYPE_ATTENDEE, Note::TYPE_EVENT, Note::TYPE_PRODUCT, Note::TYPE_ORDER];
+    private const TYPES = [Note::TYPE_MEMBER, Note::TYPE_ATTENDEE, Note::TYPE_EVENT, Note::TYPE_PRODUCT, Note::TYPE_ORDER, Note::TYPE_ASSET];
 
     public function __construct(
         private readonly UserRepository $userRepository,
@@ -44,6 +45,7 @@ class AdminNoteController extends AbstractController
         private readonly EventRepository $eventRepository,
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
+        private readonly AssetRepository $assetRepository,
         private readonly NoteRepository $noteRepository,
         private readonly NoteableResolver $noteableResolver,
         private readonly NoteAssignmentMailer $noteAssignmentMailer,
@@ -365,6 +367,7 @@ class AdminNoteController extends AbstractController
             Note::TYPE_EVENT => $this->eventRepository->find($id),
             Note::TYPE_PRODUCT => $this->productRepository->find($id),
             Note::TYPE_ORDER => $this->salesOrderRepository->find($id),
+            Note::TYPE_ASSET => $this->assetRepository->find($id),
         };
     }
 
@@ -376,6 +379,7 @@ class AdminNoteController extends AbstractController
             Note::TYPE_EVENT => $this->redirectToRoute('app_admin_event_show', ['id' => $id]),
             Note::TYPE_PRODUCT => $this->redirectToRoute('app_admin_settings_product_edit', ['id' => $id]),
             Note::TYPE_ORDER => $this->redirectToRoute('app_admin_sale_show', ['id' => $id]),
+            Note::TYPE_ASSET => $this->redirectToRoute('app_admin_asset_show', ['id' => $id]),
         };
     }
 }

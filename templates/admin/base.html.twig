@@ -481,6 +481,12 @@
           <i class="bi bi-newspaper"></i> News
         </a>
       </li>
+      <li>
+        <a href="{{ path('app_admin_assets') }}"
+           class="admin-nav__link{{ currentRoute starts with 'app_admin_asset' ? ' is-active' : '' }}">
+          <i class="bi bi-box2"></i> Assets
+        </a>
+      </li>
       {% if is_granted('ROLE_ADMIN') %}
         <li>
           <a href="{{ path('app_admin_settings_team') }}"
@@ -500,6 +506,19 @@
       <a href="{{ path('app_account') }}" class="admin-topbar__link">My account</a>
       <a href="{{ path('app_logout') }}" class="admin-topbar__link">Sign out</a>
     </div>
+
+    {% if currentRoute starts with 'app_admin_asset' %}
+      <div class="admin-subnav">
+        <a href="{{ path('app_admin_assets') }}"
+           class="admin-subnav__link{{ currentRoute != 'app_admin_assets_insurance' ? ' is-active' : '' }}">
+          <i class="bi bi-box2"></i> Register
+        </a>
+        <a href="{{ path('app_admin_assets_insurance') }}"
+           class="admin-subnav__link">
+          <i class="bi bi-shield-check"></i> Insurance report
+        </a>
+      </div>
+    {% endif %}
 
     {% if currentRoute starts with 'app_admin_settings' %}
       <div class="admin-subnav">

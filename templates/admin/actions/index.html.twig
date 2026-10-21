@@ -64,6 +64,7 @@
   {key: 'event', label: 'Events', singular: 'event', icon: 'bi-calendar3'},
   {key: 'product', label: 'Products', singular: 'product', icon: 'bi-tag'},
   {key: 'order', label: 'Sales', singular: 'sale', icon: 'bi-receipt'},
+  {key: 'asset', label: 'Assets', singular: 'asset', icon: 'bi-box2'},
 ] %}
 {% set typesByKey = {} %}
 {% for t in types %}
@@ -73,7 +74,7 @@
 {% if items is empty %}
   <div class="empty">
     <strong>Nothing pinned</strong>
-    Pin a note on a member, booking, event, product, or order to add it here.
+    Pin a note on a member, booking, event, product, order, or asset to add it here.
   </div>
 {% else %}
   <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">

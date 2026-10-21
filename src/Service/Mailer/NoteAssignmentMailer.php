@@ -18,6 +18,7 @@ class NoteAssignmentMailer
         Note::TYPE_EVENT    => 'event',
         Note::TYPE_PRODUCT  => 'product',
         Note::TYPE_ORDER    => 'sale',
+        Note::TYPE_ASSET    => 'asset',
     ];
 
     /** Capitalised noun used in the subject/title, e.g. "User action assigned to you" — distinct from TYPE_SINGULAR, which stays lowercase for the "View {type}" link. */
@@ -27,6 +28,7 @@ class NoteAssignmentMailer
         Note::TYPE_EVENT    => 'Event',
         Note::TYPE_PRODUCT  => 'Product',
         Note::TYPE_ORDER    => 'Sale',
+        Note::TYPE_ASSET    => 'Asset',
     ];
 
     public function __construct(

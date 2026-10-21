@@ -1,0 +1,289 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}{{ asset.name }} — Assets{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_assets') }}" class="page-header__crumb">Assets</a> &raquo; {{ asset.name }}</h1>
+  {% if not asset.disposed %}
+    <a href="{{ path('app_admin_asset_edit', {id: asset.id}) }}" class="btn btn--ghost btn--sm">Edit</a>
+  {% endif %}
+</div>
+
+{% if asset.disposed %}
+  <div class="flash flash--error">
+    Disposed of on {{ asset.disposedAt|date('d M Y') }}: {{ asset.disposalReasonLabel }}.
+    {% if asset.disposalNote %}{{ asset.disposalNote }}{% endif %}
+  </div>
+{% endif %}
+
+<div class="member-columns member-columns--halves">
+<div>
+
+<div class="card">
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Status</div>
+      <div class="card__value">{% include 'admin/assets/_status_pill.html.twig' %}</div>
+    </div>
+    <div>
+      <div class="card__label">Category</div>
+      <div class="card__value">{{ asset.categoryLabel }}</div>
+    </div>
+    <div>
+      <div class="card__label">Quantity</div>
+      <div class="card__value">{{ asset.quantity }}{{ asset.batch ? ' (batch)' : '' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Location</div>
+      <div class="card__value">{{ asset.location ?: '—' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Serial number or asset tag</div>
+      <div class="card__value">{{ asset.identifier ?: '—' }}</div>
+    </div>
+    <div>
+      <div class="card__label">Acquired</div>
+      <div class="card__value">
+        {{ asset.acquisitionTypeLabel }}{% if asset.acquiredAt %}, {{ asset.acquiredAt|date('d M Y') }}{% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Warranty until</div>
+      <div class="card__value">
+        {% if asset.warrantyUntil %}
+          {{ asset.warrantyUntil|date('d M Y') }}
+          {% if asset.warrantyUntil < date('today') %}<span style="color:var(--muted);">(expired)</span>{% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Added</div>
+      <div class="card__value">
+        {{ asset.createdAt|date('d M Y') }}{% if asset.createdBy %} &middot; {{ asset.createdBy.displayName }}{% endif %}
+      </div>
+    </div>
+    {% if asset.description %}
+      <div style="grid-column:1 / -1;">
+        <div class="card__label">Description</div>
+        <div class="card__value" style="white-space:pre-line;">{{ asset.description }}</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Values <span style="text-transform:none;letter-spacing:0;font-weight:normal;">(net of VAT)</span></div>
+  <div class="detail-grid">
+    <div>
+      <div class="card__label">Purchase cost</div>
+      <div class="card__value">
+        {% if asset.purchaseCost is not null %}
+          £{{ asset.purchaseCost }}
+          {% if asset.batch %}<br><span style="font-size:0.75rem;color:var(--muted);">£{{ asset.unitPurchaseCost }} each</span>{% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <div class="card__label">Replacement value</div>
+      <div class="card__value">
+        {% if asset.replacementValue is not null %}
+          £{{ asset.replacementValue }}
+          {% if asset.batch %}<br><span style="font-size:0.75rem;color:var(--muted);">£{{ asset.unitReplacementValue }} each</span>{% endif %}
+          {% if asset.replacementValueUpdatedAt %}<br><span style="font-size:0.75rem;color:var(--muted);">Valued {{ asset.replacementValueUpdatedAt|date('d M Y') }}</span>{% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% if not is_granted('ROLE_ADMIN') %}
+    <p style="font-size:0.75rem;color:var(--muted);margin:0.75rem 0 0;">Only admins can change values.</p>
+  {% endif %}
+</div>
+
+{% if not asset.disposed %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Move or change status</div>
+    <form method="post" action="{{ path('app_admin_asset_move', {id: asset.id}) }}" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.75rem;">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_asset_move_' ~ asset.id) }}">
+      <div class="form-group" style="flex:1 1 12rem;margin-bottom:0;">
+        <label for="move-location">Location</label>
+        <input type="text" id="move-location" name="location" class="form-control" maxlength="100" list="asset-locations"
+               value="{{ asset.location }}" autocomplete="off">
+        <datalist id="asset-locations">
+          {% for location in locations %}<option value="{{ location }}">{% endfor %}
+        </datalist>
+      </div>
+      <button type="submit" class="btn btn--ghost btn--sm">Move</button>
+    </form>
+    <form method="post" action="{{ path('app_admin_asset_status', {id: asset.id}) }}" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_asset_status_' ~ asset.id) }}">
+      <div class="form-group" style="flex:1 1 12rem;margin-bottom:0;">
+        <label for="change-status">Status</label>
+        <select id="change-status" name="status" class="form-control">
+          {% for key in statuses %}
+            <option value="{{ key }}"{{ asset.status == key ? ' selected' : '' }}>{{ constant('App\\Entity\\Asset::STATUS_LABELS')[key] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn--ghost btn--sm">Update status</button>
+    </form>
+    {% if is_granted('ROLE_ADMIN') %}
+      <div style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
+        <button type="button" id="dispose-open" class="btn btn--danger btn--sm">Dispose of…</button>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Photos and files</div>
+
+  {% set photos = asset.files|filter(f => f.image) %}
+  {% if photos is not empty %}
+    <div class="asset-photos">
+      {% for file in photos %}
+        <a href="{{ photoUrls[file.id] }}" target="_blank" rel="noopener" title="{{ file.originalFilename }}">
+          <img src="{{ photoUrls[file.id] }}" alt="{{ file.originalFilename }}" class="asset-photos__img">
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if asset.files is not empty %}
+    <div class="table-scroll" style="margin-bottom:1rem;">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Kind</th>
+            <th>Uploaded</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in asset.files %}
+            <tr>
+              <td data-label="Name">
+                <a href="{{ path('app_admin_asset_file_download', {id: asset.id, fileId: file.id}) }}" class="admin-table__link">{{ file.originalFilename }}</a>
+                <div style="font-size:0.72rem;color:var(--muted);">{{ file.formattedSize }}</div>
+              </td>
+              <td class="admin-table__muted" data-label="Kind">{{ file.kindLabel }}</td>
+              <td class="admin-table__muted" data-label="Uploaded">
+                {{ file.uploadedAt|date('d M Y') }}
+                {% if file.uploadedBy %} &middot; {{ file.uploadedBy.displayName }}{% endif %}
+              </td>
+              <td>
+                {% if is_granted('ROLE_ADMIN') %}
+                  <form method="post" action="{{ path('app_admin_asset_file_delete', {id: asset.id, fileId: file.id}) }}" onsubmit="return confirm('Remove this file?');" style="display:inline;">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_asset_file_' ~ file.id) }}">
+                    <button type="submit" class="btn btn--ghost btn--sm">Delete</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color:var(--muted);font-size:0.875rem;">No photos or files yet.</p>
+  {% endif %}
+
+  <form method="post" action="{{ path('app_admin_asset_file_upload', {id: asset.id}) }}" enctype="multipart/form-data" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('upload_asset_file_' ~ asset.id) }}">
+    <div class="form-group" style="flex:0 0 9rem;margin-bottom:0;">
+      <label for="file-kind">Kind</label>
+      <select id="file-kind" name="kind" class="form-control">
+        {% for key, label in constant('App\\Entity\\AssetFile::KIND_LABELS') %}
+          <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="flex:1 1 12rem;margin-bottom:0;">
+      <label for="file-input">File</label>
+      <input type="file" id="file-input" name="file" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn--ghost btn--sm">Upload</button>
+  </form>
+  <p style="font-size:0.75rem;color:var(--muted);margin:0.4rem 0 0;">PDF, Word, Excel, or image &middot; up to 15MB</p>
+</div>
+
+</div>
+<div>
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.6rem;">Notes and history</div>
+    {% include 'admin/_notes_panel.html.twig' with {notes: notes, noteableType: 'asset', noteableId: asset.id} %}
+  </div>
+</div>
+</div>
+
+{% if is_granted('ROLE_ADMIN') and not asset.disposed %}
+  <div id="dispose-modal" class="pos-modal" style="display:none;">
+    <div id="dispose-modal-backdrop" class="pos-modal__backdrop"></div>
+    <div class="pos-modal__box">
+      <div class="pos-modal__header">
+        <strong>Dispose of {{ asset.name }}</strong>
+        <button type="button" id="dispose-modal-close" class="btn btn--ghost btn--sm">✕</button>
+      </div>
+      <form method="post" action="{{ path('app_admin_asset_dispose', {id: asset.id}) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_asset_dispose_' ~ asset.id) }}">
+        {% if asset.batch %}
+          <div class="form-group">
+            <label for="dispose-qty">How many (of {{ asset.quantity }})</label>
+            <input type="number" id="dispose-qty" name="qty" class="form-control" min="1" max="{{ asset.quantity }}" step="1" value="{{ asset.quantity }}" required>
+            <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">Fewer than all of them reduces the batch, and its values go down in proportion.</p>
+          </div>
+        {% else %}
+          <input type="hidden" name="qty" value="1">
+        {% endif %}
+        <div class="detail-grid">
+          <div class="form-group">
+            <label for="dispose-reason">Reason</label>
+            <select id="dispose-reason" name="reason" class="form-control" required>
+              {% for key, label in constant('App\\Entity\\Asset::DISPOSAL_LABELS') %}
+                <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="dispose-date">Date</label>
+            <input type="date" id="dispose-date" name="disposedAt" class="form-control" value="{{ 'today'|date('Y-m-d') }}" max="{{ 'today'|date('Y-m-d') }}">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label for="dispose-note">Note (required)</label>
+          <textarea id="dispose-note" name="note" class="form-control" rows="2" maxlength="255" required placeholder="e.g. Cracked, binned. If sold, give the sale number."></textarea>
+        </div>
+        <button type="submit" class="btn btn--danger btn--sm">Dispose of</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .asset-photos { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .asset-photos__img {
+    width: 88px; height: 88px; border-radius: var(--radius); object-fit: cover;
+    border: 1px solid var(--border); display: block;
+  }
+</style>
+<script>
+  (function () {
+    const modal = document.getElementById('dispose-modal');
+    const open  = document.getElementById('dispose-open');
+    if (!modal || !open) return; // not an admin, or already disposed of
+
+    const close = () => { modal.style.display = 'none'; };
+    open.addEventListener('click', () => { modal.style.display = 'flex'; });
+    document.getElementById('dispose-modal-close').addEventListener('click', close);
+    document.getElementById('dispose-modal-backdrop').addEventListener('click', close);
+  })();
+</script>
+{% endblock %}

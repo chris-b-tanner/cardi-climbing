@@ -22,6 +22,7 @@ class NoteMentionMailer
         Note::TYPE_EVENT    => 'event',
         Note::TYPE_PRODUCT  => 'product',
         Note::TYPE_ORDER    => 'sale',
+        Note::TYPE_ASSET    => 'asset',
     ];
 
     public function __construct(

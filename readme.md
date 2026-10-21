@@ -246,12 +246,30 @@ Used to determine the price of an event which has access-method Ticket, eg
 film nights, coached climbing session.
 
 ### Discounts
-To discount items on a sale, click the price and enter a discount reason.
+To discount items on a sale, click the price and enter a discount reason. Only admins can change prices.
 
 ### Sale nominees
 Someone can buy things for other people - mainly used for primary member in a family to book climbing and events for dependents.
 Each ticket, membership or credit line on a sale needs to be nominated to someone. 
 Service items and Stock items do not need a nominee.
+
+## Assets
+The asset register (Assets in the main menu) lists the things we own and use but don't sell: holds and 
+volumes, auto-belays, mats, hire kit, tools, furniture, IT, and the building itself. Stock we sell 
+stays under Products.
+
+An asset is either a single item (quantity 1, ideally with its serial number) or a batch of identical 
+things counted together, like a set of 20 holds. Use "Save and add another" to enter lots in a row.
+
+From an asset's page you can move it, change its status (in use, in storage, out of service), and 
+upload photos, receipts, manuals and warranties. Every move, status change and value change is 
+written to its notes as history.
+
+Values are net of VAT and are totals for the whole entry, not per unit. Only admins can set purchase 
+cost and replacement value, dispose of assets (all of a batch, or just some of it) and delete files.
+
+The insurance report (Assets > Insurance report) lists every current asset with its replacement 
+value, by category and by location, ready to print.
 
 ## Emails
 Transactional emails are sent immediately via PostMark Transactional stream, 

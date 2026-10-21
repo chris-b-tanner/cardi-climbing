@@ -1,0 +1,50 @@
+{% if assets is empty %}
+  <div class="empty">
+    <strong>No assets found</strong>
+    {{ filters.q or filters.category or filters.location or filters.status ? 'Try a different search or filter.' : 'Add the first one to start the register.' }}
+  </div>
+{% else %}
+  <div class="table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Category</th>
+          <th style="text-align:right;">Qty</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th style="text-align:right;">Cost</th>
+          <th style="text-align:right;">Replacement</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in assets %}
+          <tr>
+            <td data-label="Name">
+              <a href="{{ path('app_admin_asset_show', {id: asset.id}) }}" class="admin-table__link">{{ asset.name }}</a>
+              {% if asset.identifier %}
+                <div style="font-size:0.72rem;color:var(--muted);">{{ asset.identifier }}</div>
+              {% endif %}
+            </td>
+            <td class="admin-table__muted" data-label="Category">{{ asset.categoryLabel }}</td>
+            <td class="admin-table__muted" style="text-align:right;" data-label="Qty">{{ asset.quantity }}</td>
+            <td class="admin-table__muted" data-label="Location">{{ asset.location ?: '—' }}</td>
+            <td data-label="Status">{% include 'admin/assets/_status_pill.html.twig' %}</td>
+            <td class="admin-table__muted" style="text-align:right;" data-label="Cost">{{ asset.purchaseCost is not null ? '£' ~ asset.purchaseCost : '—' }}</td>
+            <td class="admin-table__muted" style="text-align:right;" data-label="Replacement">{{ asset.replacementValue is not null ? '£' ~ asset.replacementValue : '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">{{ totals.count }} {{ totals.count == 1 ? 'entry' : 'entries' }}</th>
+          <th style="text-align:right;">{{ totals.quantity }}</th>
+          <th colspan="2">{% if totals.unvalued %}{{ totals.unvalued }} without a replacement value{% endif %}</th>
+          <th style="text-align:right;">£{{ totals.purchaseCost }}</th>
+          <th style="text-align:right;">£{{ totals.replacementValue }}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem;">Values are net of VAT and are totals for each entry, not per unit.</p>
+{% endif %}

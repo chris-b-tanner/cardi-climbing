@@ -1,4 +1,4 @@
-# Asset register spec — not yet implemented
+# Asset register spec — steps 1–3 built
 
 ## Goal
 
@@ -201,6 +201,11 @@ Following the rule that only admins change money:
   isn't tracked here.
 
 ## Build order
+
+Steps 1–3 are built (October 2026). `Asset.supplier` and `Asset.purchaseOrderLine` don't exist yet:
+they're added with step 4, alongside the `Supplier` and `PurchaseOrderLine` entities from
+`purchase-orders-spec.md`.
+
 
 1. `Asset` and `AssetFile`, the register list, the asset page and the hand-entry form, with
    `TYPE_ASSET` across the note code.

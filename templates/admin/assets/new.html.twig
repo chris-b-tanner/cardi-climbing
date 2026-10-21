@@ -1,0 +1,25 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}New asset — Assets{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><a href="{{ path('app_admin_assets') }}" class="page-header__crumb">Assets</a> &raquo; New asset</h1>
+  <a href="{{ path('app_admin_assets') }}" class="btn btn--ghost btn--sm">← Cancel</a>
+</div>
+
+{% if error %}
+  <div class="flash flash--error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ path('app_admin_asset_new') }}" novalidate>
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_asset_new') }}">
+
+  {% include 'admin/assets/_form.html.twig' with {isNew: true} %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--teal">Add asset</button>
+    <button type="submit" name="addAnother" value="1" class="btn btn--ghost">Save and add another</button>
+    <a href="{{ path('app_admin_assets') }}" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

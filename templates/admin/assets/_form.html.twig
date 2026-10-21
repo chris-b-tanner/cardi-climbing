@@ -1,0 +1,118 @@
+{#
+  Shared new/edit asset form fields. Expects `asset` and `locations`; `isNew` shows the initial
+  status (afterwards status changes through the asset page, which records why). Re-renders from the
+  submitted values after a validation error, otherwise from the asset. Money fields are admin-only:
+  the controller ignores them for anyone else.
+#}
+{% set f = app.request.isMethod('POST') ? app.request.request.all : {
+  name: asset.name,
+  category: asset.category,
+  description: asset.description,
+  quantity: asset.quantity,
+  identifier: asset.identifier,
+  location: asset.location,
+  status: asset.status,
+  acquisitionType: asset.acquisitionType,
+  acquiredAt: asset.acquiredAt ? asset.acquiredAt|date('Y-m-d') : '',
+  warrantyUntil: asset.warrantyUntil ? asset.warrantyUntil|date('Y-m-d') : '',
+  purchaseCost: asset.purchaseCost,
+  replacementValue: asset.replacementValue,
+} %}
+
+<div class="card">
+  <div class="form-group">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" class="form-control" maxlength="150"
+           value="{{ f.name ?? '' }}" placeholder="e.g. Auto-belay 3, Large volumes set A" autocomplete="off" required>
+  </div>
+  <div class="detail-grid">
+    <div class="form-group">
+      <label for="category">Category</label>
+      <select id="category" name="category" class="form-control">
+        {% for key, label in constant('App\\Entity\\Asset::CATEGORY_LABELS') %}
+          <option value="{{ key }}"{{ (f.category ?? '') == key ? ' selected' : '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="quantity">Quantity</label>
+      <input type="number" id="quantity" name="quantity" class="form-control" min="1" step="1"
+             value="{{ f.quantity ?? 1 }}" required>
+    </div>
+  </div>
+  <p style="font-size:0.75rem;color:var(--muted);margin:-0.5rem 0 1rem;">
+    Use 1 for an individual item, usually with a serial number. Use more for a batch of identical things counted together, like a set of 20 holds.
+  </p>
+  <div class="detail-grid">
+    <div class="form-group">
+      <label for="identifier">Serial number or asset tag</label>
+      <input type="text" id="identifier" name="identifier" class="form-control" maxlength="100"
+             value="{{ f.identifier ?? '' }}" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label for="location">Location</label>
+      <input type="text" id="location" name="location" class="form-control" maxlength="100" list="asset-locations"
+             value="{{ f.location ?? '' }}" placeholder="e.g. Main wall, Setting store" autocomplete="off">
+      <datalist id="asset-locations">
+        {% for location in locations %}<option value="{{ location }}">{% endfor %}
+      </datalist>
+    </div>
+  </div>
+  <div class="form-group"{% if not isNew %} style="margin-bottom:0;"{% endif %}>
+    <label for="description">Description</label>
+    <textarea id="description" name="description" class="form-control" rows="3">{{ f.description ?? '' }}</textarea>
+  </div>
+  {% if isNew %}
+    <div class="form-group" style="margin-bottom:0;">
+      <label for="status">Status</label>
+      <select id="status" name="status" class="form-control">
+        {% for key in ['in_use', 'in_storage', 'out_of_service'] %}
+          <option value="{{ key }}"{{ (f.status ?? 'in_use') == key ? ' selected' : '' }}>{{ constant('App\\Entity\\Asset::STATUS_LABELS')[key] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card__label" style="margin-bottom:0.6rem;">Acquisition</div>
+  <div class="detail-grid">
+    <div class="form-group">
+      <label for="acquisitionType">How it was acquired</label>
+      <select id="acquisitionType" name="acquisitionType" class="form-control">
+        {% for key, label in constant('App\\Entity\\Asset::ACQUISITION_LABELS') %}
+          <option value="{{ key }}"{{ (f.acquisitionType ?? '') == key ? ' selected' : '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="acquiredAt">Acquired (if known)</label>
+      <input type="date" id="acquiredAt" name="acquiredAt" class="form-control" value="{{ f.acquiredAt ?? '' }}">
+    </div>
+  </div>
+  <div class="form-group" style="margin-bottom:0;">
+    <label for="warrantyUntil">Warranty until</label>
+    <input type="date" id="warrantyUntil" name="warrantyUntil" class="form-control" value="{{ f.warrantyUntil ?? '' }}">
+  </div>
+</div>
+
+{% if is_granted('ROLE_ADMIN') %}
+  <div class="card" style="margin-top:1.25rem;">
+    <div class="card__label" style="margin-bottom:0.6rem;">Values</div>
+    <div class="detail-grid">
+      <div class="form-group">
+        <label for="purchaseCost">Purchase cost (£, net)</label>
+        <input type="number" id="purchaseCost" name="purchaseCost" class="form-control" step="0.01" min="0"
+               value="{{ f.purchaseCost ?? '' }}">
+      </div>
+      <div class="form-group">
+        <label for="replacementValue">Replacement value (£, net)</label>
+        <input type="number" id="replacementValue" name="replacementValue" class="form-control" step="0.01" min="0"
+               value="{{ f.replacementValue ?? '' }}">
+      </div>
+    </div>
+    <p style="font-size:0.75rem;color:var(--muted);margin:0;">
+      Totals for the whole entry, not per unit, net of VAT. Leave the purchase cost blank if it was donated or isn't known.{% if isNew %} A blank replacement value starts at the purchase cost.{% endif %}
+    </p>
+  </div>
+{% endif %}

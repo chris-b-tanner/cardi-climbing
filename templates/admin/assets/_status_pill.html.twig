@@ -1,0 +1,2 @@
+{% set pillClass = {in_use: 'status-pill--published', in_storage: 'status-pill--waiting', out_of_service: 'status-pill--cancelled', disposed: ''}[asset.status] ?? '' %}
+<span class="status-pill {{ pillClass }}">{{ asset.statusLabel }}</span>

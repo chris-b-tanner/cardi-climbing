@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Insurance report — Y Wal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      padding: 2rem;
+    }
+    .print-bar {
+      display: flex; justify-content: flex-end; gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .print-bar button, .print-bar a {
+      font-family: inherit; font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #fff; color: #1a1a1a;
+      text-decoration: none; cursor: pointer;
+    }
+    .print-bar button { background: #2a9d8f; color: #fff; border-color: #2a9d8f; }
+    h1 { font-size: 1.35rem; margin-bottom: 0.2rem; }
+    h2 { font-size: 1.05rem; margin: 2rem 0 0.75rem; }
+    h3 { font-size: 0.9375rem; margin: 1.25rem 0 0.4rem; }
+    .subtitle { color: #6b7280; font-size: 0.9375rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { text-align: left; padding: 0.45rem 0.75rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #6b7280; background: #f9fafb;
+    }
+    .num { text-align: right; white-space: nowrap; }
+    .muted { color: #6b7280; font-size: 0.8125rem; }
+    tfoot td { font-weight: 600; border-bottom: none; }
+    .summary td { font-size: 0.9375rem; }
+    .empty { color: #6b7280; font-size: 0.9375rem; }
+    .group { break-inside: avoid; }
+
+    @media print {
+      body { padding: 0; }
+      .print-bar { display: none; }
+      h2 { break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <a href="{{ path('app_admin_assets') }}">&larr; Back to assets</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+
+  <h1>Asset register — insurance report</h1>
+  <p class="subtitle">
+    Y Wal (Cardigan Climbing CIC) &middot; generated {{ generatedAt|date('d M Y') }} &middot;
+    every asset not disposed of &middot; values net of VAT
+  </p>
+
+  {% if totals.count == 0 %}
+    <p class="empty">There are no assets on the register yet.</p>
+  {% else %}
+    <table class="summary">
+      <tbody>
+        <tr><td>Entries</td><td class="num">{{ totals.count }}</td></tr>
+        <tr><td>Items (counting each unit in a batch)</td><td class="num">{{ totals.quantity }}</td></tr>
+        <tr><td>Total replacement value</td><td class="num">£{{ totals.replacementValue }}</td></tr>
+        <tr><td>Total purchase cost</td><td class="num">£{{ totals.purchaseCost }}</td></tr>
+        {% if totals.unvalued %}
+          <tr><td>Entries with no replacement value</td><td class="num">{{ totals.unvalued }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    {% macro group_table(group) %}
+      <table>
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Location</th>
+            <th class="num">Qty</th>
+            <th class="num">Replacement value</th>
+            <th>Last valued</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asset in group.assets %}
+            <tr>
+              <td>
+                {{ asset.name }}
+                {% if asset.identifier %}<div class="muted">{{ asset.identifier }}</div>{% endif %}
+              </td>
+              <td>{{ asset.location ?: '—' }}</td>
+              <td class="num">{{ asset.quantity }}</td>
+              <td class="num">{{ asset.replacementValue is not null ? '£' ~ asset.replacementValue : '—' }}</td>
+              <td class="muted">
+                {% if asset.replacementValueUpdatedAt %}
+                  {{ asset.replacementValueUpdatedAt|date('d M Y') }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">{{ group.totals.count }} {{ group.totals.count == 1 ? 'entry' : 'entries' }}</td>
+            <td class="num">{{ group.totals.quantity }}</td>
+            <td class="num">£{{ group.totals.replacementValue }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    {% endmacro %}
+
+    <h2>By category</h2>
+    {% for label, group in byCategory %}
+      <div class="group">
+        <h3>{{ label }}</h3>
+        {{ _self.group_table(group) }}
+      </div>
+    {% endfor %}
+
+    <h2>By location</h2>
+    {% for label, group in byLocation %}
+      <div class="group">
+        <h3>{{ label }}</h3>
+        {{ _self.group_table(group) }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+</body>
+</html>

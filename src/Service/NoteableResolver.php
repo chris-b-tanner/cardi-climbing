@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Note;
 use App\Entity\User;
+use App\Repository\AssetRepository;
 use App\Repository\AttendeeRepository;
 use App\Repository\EventRepository;
 use App\Repository\ProductRepository;
@@ -20,6 +21,7 @@ class NoteableResolver
         private readonly EventRepository $eventRepository,
         private readonly ProductRepository $productRepository,
         private readonly SalesOrderRepository $salesOrderRepository,
+        private readonly AssetRepository $assetRepository,
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {}
 
@@ -30,7 +32,7 @@ class NoteableResolver
      *
      * `person` is the User the note is about — the member, the booker, or the sale's customer — for
      * callers that need more than their name (e.g. their Tag entities, for coloured badges); absent
-     * for event/product notes and deleted records.
+     * for event/product/asset notes and deleted records.
      *
      * @return array{label: string, url: ?string, company?: ?string, tags?: string[], person?: User}
      */
@@ -44,6 +46,7 @@ class NoteableResolver
             Note::TYPE_EVENT => $this->resolveEvent($id, $absolute),
             Note::TYPE_PRODUCT => $this->resolveProduct($id, $absolute),
             Note::TYPE_ORDER => $this->resolveOrder($id, $absolute),
+            Note::TYPE_ASSET => $this->resolveAsset($id, $absolute),
             default => ['label' => 'Unknown record', 'url' => null],
         };
     }
@@ -119,6 +122,19 @@ class NoteableResolver
             'url'   => $this->url('app_admin_sale_show', ['id' => $id], $absolute),
             'tags'   => $this->tagNames($order->getUser()),
             'person' => $order->getUser(),
+        ];
+    }
+
+    private function resolveAsset(int $id, bool $absolute): array
+    {
+        $asset = $this->assetRepository->find($id);
+        if (!$asset) {
+            return ['label' => 'Asset #' . $id . ' (deleted)', 'url' => null];
+        }
+
+        return [
+            'label' => $asset->getName() . ($asset->getLocation() ? ' — ' . $asset->getLocation() : ''),
+            'url'   => $this->url('app_admin_asset_show', ['id' => $id], $absolute),
         ];
     }
 

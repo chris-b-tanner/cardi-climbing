@@ -6,7 +6,7 @@ use App\Repository\NoteRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/** A note attachable to any of five record types (see TYPE_* below), identified by noteableType + noteableId rather than a Doctrine association — there's no single target entity to point a ManyToOne at. */
+/** A note attachable to any of six record types (see TYPE_* below), identified by noteableType + noteableId rather than a Doctrine association — there's no single target entity to point a ManyToOne at. */
 #[ORM\Entity(repositoryClass: NoteRepository::class)]
 #[ORM\Index(name: 'idx_note_email_ref', columns: ['email_ref'])]
 class Note
@@ -16,6 +16,7 @@ class Note
     public const TYPE_EVENT    = 'event';
     public const TYPE_PRODUCT  = 'product';
     public const TYPE_ORDER    = 'order';
+    public const TYPE_ASSET    = 'asset';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -123,7 +124,7 @@ class Note
         return $this->noteableId;
     }
 
-    /** Sets noteableType/noteableId from whichever of the five supported entity types this is. */
+    /** Sets noteableType/noteableId from whichever of the six supported entity types this is. */
     public function setNoteable(object $entity): static
     {
         $this->noteableType = match (true) {
@@ -132,6 +133,7 @@ class Note
             $entity instanceof Event => self::TYPE_EVENT,
             $entity instanceof Product => self::TYPE_PRODUCT,
             $entity instanceof SalesOrder => self::TYPE_ORDER,
+            $entity instanceof Asset => self::TYPE_ASSET,
             default => throw new \InvalidArgumentException(sprintf('%s cannot carry a Note.', $entity::class)),
         };
         $this->noteableId = $entity->getId();

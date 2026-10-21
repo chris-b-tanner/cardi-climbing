@@ -1,0 +1,98 @@
+{% extends 'admin/base.html.twig' %}
+{% block title %}Asset register{% endblock %}
+
+{% set statusFilterLabels = {'': 'Current', in_use: 'In use', in_storage: 'In storage', out_of_service: 'Out of service', disposed: 'Disposed', all: 'All'} %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Asset register</h1>
+  <div style="display:flex;gap:0.5rem;">
+    <a href="#" id="export-link" class="btn btn--ghost btn--sm">Export CSV</a>
+    <a href="{{ path('app_admin_asset_new') }}" class="btn btn--teal btn--sm">+ New asset</a>
+  </div>
+</div>
+
+<div class="filter-form" style="align-items:center;">
+  <input type="search" id="search-q" placeholder="Search name, serial, description…"
+         value="{{ filters.q }}" aria-label="Search assets" autocomplete="off" style="flex:0 1 240px;">
+  <select id="search-category" aria-label="Filter by category">
+    <option value="">All categories</option>
+    {% for key, label in constant('App\\Entity\\Asset::CATEGORY_LABELS') %}
+      <option value="{{ key }}"{{ filters.category == key ? ' selected' : '' }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select id="search-location" aria-label="Filter by location">
+    <option value="">All locations</option>
+    {% for location in locations %}
+      <option value="{{ location }}"{{ filters.location == location ? ' selected' : '' }}>{{ location }}</option>
+    {% endfor %}
+  </select>
+  <div class="pos-tabs" id="status-filters" style="margin-bottom:0;">
+    {% for key, label in statusFilterLabels %}
+      <button type="button" class="pos-tab{{ filters.status == key ? ' is-active' : '' }}" data-status="{{ key }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+</div>
+
+<div id="results">
+  {% include 'admin/assets/_list.html.twig' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const searchInput    = document.getElementById('search-q');
+  const categoryInput  = document.getElementById('search-category');
+  const locationInput  = document.getElementById('search-location');
+  const statusTabs     = document.querySelectorAll('#status-filters .pos-tab');
+  const results        = document.getElementById('results');
+  const exportLink     = document.getElementById('export-link');
+  const endpoint       = '{{ path('app_admin_assets') }}';
+  const exportUrl      = '{{ path('app_admin_assets_export') }}';
+  let currentStatus    = '{{ filters.status }}';
+  let debounce;
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    if (searchInput.value)   params.set('q', searchInput.value);
+    if (categoryInput.value) params.set('category', categoryInput.value);
+    if (locationInput.value) params.set('location', locationInput.value);
+    if (currentStatus)       params.set('status', currentStatus);
+    return params;
+  }
+
+  function updateExportLink() {
+    const qs = currentParams().toString();
+    exportLink.href = qs ? `${exportUrl}?${qs}` : exportUrl;
+  }
+
+  function fetchResults() {
+    const qs = currentParams().toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+    updateExportLink();
+
+    fetch(`${endpoint}${qs ? '?' + qs : ''}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.text())
+      .then(html => { results.innerHTML = html; });
+  }
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(fetchResults, 300);
+  });
+  categoryInput.addEventListener('change', fetchResults);
+  locationInput.addEventListener('change', fetchResults);
+
+  statusTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      currentStatus = tab.dataset.status;
+      statusTabs.forEach(t => t.classList.toggle('is-active', t === tab));
+      fetchResults();
+    });
+  });
+
+  updateExportLink();
+</script>
+{% endblock %}
