@@ -26,6 +26,28 @@ class EventRepository extends ServiceEntityRepository
     }
 
     /**
+     * Published events with an occurrence today or later — a one-off dated today onwards, or a
+     * recurring event whose recurrence hasn't ended. Feeds the public sitemap (SitemapController).
+     *
+     * @return Event[]
+     */
+    public function findPublishedUpcoming(\DateTimeImmutable $today): array
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.status = :published')
+            ->andWhere('
+                (e.isRecurring = false AND e.date >= :today)
+                OR
+                (e.isRecurring = true AND (e.recurUntil IS NULL OR e.recurUntil >= :today))
+            ')
+            ->setParameter('published', Event::STATUS_PUBLISHED)
+            ->setParameter('today', $today)
+            ->orderBy('e.date', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Events that don't accept a ticket as an access method — the only ones an admin can check a
      * member directly onto, since a ticket-accepting event is booked by selling one instead (via
      * the shop/cart) — whose date, or for a recurring event whose recurrence window, overlaps the
