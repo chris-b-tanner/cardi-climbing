@@ -563,8 +563,9 @@ class AdminSalesController extends AbstractController
         return $this->redirectToRoute('app_admin_sale_show', ['id' => $order->getId()]);
     }
 
-    /** A note is mandatory here — an overridden price always needs a recorded reason, unlike the row's note in general. */
+    /** A note is mandatory here — an overridden price always needs a recorded reason, unlike the row's note in general. Admin-only: team members can sell at the standard price but not change it. */
     #[Route('/{id}/rows/price', name: 'app_admin_sale_row_price', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function updateRowPrice(Request $request, SalesOrder $order, EntityManagerInterface $em): Response
     {
         if (!$this->assertOpenAndValid($request, $order)) {

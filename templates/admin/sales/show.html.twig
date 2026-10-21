@@ -161,7 +161,7 @@
                 {% endif %}
               </td>
               <td class="admin-table__muted" style="text-align:right;" data-label="Price">
-                {% if order.status == 'draft' %}
+                {% if order.status == 'draft' and is_granted('ROLE_ADMIN') %}
                   <button type="button" class="price-edit-trigger"
                           data-row-id="{{ row.id }}"
                           data-product-name="{{ row.product.name }}{% if row.product.variantValue %} ({{ row.product.variantValue }}){% endif %}"

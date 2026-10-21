@@ -1,15 +1,17 @@
-# Discounts, promotions & gift vouchers — architecture spec (not yet implemented)
+# Discounts & promotions — architecture spec (not yet implemented)
 
 ## Goal
 
 Let admins run price promotions (percentage or fixed-amount off) across memberships, drop-in
-credits, event tickets, stock and services, plus optionally sell gift vouchers — without bending
-the existing `Product` / `SalesOrder` / `SalesOrderRow` / `Payment` pipeline out of shape.
+credits, event tickets, stock and services, without bending the existing `Product` /
+`SalesOrder` / `SalesOrderRow` / `Payment` pipeline out of shape.
 
 This is a proposal to review, not a build plan to follow blindly — see **Open items** at the end
 for the judgment calls that need an answer first.
 
-## Two different problems, not one
+Gift vouchers are a separate feature with their own spec — see `gift-vouchers-spec.md`.
+
+## Why this is separate from gift vouchers
 
 It's tempting to treat "discount code" and "gift voucher" as the same feature with two names.
 They're not, and conflating them causes real bugs (mainly around VAT and revenue reporting):
@@ -17,16 +19,16 @@ They're not, and conflating them causes real bugs (mainly around VAT and revenue
 - **A discount/promotion reduces the price of the goods.** It changes what's owed, and therefore
   the VAT base and how much revenue the sale recognises. A 20% early-bird ticket discount means
   the ticket genuinely cost 20% less.
-- **A gift voucher is a payment method — stored value, spent later.** It doesn't change what
-  anything costs; it changes *how* an already-priced order gets paid for, the same way cash or a
-  drop-in credit already do. The VAT and the "real" price of the thing bought are unaffected.
+- **A gift voucher is a payment method** — it changes *how* an already-priced order gets paid
+  for, not what anything costs.
 
-Keep these as two separate subsystems that both plug into the same checkout, rather than one
-"Discount" entity trying to be both. The rest of this doc treats them separately.
+Discounts are resolved into `chargedPrice` when a row is created; vouchers act later, at order
+completion, on whatever `order.getTotal()` already is. The two never touch the same field, so
+this spec can be built and shipped without any voucher design decisions being made.
 
 ## The pricing model as it stands today (for reference)
 
-Nothing here changes — this is the pipeline both new pieces sit alongside:
+Nothing here changes — this is the pipeline discounts sit alongside:
 
 - `Product` holds one canonical `price` + `vatCode`. Type-specific data lives in a 1:1 extension
   (`StockProduct`, `CreditProduct`, `MembershipProduct`, `EventTicketProduct`) — no extension
@@ -43,25 +45,15 @@ Nothing here changes — this is the pipeline both new pieces sit alongside:
 - `SalesOrder::getTotal()` just sums `row.chargedPrice * row.qty` — no order-level discount or
   shipping field exists, and none is needed if discounts are resolved into `chargedPrice` before
   the row is ever persisted.
-- `SalesOrderService` owns draft → complete: `completeFree()`, `completeWithCash()`,
-  `startCardPayment()` (sets `Payment.amount = order.getTotal()`), `completeFromPayment()`. A
-  voucher redemption hooks in here, not in the row-pricing step.
-- `FulfilmentHandlerInterface` (tagged `app.fulfilment_handler`, one implementation per
-  `Product::TYPE_*`) is the existing extension point for "what actually happens when a row is
-  paid for". A gift voucher becomes a new product type with its own handler — no changes needed
-  to the dispatch mechanism itself.
 - There's already an ad-hoc, manual escape hatch: `AdminSalesController`'s row price-edit action
   lets an admin set any `chargedPrice` directly, but requires a free-text `note` and leaves no
   structured record of *why*. This should keep working (staff still need to comp things
   case-by-case) — the new system is additive, not a replacement for it.
-- Precedent for "a running balance with an audit trail" already exists twice: `CreditLedgerEntry`
-  (drop-in credit balance) and `InventoryMovement` (stock levels) — both append-only ledgers of
-  balance changes with a `reason`, an optional link to the row/booking that caused it, a `note`,
-  and `createdBy`. Gift vouchers should be a third instance of the same shape, not a new pattern.
+- Precedent for "a running count with an audit trail" already exists: `CreditLedgerEntry`
+  (drop-in credit balance) and `InventoryMovement` (stock levels). `DiscountRedemption` below
+  follows the same append-only idea.
 
-## Part 1 — Discounts & promotions
-
-### New entities
+## New entities
 
 ```
 Discount
@@ -109,7 +101,7 @@ across every row and order a discount has ever touched — exactly the kind of q
 itself is just the fast-path "what actually happened to this line" snapshot, same as
 `vatCodeAtSale`.
 
-### Scope, deliberately kept simple for v1
+## Scope, deliberately kept simple for v1
 
 A discount targets **one line at a time** — a specific product, a whole product type, or (via
 `requiresTag`/`requiresMembershipType`) a specific audience — never "£5 off the whole basket
@@ -123,7 +115,7 @@ than one automatic discount, or an automatic discount and an entered code both a
 picks whichever gives the biggest `amountOff` rather than combining them. Confirm this matches
 expectations; see Open items.
 
-### Where this plugs in
+## Where this plugs in
 
 A single new service — `DiscountEngine` (or similar) — is the one place pricing logic lives:
 
@@ -144,7 +136,7 @@ An entered code is validated against the specific line it's being applied to (pr
 audience match, date window, remaining redemptions) — a code that doesn't fit anything in the
 cart just shows "That code doesn't apply to anything in your basket" rather than a generic error.
 
-### Per product type
+## Per product type
 
 - **Membership**: discount targets the `MembershipProduct`'s `Product` row directly (e.g. "20% off
   Family membership"). `Membership.price` still snapshots what was actually paid — no change
@@ -159,133 +151,36 @@ cart just shows "That code doesn't apply to anything in your basket" rather than
 - **Stock**: targets a specific `StockProduct`'s `Product`, or `appliesToProductType = 'stock'`
   for a storewide clearance sale.
 - **Service**: same as stock — no beneficiary-specific nuance beyond what already exists.
-
-## Part 2 — Gift vouchers
-
-### Sold through the existing pipeline, not a parallel one
-
-A gift voucher is just a new `Product::TYPE_GIFT_VOUCHER`, sold via the same
-`Product`/`SalesOrderRow`/`Payment`/fulfilment flow as everything else — no new purchase UI
-pattern needed, it slots into the shop grid like any other product.
-
-Fixed denominations only for v1 (e.g. separate £10 / £25 / £50 / £100 products, using
-`variantName`/`variantValue` exactly like `StockProduct` size variants already do) rather than a
-free-typed custom amount — that would break the "a Product has one fixed price" assumption
-everything else in the codebase relies on (cart line totals, price snapshotting). Custom amounts
-are an Open item, not MVP.
-
-```
-GiftVoucherProduct                       -- 1:1 extension, same pattern as CreditProduct etc.
-  product            int PK/FK -> product.id
-  faceValue          decimal(8,2)         -- what the voucher is worth to redeem — independent of
-                                           -- whatever chargedPrice the buyer actually paid, so a
-                                           -- voucher bought at a discount still gives full value
-
-GiftVoucher
-  id
-  code               varchar(20) unique   -- e.g. 12-char alphanumeric, generated like MagicLinkService's tokens
-  initialValue       decimal(8,2)         -- copied from faceValue at issuance
-  balance            decimal(8,2)         -- decreases as redeemed
-  purchasedBy        int FK -> user.id
-  recipientName      varchar(150) NULL
-  recipientEmail     varchar(255) NULL
-  personalMessage    text NULL
-  status             varchar(20)          -- active | redeemed | expired | cancelled
-  issuedAt           datetime
-  expiresAt          datetime NULL
-
-GiftVoucherLedgerEntry                    -- mirrors CreditLedgerEntry exactly
-  id
-  giftVoucher        int FK -> gift_voucher.id
-  amountChange       decimal(8,2)         -- negative on redemption
-  reason             varchar(20)          -- issued | redeemed | refunded | expired | adjustment
-  salesOrder         int NULL FK -> sales_order.id   -- the purchase (issued) or the spend (redeemed)
-  note               varchar(255) NULL
-  createdAt, createdBy
-```
-
-The voucher is **bearer, not account-bound**: whoever has the code can spend it, same as a
-physical gift card — it doesn't have to be redeemed by the `recipientEmail` it was addressed to.
-`GiftVoucherFulfilmentHandler::fulfil($row)` mints the `GiftVoucher` on order completion and
-emails the recipient (or the buyer, if no recipient given — a self-purchase) with the code, same
-mailer pattern as `WelcomeMailer`/`BookingMailer`.
-
-### Redemption — a payment method, not a price change
-
-At checkout (public cart and admin POS both need this), a "Have a gift voucher?" code field sits
-**separately** from the discount code field — same input area is fine, but label them distinctly
-so a member isn't confused about what kind of code they're holding.
-
-On completing an order with a voucher applied:
-
-```
-amountFromVoucher = min(voucher.balance, order.getTotal())
-Payment.amount     = order.getTotal() - amountFromVoucher   // only the remainder goes to Stripe/cash
-```
-
-If `amountFromVoucher` covers the order in full, skip Stripe entirely — a new
-`SalesOrderService::completeWithVoucher()` mirroring `completeFree()`/`completeWithCash()`, no
-`Payment` row fabricated for the voucher portion. The spend itself is recorded as a
-`GiftVoucherLedgerEntry` (reason `redemption`, linked to the `SalesOrder`), not as a `Payment` —
-`Payment` keeps meaning "real money moved via a real method" (cash/card/terminal), and "how much
-of our revenue came in via vouchers" is answered by querying the ledger, exactly how
-credit-covered free bookings already coexist with `Payment` today.
-
-**This is also exactly where the accounting question in Open items bites** — see below.
+- **Gift voucher** (only once that feature exists): **never discounted**. `DiscountEngine`
+  always returns no discount for a `TYPE_GIFT_VOUCHER` line, even under a blanket
+  `appliesToProductType = NULL` discount, and the admin form doesn't offer gift voucher as a
+  target type/product. Otherwise a discounted £50 voucher still redeems for £50. See
+  `gift-vouchers-spec.md`.
 
 ## Admin UX sketch
 
 - `/admin/settings/discounts` — new settings page alongside Tags/Certifications/Products,
   ROLE_ADMIN only (matching those). List + create/edit form; redemption count and remaining cap
   shown per discount, linking to the (filtered) sales list for "who's used this".
-- `/admin/vouchers` — list of issued vouchers (code, balance, purchaser, recipient, status),
-  search by code (for a phone-in "can you check my voucher balance" query), a manual
-  balance-adjustment action (mirroring the credit ledger's admin adjustment path) with a required
-  note, and a way to resend the recipient email.
 - Admin POS (`admin/sales/show.html.twig`): a code field next to the existing "Add product"
   picker, applying to whichever row it matches; the existing note-required manual price override
   stays exactly as-is as the case-by-case fallback.
 
 ## Public UX sketch
 
-- Shop page (`/shop`): gift voucher products appear as their own category tile group, same
-  `.pos-tabs` pattern already used for the shop grid and the admin events/sales filters.
-- Cart page: a "Discount code" field and a separate "Gift voucher code" field above the total,
-  each with its own inline apply/remove and a running note of what's been applied and why
-  (`-£8.00 — EARLYBIRD25` / `-£25.00 — gift voucher •••• 4F2A`).
+- Cart page: a "Discount code" field above the total, with inline apply/remove and a running
+  note of what's been applied and why (`-£8.00 — EARLYBIRD25`).
 
 ## Suggested build order
 
 1. `Discount` + `DiscountRedemption` + the two new `SalesOrderRow` columns. `DiscountEngine`
    service. Wire into `CartService::checkout()` and the admin POS row-adding paths. Admin CRUD UI.
-   Cart code-entry UI. No vouchers yet — ship and use this first.
-2. `Product::TYPE_GIFT_VOUCHER` + `GiftVoucherProduct` + `GiftVoucher` +
-   `GiftVoucherLedgerEntry` + `GiftVoucherFulfilmentHandler`. Sellable in the shop, mints a code,
-   sends the recipient email. No redemption yet — a voucher can be bought but not spent.
-3. Redemption: `SalesOrderService::completeWithVoucher()`, the reduced-Stripe-amount wiring, the
-   cart/POS redemption field, the admin voucher lookup/adjustment page.
-4. Later, optional: whole-basket discounts, custom-amount vouchers, stacking beyond
-   "one per line, best wins", expiry-reminder emails, refunding a cancelled paid booking back
-   onto a voucher balance instead of a card refund.
+   Cart code-entry UI.
+2. Later, optional: whole-basket discounts, stacking beyond "one per line, best wins".
 
 ## Open items / decisions needed before building
 
-- **Revenue recognition for vouchers is an accounting question, not just an engineering one.**
-  Recognising the sale as revenue when the voucher is *bought* is simpler to build, but a
-  community-fund/charity context may want proper deferred-revenue treatment (recognise it when
-  *redeemed* instead), which affects reporting and possibly Gift Aid position. Needs an answer
-  from whoever manages the accounts before Part 2 is built — this doc doesn't pick one.
 - Confirm "one discount per line, best value wins" (no stacking) is acceptable, and that
   per-line-only scope (no whole-basket £-off) covers the real scenarios in mind.
-- Voucher expiry: none, or a standard term (12/24 months)? Affects the `expiresAt` default and
-  whether an expiry-reminder email is worth building in phase 4.
-- Fixed denominations only, or is a custom "pay what you want" voucher amount important enough to
-  justify relaxing the one-fixed-price-per-product assumption for this one product type?
-- Can a voucher be redeemed against a donation (a `Payment` with `isDonation()` true, which has no
-  `SalesOrder`)? Proposal above assumes no — vouchers only ever pay off a real `SalesOrder` — but
-  "buy a voucher, redeem it as a donation" is a conceivable ask worth ruling in or out explicitly.
-- Who can create/edit discount codes and issue manual voucher adjustments — ROLE_ADMIN only
-  (matching Products/Tags/Certifications settings), or also ROLE_TEAM?
-- Should a cancelled/refunded booking that was paid for (even partly) with a voucher return that
-  amount to the voucher's balance automatically, or does that always need an admin's manual
-  adjustment with a note (safer default, more staff effort)?
+- Who can create/edit discount codes — ROLE_ADMIN only (matching Products/Tags/Certifications
+  settings), or also ROLE_TEAM?
