@@ -188,7 +188,7 @@ class AdminNoteController extends AbstractController
                     $this->addFlash('success', 'Note added. Email to ' . $noteable->getEmail() . ' scheduled for '
                         . $scheduledFor->setTimezone(new \DateTimeZone('Europe/London'))->format('j M Y, H:i') . '.');
                 } elseif ($wantsEmail) {
-                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef());
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef(), $admin);
                     $this->contactWatchMailer->notifyEmailSent($noteable, $subject, $noteContent, $admin);
                     $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
                     $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');

@@ -50,7 +50,7 @@ final class SendScheduledNoteEmailMessageHandler
         $quoteNote = $message->getQuoteNoteId() ? $this->noteRepository->find($message->getQuoteNoteId()) : null;
 
         try {
-            $this->contactQuickEmailMailer->send($contact, $note->getEmailSubject() ?? '', $note->getContent(), $quoteNote, [], $note->getEmailRef());
+            $this->contactQuickEmailMailer->send($contact, $note->getEmailSubject() ?? '', $note->getContent(), $quoteNote, [], $note->getEmailRef(), $note->getAddedBy());
         } catch (\Throwable $e) {
             error_log('Scheduled note email #' . $note->getId() . ' failed for user ' . $contact->getId() . ': ' . $e->getMessage());
             return;

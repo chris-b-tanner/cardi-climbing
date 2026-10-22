@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use App\Service\Mailer\ContactWatchMailer;
 use App\Service\Mailer\EmailOpenTracking;
 use App\Service\Mailer\EmailPlaceholders;
+use App\Service\Mailer\PersonalSenderAddress;
 use App\Service\UserService;
 use App\Twig\AppExtension;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,6 +38,7 @@ final class SendBulkEmailMessageHandler
         private readonly EmailPlaceholders $emailPlaceholders,
         private readonly AppExtension $appExtension,
         private readonly ContactWatchMailer $contactWatchMailer,
+        private readonly PersonalSenderAddress $personalSenderAddress,
         #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
         #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
         #[Autowire('%env(POSTMARK_BROADCAST_STREAM)%')] private readonly string $broadcastStream,
@@ -71,12 +73,19 @@ final class SendBulkEmailMessageHandler
         }
 
         $mimeMessage = (new TemplatedEmail())
-            ->from(new Address($this->mailerFrom, $this->mailerFromName))
             ->to($user->getEmail())
             ->subject($email->getSubject())
             ->htmlTemplate($htmlTemplate)
             ->textTemplate($textTemplate)
             ->context($context);
+
+        // A single-member send is one-to-one correspondence, so it comes from the admin who sent
+        // it — see PersonalSenderAddress. Everything else comes from the club.
+        if ($email->getAudienceType() === Email::AUDIENCE_USER) {
+            $this->personalSenderAddress->apply($mimeMessage, $sender);
+        } else {
+            $mimeMessage->from(new Address($this->mailerFrom, $this->mailerFromName));
+        }
 
         // Tag/everyone sends are marketing-style broadcasts: they carry one-click unsubscribe
         // (RFC 8058, required by Gmail/Yahoo for bulk senders) and go out on Postmark's broadcast

@@ -5,10 +5,8 @@ namespace App\Service\Mailer;
 use App\Entity\Note;
 use App\Entity\User;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\MimeTypes;
 
 /**
@@ -64,15 +62,15 @@ class ContactQuickEmailMailer
     public function __construct(
         private readonly MailerInterface $mailer,
         private readonly EmailPlaceholders $emailPlaceholders,
-        #[Autowire('%env(MAILER_FROM)%')]      private readonly string $mailerFrom,
-        #[Autowire('%env(MAILER_FROM_NAME)%')] private readonly string $mailerFromName,
+        private readonly PersonalSenderAddress $personalSenderAddress,
     ) {}
 
     /**
      * @param UploadedFile[] $attachments Already checked by AdminNoteController::add() — see attachmentError().
      * @param string|null $emailRef The ref already stored on this email's note — see EmailOpenTracking.
+     * @param User|null $sender The admin sending it, who it comes from — see PersonalSenderAddress.
      */
-    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = [], ?string $emailRef = null): void
+    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = [], ?string $emailRef = null, ?User $sender = null): void
     {
         if (!$contact->getEmail()) {
             return;
@@ -89,12 +87,13 @@ class ContactQuickEmailMailer
         }
 
         $email = (new TemplatedEmail())
-            ->from(new Address($this->mailerFrom, $this->mailerFromName))
             ->to($contact->getEmail())
             ->subject($subject)
             ->htmlTemplate('email/bulk_blank.html.twig')
             ->textTemplate('email/bulk_blank.txt.twig')
             ->context($context);
+
+        $this->personalSenderAddress->apply($email, $sender);
 
         if ($emailRef !== null) {
             EmailOpenTracking::tag($email, $emailRef);
