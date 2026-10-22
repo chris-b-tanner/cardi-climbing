@@ -9,10 +9,10 @@ use Symfony\Component\Mime\Email;
 
 /**
  * The From for one-to-one emails an admin sends a single member (a single-member compose send, or
- * a quick email from the member page's add-note form): "{firstname}@{our domain}", named after the
- * admin, so it reads as coming from a person rather than the club. Each of those addresses has to
- * be set up as a Postmark sender signature, or Postmark refuses the send. Falls back to the usual
- * MAILER_FROM when there's no sender or they have no first name.
+ * a quick email from the member page's add-note form): "{firstname}@{our domain}", named
+ * "First (Cardigan Climbing)", so it reads as coming from a person at the club. Each of those
+ * addresses has to be set up as a Postmark sender signature, or Postmark refuses the send. Falls
+ * back to the usual MAILER_FROM when there's no sender or they have no first name.
  *
  * Reply-To stays MAILER_FROM: replies are tracked by that inbox forwarding to Postmark's inbound
  * webhook (see WebhookController::inbound()), so a reply to the personal address would never make
@@ -37,7 +37,7 @@ class PersonalSenderAddress
         $domain = substr($this->mailerFrom, strrpos($this->mailerFrom, '@') + 1);
 
         return $email
-            ->from(new Address($local . '@' . $domain, $sender->getDisplayName()))
+            ->from(new Address($local . '@' . $domain, trim($sender->getFirstName()) . ' (Cardigan Climbing)'))
             ->replyTo($default);
     }
 
