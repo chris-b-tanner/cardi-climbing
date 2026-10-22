@@ -212,7 +212,7 @@ job_cm_apply_subject: "Centre Manager application"
 
 cookie_banner_label: "Cookie consent"
 cookie_banner_text: "We'd like to use analytics cookies to see how people use this site so we can improve it. They're only set if you accept."
-cookie_banner_more: "Read our policies"
+cookie_banner_more: "Read our privacy policy"
 cookie_accept: "Accept"
 cookie_reject: "Reject"
 cookie_settings: "Cookie settings"

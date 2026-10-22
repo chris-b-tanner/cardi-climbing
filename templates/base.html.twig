@@ -257,7 +257,7 @@
 {# Kiosk/shared-device pages override this and the analytics block to opt out entirely. #}
 {% block cookie_banner %}
 <div class="cookie-banner" id="cookie-banner" role="region" aria-label="{{ 'cookie_banner_label'|trans }}" hidden>
-  <p class="cookie-banner__text">{{ 'cookie_banner_text'|trans }} <a href="{{ path('app_policies') }}">{{ 'cookie_banner_more'|trans }}</a></p>
+  <p class="cookie-banner__text">{{ 'cookie_banner_text'|trans }} <a href="{{ path('app_policy_privacy') }}">{{ 'cookie_banner_more'|trans }}</a></p>
   <div class="cookie-banner__actions">
     <button type="button" class="btn btn--sm btn--outline" data-cookie-choice="denied">{{ 'cookie_reject'|trans }}</button>
     <button type="button" class="btn btn--sm btn--outline" data-cookie-choice="granted">{{ 'cookie_accept'|trans }}</button>

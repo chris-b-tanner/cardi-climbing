@@ -1,0 +1,22 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title }} — Y Wal{% endblock %}
+{% block og_title %}{{ title }} — Y Wal{% endblock %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <p class="policy__back"><a href="{{ path('app_policies') }}">&larr; All policies</a></p>
+    <h1 class="page-hero__h1">{{ title }}</h1>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <iframe class="sponsorship__doc" src="{{ docEmbedUrl }}" title="{{ title }}" loading="lazy"></iframe>
+    <p class="sponsorship__doc-link">
+      <a href="{{ docUrl }}" target="_blank" rel="noopener" class="btn btn--teal">Open in Google Docs</a>
+    </p>
+  </div>
+</section>
+{% endblock %}
