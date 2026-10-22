@@ -31,6 +31,7 @@ class SitemapController extends AbstractController
         'app_policy_privacy',
         'app_policy_safeguarding',
         'app_policy_social_media',
+        'app_policy_complaints',
     ];
 
     #[Route('/sitemap.xml', name: 'app_sitemap', methods: ['GET'], format: 'xml')]

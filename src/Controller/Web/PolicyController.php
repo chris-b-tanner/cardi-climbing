@@ -10,6 +10,7 @@ class PolicyController extends AbstractController
 {
     private const SAFEGUARDING_DOC_ID = '1SKVGw8GQCbvLjY8u9o8y723cbqBXpVG123Kk3rXp5Ns';
     private const SOCIAL_MEDIA_DOC_ID = '1Y644oDtfj2UGKHjA3Grkkjw0T6qCkmyAOda1SCgsc_8';
+    private const COMPLAINTS_DOC_ID = '1BN5w6oJ0nzU-rGOcDDoOLYscNpqEb1nhxGpy6CTEUZs';
 
     #[Route('/policies', name: 'app_policies')]
     public function index(): Response
@@ -33,6 +34,12 @@ class PolicyController extends AbstractController
     public function socialMedia(): Response
     {
         return $this->renderDoc('Social Media Policy', self::SOCIAL_MEDIA_DOC_ID);
+    }
+
+    #[Route('/policies/complaints-and-whistleblowing', name: 'app_policy_complaints')]
+    public function complaints(): Response
+    {
+        return $this->renderDoc('Complaints and Whistleblowing Policy', self::COMPLAINTS_DOC_ID);
     }
 
     private function renderDoc(string $title, string $docId): Response
