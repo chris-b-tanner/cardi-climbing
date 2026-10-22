@@ -134,9 +134,6 @@
         <span class="lang-switch__sep">/</span>
         <a href="/?lang=cy" class="{{ app.request.locale == 'cy' ? 'lang-switch__current' : '' }}">CY</a>
       </div>
-      {% if not is_granted('ROLE_USER') %}
-        <a href="{{ path('app_home') }}#involved" class="btn btn--teal nav__cta">{{ 'nav_cta'|trans }}</a>
-      {% endif %}
       <button class="nav__hamburger" id="nav-toggle" aria-label="Menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -166,7 +163,6 @@
           <span class="lang-switch__sep">/</span>
           <a href="/?lang=cy" class="{{ app.request.locale == 'cy' ? 'lang-switch__current' : '' }}">CY</a>
         </div>
-        <a href="{{ path('app_home') }}#involved" class="btn btn--teal nav__mobile-link">{{ 'nav_cta'|trans }}</a>
       </div>
     </div>
   </div>

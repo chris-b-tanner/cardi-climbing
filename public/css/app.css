@@ -141,10 +141,8 @@ p + p { margin-top: 1rem; }
 @media (min-width: 640px) { .nav__hamburger { display: none; } }
 
 /* ── Mobile menu ────────────────────────────────────── */
-.nav__cta        { display: none; }
 .nav__lang-desktop { display: none; }
 @media (min-width: 640px) {
-  .nav__cta          { display: inline-block; }
   .nav__lang-desktop { display: flex; }
 }
 .nav__mobile {
