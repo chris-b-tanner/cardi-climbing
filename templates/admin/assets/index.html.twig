@@ -17,7 +17,7 @@
          value="{{ filters.q }}" aria-label="Search assets" autocomplete="off" style="flex:0 1 240px;">
   <select id="search-category" aria-label="Filter by category">
     <option value="">All categories</option>
-    {% for key, label in constant('App\\Entity\\Asset::CATEGORY_LABELS') %}
+    {% for key, label in constant('App\\Entity\\Asset::CATEGORY_LABELS')|sort %}
       <option value="{{ key }}"{{ filters.category == key ? ' selected' : '' }}>{{ label }}</option>
     {% endfor %}
   </select>

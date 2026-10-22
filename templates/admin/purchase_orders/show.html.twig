@@ -2,7 +2,7 @@
 {% block title %}{{ po.number }} — Purchasing{% endblock %}
 
 {% set vatLabels      = constant('App\\Entity\\Product::VAT_LABELS') %}
-{% set categoryLabels = constant('App\\Entity\\PurchaseOrderLine::CATEGORY_LABELS') %}
+{% set categoryLabels = constant('App\\Entity\\PurchaseOrderLine::CATEGORY_LABELS')|sort %}
 {% set isAdmin        = is_granted('ROLE_ADMIN') %}
 {% set isRaiser       = po.createdBy and po.createdBy == app.user %}
 {% set editable       = po.editable %}
@@ -56,14 +56,26 @@
     </div>
   </div>
 
-  <div class="card__label" style="margin:1rem 0 0.4rem;">History</div>
-  <ul class="po-history">
-    <li>Raised {{ po.createdAt|date('d M Y, H:i') }}{% if po.createdBy %} by {{ po.createdBy.displayName }}{% endif %}</li>
-    {% if po.submittedAt %}<li>Submitted {{ po.submittedAt|date('d M Y, H:i') }}{% if po.submittedBy %} by {{ po.submittedBy.displayName }}{% endif %}</li>{% endif %}
-    {% if po.approvedAt %}<li>Approved {{ po.approvedAt|date('d M Y, H:i') }}{% if po.approvedBy %} by {{ po.approvedBy.displayName }}{% endif %}</li>{% endif %}
-    {% if po.orderedAt %}<li>Ordered {{ po.orderedAt|date('d M Y, H:i') }}{% if po.orderedBy %} by {{ po.orderedBy.displayName }}{% endif %}</li>{% endif %}
-    {% for receipt in po.receipts|slice(0, 1) %}<li>Last delivery {{ receipt.receivedAt|date('d M Y') }}</li>{% endfor %}
-  </ul>
+  {% if po.status != 'cancelled' %}
+    <details class="po-line-edit" style="margin-top:0.75rem;">
+      <summary>Edit reference and delivery date</summary>
+      <form method="post" action="{{ path('app_admin_purchase_order_details', {id: po.id}) }}" novalidate>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_details_' ~ po.id) }}">
+        <div class="detail-grid">
+          <div class="form-group">
+            <label for="details-reference">Their reference</label>
+            <input type="text" id="details-reference" name="supplierReference" class="form-control" maxlength="100" value="{{ po.supplierReference }}">
+          </div>
+          <div class="form-group">
+            <label for="details-expected">Expected delivery</label>
+            <input type="date" id="details-expected" name="expectedAt" class="form-control" value="{{ po.expectedAt ? po.expectedAt|date('Y-m-d') : '' }}">
+          </div>
+        </div>
+        <button type="submit" class="btn btn--ghost btn--sm">Save</button>
+      </form>
+    </details>
+  {% endif %}
+
 </div>
 
 {# ── Actions for the current status ─────────────────────────────────── #}
@@ -318,105 +330,21 @@
   </table>
 
   {% if editable %}
-    <div style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
-      <div class="pos-tabs" id="add-line-tabs" style="margin-bottom:0.75rem;">
-        <button type="button" class="pos-tab is-active" data-panel="stock">Add stock item</button>
-        <button type="button" class="pos-tab" data-panel="nonstock">Add other item</button>
-      </div>
-
-      <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" data-add-panel="stock" novalidate>
-        <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
-        <input type="hidden" name="kind" value="stock">
-        {% if stockProducts is empty %}
-          <p style="font-size:0.875rem;color:var(--muted);margin:0;">There are no stock products yet. Add them under Settings &raquo; Products, or use "Add other item".</p>
-        {% else %}
-          <div class="form-group">
-            <label for="stock-filter">Product</label>
-            <input type="search" id="stock-filter" class="form-control" placeholder="Filter by name or SKU…" autocomplete="off" style="margin-bottom:0.4rem;">
-            <select id="stock-product" name="productId" class="form-control" size="6" required>
-              {% for product in stockProducts %}
-                {% set sp = product.stockProduct %}
-                {% if sp %}
-                  <option value="{{ product.id }}" data-cost="{{ sp.costPrice }}" data-vat="{{ product.vatCode }}"
-                          data-search="{{ (product.name ~ ' ' ~ product.variantValue ~ ' ' ~ sp.sku)|lower }}">
-                    {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %} — {{ sp.sku }} — {{ sp.currentStock }} in stock{% if not product.isActive %} — inactive{% endif %}
-                  </option>
-                {% endif %}
-              {% endfor %}
-            </select>
-          </div>
-          <div class="detail-grid">
-            <div class="form-group">
-              <label for="stock-qty">Qty</label>
-              <input type="number" id="stock-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
-            </div>
-            <div class="form-group">
-              <label for="stock-cost">Unit cost (£, net)</label>
-              <input type="number" id="stock-cost" name="unitCost" class="form-control" min="0" step="0.01" placeholder="Current average cost">
-            </div>
-            <div class="form-group">
-              <label for="stock-vat">VAT</label>
-              <select id="stock-vat" name="vatCode" class="form-control">
-                {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="stock-code">Their code</label>
-              <input type="text" id="stock-code" name="supplierCode" class="form-control" maxlength="100">
-            </div>
-          </div>
-          <button type="submit" class="btn btn--teal btn--sm">Add line</button>
-        {% endif %}
-      </form>
-
-      <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" data-add-panel="nonstock" style="display:none;" novalidate>
-        <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
-        <input type="hidden" name="kind" value="nonstock">
-        <div class="form-group">
-          <label for="ns-description">Description</label>
-          <input type="text" id="ns-description" name="description" class="form-control" maxlength="255" placeholder="e.g. Large volumes set, 5 pcs" required>
-        </div>
-        <div class="detail-grid">
-          <div class="form-group">
-            <label for="ns-category">Category</label>
-            <select id="ns-category" name="category" class="form-control">
-              {% for key, label in categoryLabels %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="ns-qty">Qty</label>
-            <input type="number" id="ns-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
-          </div>
-          <div class="form-group">
-            <label for="ns-cost">Unit cost (£, net)</label>
-            <input type="number" id="ns-cost" name="unitCost" class="form-control" min="0" step="0.01" required>
-          </div>
-          <div class="form-group">
-            <label for="ns-vat">VAT</label>
-            <select id="ns-vat" name="vatCode" class="form-control">
-              {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="ns-code">Their code</label>
-          <input type="text" id="ns-code" name="supplierCode" class="form-control" maxlength="100">
-        </div>
-        <button type="submit" class="btn btn--teal btn--sm">Add line</button>
-      </form>
+    <div class="btn-row" style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
+      <button type="button" class="btn btn--teal btn--sm" data-open-modal="add-stock-modal">+ Add stock item</button>
+      <button type="button" class="btn btn--ghost btn--sm" data-open-modal="add-other-modal">+ Add other item</button>
     </div>
   {% endif %}
 </div>
 
-{# ── Details (header fields) ─────────────────────────────────────────── #}
-{% if not closed %}
+{# ── Supplier and delivery charge (drafts only) ──────────────────────── #}
+{% if editable %}
   <div class="card" style="margin-top:1.25rem;">
-    <details{% if editable %} open{% endif %}>
-      <summary class="card__label" style="cursor:pointer;">Order details</summary>
+    <details open>
+      <summary class="card__label" style="cursor:pointer;">Supplier and delivery charge</summary>
       <form method="post" action="{{ path('app_admin_purchase_order_details', {id: po.id}) }}" style="margin-top:0.75rem;" novalidate>
         <input type="hidden" name="_csrf_token" value="{{ csrf_token('admin_po_details_' ~ po.id) }}">
-        {% if editable %}
-          <div class="form-group">
+        <div class="form-group">
             <label for="details-supplier">Supplier</label>
             <select id="details-supplier" name="supplierId" class="form-control">
               {% for supplier in suppliers %}
@@ -425,17 +353,7 @@
               {% if po.supplier not in suppliers %}<option value="{{ po.supplier.id }}" selected>{{ po.supplier.supplierName }} (no longer a supplier)</option>{% endif %}
             </select>
           </div>
-        {% endif %}
         <div class="detail-grid">
-          <div class="form-group">
-            <label for="details-reference">Their reference</label>
-            <input type="text" id="details-reference" name="supplierReference" class="form-control" maxlength="100" value="{{ po.supplierReference }}">
-          </div>
-          <div class="form-group">
-            <label for="details-expected">Expected delivery</label>
-            <input type="date" id="details-expected" name="expectedAt" class="form-control" value="{{ po.expectedAt ? po.expectedAt|date('Y-m-d') : '' }}">
-          </div>
-          {% if editable %}
             <div class="form-group">
               <label for="details-delivery">Delivery charge (£, net)</label>
               <input type="number" id="details-delivery" name="deliveryCharge" class="form-control" min="0" step="0.01" value="{{ po.deliveryCharge }}">
@@ -448,9 +366,8 @@
                 {% endfor %}
               </select>
             </div>
-          {% endif %}
         </div>
-        <button type="submit" class="btn btn--ghost btn--sm">Save details</button>
+        <button type="submit" class="btn btn--ghost btn--sm">Save</button>
       </form>
     </details>
   </div>
@@ -494,7 +411,7 @@
   <div class="card" style="margin-top:1.25rem;">
     <div class="card__label" style="margin-bottom:0.6rem;">Supplier invoices</div>
     {% if po.invoices is empty %}
-      <p style="color:var(--muted);font-size:0.875rem;">No invoices uploaded yet.</p>
+      <div class="flash flash--muted">No invoices uploaded yet.</div>
     {% else %}
       <div class="table-scroll" style="margin-bottom:1rem;">
         <table class="admin-table">
@@ -560,11 +477,110 @@
   </div>
 </div>
 </div>
+{% if editable %}
+  <div id="add-stock-modal" class="pos-modal" style="display:none;">
+    <div class="pos-modal__backdrop" data-close-modal></div>
+    <div class="pos-modal__box po-add-modal__box">
+      <div class="pos-modal__header">
+        <strong>Add stock item</strong>
+        <button type="button" class="btn btn--ghost btn--sm" data-close-modal>✕</button>
+      </div>
+          <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" novalidate>
+            <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+            <input type="hidden" name="kind" value="stock">
+            {% if stockProducts is empty %}
+              <p style="font-size:0.875rem;color:var(--muted);margin:0;">There are no stock products yet. Add them under Settings &raquo; Products, or use "Add other item".</p>
+            {% else %}
+              <div class="form-group">
+                <label for="stock-filter">Product</label>
+                <input type="search" id="stock-filter" class="form-control" placeholder="Filter by name or SKU…" autocomplete="off" style="margin-bottom:0.4rem;">
+                <select id="stock-product" name="productId" class="form-control" size="6" required>
+                  {% for product in stockProducts %}
+                    {% set sp = product.stockProduct %}
+                    {% if sp %}
+                      <option value="{{ product.id }}" data-cost="{{ sp.costPrice }}" data-vat="{{ product.vatCode }}"
+                              data-search="{{ (product.name ~ ' ' ~ product.variantValue ~ ' ' ~ sp.sku)|lower }}">
+                        {{ product.name }}{% if product.variantValue %} ({{ product.variantValue }}){% endif %} — {{ sp.sku }} — {{ sp.currentStock }} in stock{% if not product.isActive %} — inactive{% endif %}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="detail-grid">
+                <div class="form-group">
+                  <label for="stock-qty">Qty</label>
+                  <input type="number" id="stock-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
+                </div>
+                <div class="form-group">
+                  <label for="stock-cost">Unit cost (£, net)</label>
+                  <input type="number" id="stock-cost" name="unitCost" class="form-control" min="0" step="0.01" placeholder="Current average cost">
+                </div>
+                <div class="form-group">
+                  <label for="stock-vat">VAT</label>
+                  <select id="stock-vat" name="vatCode" class="form-control">
+                    {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="stock-code">Their code</label>
+                  <input type="text" id="stock-code" name="supplierCode" class="form-control" maxlength="100">
+                </div>
+              </div>
+              <button type="submit" class="btn btn--teal btn--sm">Add line</button>
+            {% endif %}
+          </form>
+    </div>
+  </div>
+
+  <div id="add-other-modal" class="pos-modal" style="display:none;">
+    <div class="pos-modal__backdrop" data-close-modal></div>
+    <div class="pos-modal__box po-add-modal__box">
+      <div class="pos-modal__header">
+        <strong>Add other item</strong>
+        <button type="button" class="btn btn--ghost btn--sm" data-close-modal>✕</button>
+      </div>
+          <form method="post" action="{{ path('app_admin_purchase_order_line_add', {id: po.id}) }}" novalidate>
+            <input type="hidden" name="_csrf_token" value="{{ linesToken }}">
+            <input type="hidden" name="kind" value="nonstock">
+            <div class="form-group">
+              <label for="ns-description">Description</label>
+              <input type="text" id="ns-description" name="description" class="form-control" maxlength="255" placeholder="e.g. Large volumes set, 5 pcs" required>
+            </div>
+            <div class="detail-grid">
+              <div class="form-group">
+                <label for="ns-category">Category</label>
+                <select id="ns-category" name="category" class="form-control">
+                  {% for key, label in categoryLabels %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="ns-qty">Qty</label>
+                <input type="number" id="ns-qty" name="qty" class="form-control" min="1" step="1" value="1" required>
+              </div>
+              <div class="form-group">
+                <label for="ns-cost">Unit cost (£, net)</label>
+                <input type="number" id="ns-cost" name="unitCost" class="form-control" min="0" step="0.01" required>
+              </div>
+              <div class="form-group">
+                <label for="ns-vat">VAT</label>
+                <select id="ns-vat" name="vatCode" class="form-control">
+                  {% for code, label in vatLabels %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="ns-code">Their code</label>
+              <input type="text" id="ns-code" name="supplierCode" class="form-control" maxlength="100">
+            </div>
+            <button type="submit" class="btn btn--teal btn--sm">Add line</button>
+          </form>
+    </div>
+  </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <style>
-  .po-history { list-style: none; margin: 0; padding: 0; font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
   .po-action { margin-bottom: 0.6rem; }
   .po-action > summary, .po-line-edit > summary {
     cursor: pointer; font-size: 0.85rem; color: var(--teal-dk); font-weight: 600; margin-bottom: 0.5rem;
@@ -572,21 +588,29 @@
   .po-line-edit { margin-top: 0.4rem; }
   .po-line-edit > summary { font-size: 0.75rem; font-weight: normal; margin-bottom: 0.4rem; }
   .po-line-edit form { margin-top: 0.4rem; }
+  .po-add-modal__box { width: min(640px, calc(100vw - 2rem)); }
   .po-totals { margin: 0.75rem 0 0 auto; border-collapse: collapse; font-size: 0.875rem; }
   .po-totals td { padding: 0.2rem 0 0.2rem 1.5rem; text-align: right; color: var(--muted); }
   .po-totals__grand td { color: var(--black); font-weight: 700; border-top: 1px solid var(--border); padding-top: 0.4rem; }
 </style>
 <script>
   (function () {
-    const tabs = document.querySelectorAll('#add-line-tabs .pos-tab');
-    if (!tabs.length) return; // not a draft
+    const openers = document.querySelectorAll('[data-open-modal]');
+    if (!openers.length) return; // not a draft
 
-    tabs.forEach(tab => tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.toggle('is-active', t === tab));
-      document.querySelectorAll('[data-add-panel]').forEach(panel => {
-        panel.style.display = panel.dataset.addPanel === tab.dataset.panel ? '' : 'none';
-      });
+    openers.forEach(btn => btn.addEventListener('click', () => {
+      const modal = document.getElementById(btn.dataset.openModal);
+      modal.style.display = 'flex';
+      const first = modal.querySelector('input:not([type=hidden]), select, textarea');
+      if (first) first.focus();
     }));
+    document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', () => {
+      el.closest('.pos-modal').style.display = 'none';
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll('.pos-modal').forEach(m => { m.style.display = 'none'; });
+    });
 
     // Stock product picker: filter the list as you type, and suggest the product's VAT rate and
     // current average cost when one's picked.

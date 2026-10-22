@@ -54,6 +54,20 @@
           <label for="dateOfBirth">Date of birth</label>
           <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-control" autocomplete="off">
         </div>
+        {% if is_granted('ROLE_ADMIN') %}
+          <div class="form-group" style="margin-top:1rem;margin-bottom:0;">
+            <label style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;text-transform:none;font-size:0.875rem;color:var(--black);">
+              <input type="checkbox" id="isSupplier" name="isSupplier" value="1"
+                     style="width:1rem;height:1rem;accent-color:var(--teal);">
+              Supplier — we buy from them on purchase orders
+            </label>
+            <div id="supplier-fields" style="margin-top:0.6rem;display:none;">
+              <label for="supplierAccountReference">Our account number with them</label>
+              <input type="text" id="supplierAccountReference" name="supplierAccountReference" class="form-control"
+                     maxlength="100" autocomplete="off" style="max-width:16rem;">
+            </div>
+          </div>
+        {% endif %}
       </div>
 
       <div class="form-actions">
@@ -83,6 +97,14 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  (function () {
+    const box    = document.getElementById('isSupplier');
+    const fields = document.getElementById('supplier-fields');
+    if (!box || !fields) return; // not an admin
+    box.addEventListener('change', () => { fields.style.display = box.checked ? '' : 'none'; });
+  })();
+</script>
 {% include 'admin/users/_contact_validation.html.twig' with {formId: 'new-member-form'} %}
 <style>
   .new-member-wrap {

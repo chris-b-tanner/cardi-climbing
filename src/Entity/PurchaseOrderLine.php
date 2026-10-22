@@ -22,6 +22,7 @@ class PurchaseOrderLine
     public const CATEGORY_SETTING_TOOLS = 'setting_tools';
     public const CATEGORY_CLEANING      = 'cleaning';
     public const CATEGORY_MAINTENANCE   = 'maintenance';
+    public const CATEGORY_MARKETING     = 'marketing';
     public const CATEGORY_OFFICE        = 'office';
     public const CATEGORY_OTHER         = 'other';
 
@@ -32,6 +33,7 @@ class PurchaseOrderLine
         self::CATEGORY_SETTING_TOOLS => 'Setting tools',
         self::CATEGORY_CLEANING      => 'Cleaning',
         self::CATEGORY_MAINTENANCE   => 'Maintenance',
+        self::CATEGORY_MARKETING     => 'Marketing',
         self::CATEGORY_OFFICE        => 'Office',
         self::CATEGORY_OTHER         => 'Other',
     ];

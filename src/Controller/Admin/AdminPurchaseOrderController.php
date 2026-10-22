@@ -109,15 +109,19 @@ class AdminPurchaseOrderController extends AbstractController
         ]);
     }
 
-    /** Header details. On a draft everything can change; once submitted, only the supplier's reference and the expected date (both often only known when it's placed). */
+    /**
+     * Header details. The supplier's reference and the expected date can be corrected at any point
+     * until the order's cancelled (both are often only known once it's placed); the supplier and
+     * delivery charge only while it's a draft.
+     */
     #[Route('/{id}/details', name: 'app_admin_purchase_order_details', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function details(Request $request, PurchaseOrder $po, EntityManagerInterface $em): Response
     {
         if (!$this->assertCsrf($request, 'admin_po_details_' . $po->getId())) {
             return $this->redirectToShow($po);
         }
-        if (in_array($po->getStatus(), [PurchaseOrder::STATUS_RECEIVED, PurchaseOrder::STATUS_CANCELLED], true)) {
-            $this->addFlash('error', 'This order is closed.');
+        if ($po->getStatus() === PurchaseOrder::STATUS_CANCELLED) {
+            $this->addFlash('error', 'This order has been cancelled.');
             return $this->redirectToShow($po);
         }
 
@@ -664,12 +668,18 @@ class AdminPurchaseOrderController extends AbstractController
         ];
     }
 
-    /** Header fields from a form. With {allFields} false only the supplier reference and expected date are read. Returns an error message or null. */
+    /**
+     * Header fields from a form. The supplier reference and expected date are only touched when the
+     * form sends them, so a form without them (the draft's supplier/delivery box) leaves them alone.
+     * With {allFields} false the supplier and delivery charge are never read. Returns an error message or null.
+     */
     private function applyDetails(Request $request, PurchaseOrder $po, bool $allFields): ?string
     {
-        $reference   = trim($request->request->get('supplierReference', ''));
-        $expectedRaw = trim($request->request->get('expectedAt', ''));
-        $expectedAt  = $this->parseDate($expectedRaw);
+        $hasReference = $request->request->has('supplierReference');
+        $hasExpected  = $request->request->has('expectedAt');
+        $reference    = trim($request->request->get('supplierReference', ''));
+        $expectedRaw  = trim($request->request->get('expectedAt', ''));
+        $expectedAt   = $this->parseDate($expectedRaw);
 
         if (mb_strlen($reference) > 100) {
             return 'Keep the supplier\'s reference under 100 characters.';
@@ -701,8 +711,12 @@ class AdminPurchaseOrderController extends AbstractController
             $po->setDeliveryVatCode($deliveryVat);
         }
 
-        $po->setSupplierReference($reference !== '' ? $reference : null);
-        $po->setExpectedAt($expectedAt);
+        if ($hasReference) {
+            $po->setSupplierReference($reference !== '' ? $reference : null);
+        }
+        if ($hasExpected) {
+            $po->setExpectedAt($expectedAt);
+        }
 
         return null;
     }

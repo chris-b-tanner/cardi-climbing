@@ -110,7 +110,7 @@ Totals (net, VAT, gross) are calculated from the lines plus the delivery charge,
 | `purchaseOrder` | ManyToOne | |
 | `stockProduct` | ?ManyToOne `StockProduct` | Set for a stock line, null for a non-stock line |
 | `description` | string(255) | Pre-filled from the product name and variant for a stock line. Free text otherwise ("Large volumes set, 5 pcs"). |
-| `category` | ?string(30) | Non-stock lines only. Constant list: `holds_volumes`, `equipment`, `ppe`, `setting_tools`, `cleaning`, `maintenance`, `office`, `other`. Used for spend reports. |
+| `category` | ?string(30) | Non-stock lines only. Constant list: `holds_volumes`, `equipment`, `ppe`, `setting_tools`, `cleaning`, `maintenance`, `marketing`, `office`, `other`. Used for spend reports. |
 | `supplierCode` | ?string(100) | The supplier's part number, if different from our SKU |
 | `qty` | int | Ordered quantity, at least 1 |
 | `unitCost` | decimal(8,2) | Net, ex VAT. Pre-filled from `StockProduct.costPrice` for a stock line, but editable, since prices change. |

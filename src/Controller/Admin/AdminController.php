@@ -196,8 +196,12 @@ class AdminController extends AbstractController
             $dobRaw = trim($request->request->get('dateOfBirth', ''));
             $dob    = $dobRaw !== '' ? (\DateTimeImmutable::createFromFormat('Y-m-d', $dobRaw) ?: null) : null;
 
+            $accountReference = trim($request->request->get('supplierAccountReference', ''));
+
             if ($email !== null && $userService->findExistingByEmail($email)) {
                 $error = 'A member with that email address already exists.';
+            } elseif (mb_strlen($accountReference) > 100) {
+                $error = 'Keep the supplier account number under 100 characters.';
             } else {
                 /** @var User $admin */
                 $admin = $this->getUser();
@@ -218,8 +222,15 @@ class AdminController extends AbstractController
                 $memo = trim($request->request->get('memo', ''));
                 if ($memo !== '') {
                     $user->setMemo($memo);
-                    $em->flush();
                 }
+
+                // Supplier flag — admin-only, as on the edit form.
+                if ($this->isGranted('ROLE_ADMIN') && $request->request->has('isSupplier')) {
+                    $user->setIsSupplier(true);
+                    $user->setSupplierAccountReference($accountReference !== '' ? $accountReference : null);
+                }
+
+                $em->flush();
 
                 $this->addFlash('success', 'Member created.');
                 return $this->redirectToRoute('app_admin_user_show', ['id' => $user->getId()]);
