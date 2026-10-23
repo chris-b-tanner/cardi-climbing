@@ -9,7 +9,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * MOCKUP — public list of the routes currently set at the wall, used to show prospective
  * route sponsors what a branded route looks like. Data is hard-coded below and will be replaced
- * by the route management system; the sponsors and their logos are fictional.
+ * by the route management system; the sponsors and their logos are fictional, apart from Harvst.
  */
 class ClimbingRoutesController extends AbstractController
 {
@@ -39,6 +39,13 @@ class ClimbingRoutesController extends AbstractController
             'tagline' => 'Kit for the Ceredigion coast and crag',
             'colour'  => '#0f5c74',
         ],
+        'harvst' => [
+            'name'    => 'Harvst',
+            'logo'    => '/images/routes-mock/harvst.png',
+            'url'     => 'https://harvst.io',
+            'tagline' => 'Grow more',
+            'colour'  => '#3a3a3a',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -52,14 +59,14 @@ class ClimbingRoutesController extends AbstractController
 
     /**
      * Attaches grade rank and sponsor details, then orders by popularity (the default sort),
-     * keeping pinned routes at the top.
+     * keeping sponsored routes pinned at the top — the template's sort keeps them there too.
      */
     private function prepare(array $routes, array $grades): array
     {
         foreach ($routes as &$route) {
             $route['gradeRank'] = array_search($route['grade'], $grades, true);
             $route['sponsor']   = isset($route['sponsor']) ? self::SPONSORS[$route['sponsor']] : null;
-            $route['pinned']    = $route['pinned'] ?? false;
+            $route['pinned']    = $route['sponsor'] !== null;
         }
         unset($route);
 
@@ -81,7 +88,7 @@ class ClimbingRoutesController extends AbstractController
             ['grade' => 'V6', 'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Cat',  'setOn' => '2026-09-18', 'ascents' => 38,  'rating' => 4.7, 'name' => 'Teifi Tide', 'sponsor' => 'coastline'],
             ['grade' => 'V3', 'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Zone 2 – Arête', 'setter' => 'Owain','setOn' => '2026-10-02', 'ascents' => 119, 'rating' => 3.8],
             ['grade' => 'V7', 'colour' => 'Grey',   'hex' => '#8a8a8a', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-09-18', 'ascents' => 17,  'rating' => 4.9, 'name' => 'Bara Brith', 'namedBy' => 'Dafydd P.'],
-            ['grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0],
+            ['grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst'],
             ['grade' => 'V4', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Owain','setOn' => '2026-09-25', 'ascents' => 77,  'rating' => 4.4],
         ];
     }
@@ -90,11 +97,11 @@ class ClimbingRoutesController extends AbstractController
     {
         return [
             ['grade' => '5',   'colour' => 'Green',  'hex' => '#3c9a5f', 'wall' => 'Line 1', 'style' => 'Auto-belay', 'setter' => 'Cat',  'setOn' => '2026-10-05', 'ascents' => 164, 'rating' => 4.2],
-            ['grade' => '6a+', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-09-28', 'ascents' => 98,  'rating' => 4.6, 'name' => 'High Tide Line', 'sponsor' => 'coastline', 'pinned' => true],
+            ['grade' => '6a+', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-09-28', 'ascents' => 98,  'rating' => 4.6, 'name' => 'High Tide Line', 'sponsor' => 'coastline'],
             ['grade' => '4',   'colour' => 'White',  'hex' => '#ffffff', 'wall' => 'Line 1', 'style' => 'Auto-belay', 'setter' => 'Owain','setOn' => '2026-10-05', 'ascents' => 203, 'rating' => 3.9],
-            ['grade' => '6c',  'colour' => 'Red',    'hex' => '#d6402f', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-21', 'ascents' => 41,  'rating' => 4.7, 'name' => 'Double Shot', 'sponsor' => 'summit', 'pinned' => true],
+            ['grade' => '6c',  'colour' => 'Red',    'hex' => '#d6402f', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-21', 'ascents' => 41,  'rating' => 4.7, 'name' => 'Double Shot', 'sponsor' => 'summit'],
             ['grade' => '5+',  'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 2', 'style' => 'Auto-belay', 'setter' => 'Cat',  'setOn' => '2026-10-05', 'ascents' => 129, 'rating' => 4.0, 'name' => 'Nain’s Staircase', 'namedBy' => 'Gwen T.'],
-            ['grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3],
+            ['grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst'],
             ['grade' => '7a',  'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-14', 'ascents' => 14,  'rating' => 4.8],
             ['grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1],
             ['grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-21', 'ascents' => 55,  'rating' => 4.5],
