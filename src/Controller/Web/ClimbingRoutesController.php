@@ -9,7 +9,8 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * MOCKUP — public list of the routes currently set at the wall, used to show prospective
  * route sponsors what a branded route looks like. Data is hard-coded below and will be replaced
- * by the route management system; the sponsors and their logos are fictional, apart from Harvst.
+ * by the route management system; the sponsors and their logos are fictional, apart from Harvst,
+ * Craft Courses, Adventure Beyond and A Bay to Remember.
  */
 class ClimbingRoutesController extends AbstractController
 {
@@ -25,13 +26,6 @@ class ClimbingRoutesController extends AbstractController
             'tagline' => 'Fuelling every send since 2019',
             'colour'  => '#3b2418',
         ],
-        'chalk' => [
-            'name'    => 'Chalk & Co.',
-            'logo'    => '/images/routes-mock/chalk-and-co.svg',
-            'url'     => '#',
-            'tagline' => 'Grip it. Send it.',
-            'colour'  => '#141414',
-        ],
         'coastline' => [
             'name'    => 'Coastline Outdoor',
             'logo'    => '/images/routes-mock/coastline-outdoor.svg',
@@ -45,6 +39,27 @@ class ClimbingRoutesController extends AbstractController
             'url'     => 'https://harvst.io',
             'tagline' => 'Grow more',
             'colour'  => '#3a3a3a',
+        ],
+        'craftcourses' => [
+            'name'    => 'Craft Courses',
+            'logo'    => '/images/routes-mock/craft-courses.svg',
+            'url'     => 'https://www.craftcourses.com',
+            'tagline' => 'Art & craft workshops with 1000s of UK makers',
+            'colour'  => '#be3455',
+        ],
+        'adventurebeyond' => [
+            'name'    => 'Adventure Beyond',
+            'logo'    => '/images/routes-mock/adventure-beyond.png',
+            'url'     => 'https://adventurebeyond.co.uk',
+            'tagline' => 'Family-run outdoor adventures in Cardigan Bay since 1997',
+            'colour'  => '#0a4fa3',
+        ],
+        'baytoremember' => [
+            'name'    => 'A Bay to Remember',
+            'logo'    => '/images/routes-mock/bay-to-remember.png',
+            'url'     => 'https://www.baytoremember.co.uk',
+            'tagline' => 'Dolphin watching trips in Cardigan Bay',
+            'colour'  => '#e5572b',
         ],
     ];
 
@@ -78,9 +93,9 @@ class ClimbingRoutesController extends AbstractController
     private static function boulders(): array
     {
         return [
-            ['grade' => 'V3', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-10-02', 'ascents' => 142, 'rating' => 4.6, 'name' => 'Espresso Crimp', 'sponsor' => 'summit'],
+            ['grade' => 'V3', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-10-02', 'ascents' => 142, 'rating' => 4.6, 'name' => 'Coasteer Clear', 'sponsor' => 'adventurebeyond'],
             ['grade' => 'V0', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 211, 'rating' => 4.1],
-            ['grade' => 'V5', 'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Rhys', 'setOn' => '2026-09-25', 'ascents' => 64,  'rating' => 4.8, 'name' => 'Dust Devil', 'sponsor' => 'chalk'],
+            ['grade' => 'V5', 'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Rhys', 'setOn' => '2026-09-25', 'ascents' => 64,  'rating' => 4.8, 'name' => 'Dolphin Dyno', 'sponsor' => 'baytoremember'],
             ['grade' => 'VB', 'colour' => 'White',  'hex' => '#ffffff', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 188, 'rating' => 3.9],
             ['grade' => 'V2', 'colour' => 'Green',  'hex' => '#3c9a5f', 'wall' => 'Zone 2 – Arête', 'setter' => 'Owain','setOn' => '2026-10-02', 'ascents' => 156, 'rating' => 4.3, 'name' => 'Mam’s Ladder', 'namedBy' => 'Elin W.'],
             ['grade' => 'V4', 'colour' => 'Red',    'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave',  'setter' => 'Owain','setOn' => '2026-09-25', 'ascents' => 91,  'rating' => 4.0],
@@ -103,7 +118,7 @@ class ClimbingRoutesController extends AbstractController
             ['grade' => '5+',  'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 2', 'style' => 'Auto-belay', 'setter' => 'Cat',  'setOn' => '2026-10-05', 'ascents' => 129, 'rating' => 4.0, 'name' => 'Nain’s Staircase', 'namedBy' => 'Gwen T.'],
             ['grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst'],
             ['grade' => '7a',  'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-14', 'ascents' => 14,  'rating' => 4.8],
-            ['grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1],
+            ['grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses'],
             ['grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-21', 'ascents' => 55,  'rating' => 4.5],
         ];
     }
