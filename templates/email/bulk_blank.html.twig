@@ -19,9 +19,11 @@
   <tr>
     <td style="padding:24px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#2b2b2b;line-height:1.7;text-align:left;">
 
-      {% for line in body|split('\n') %}
-        {% if line|trim %}
-          <p style="margin:0 0 16px;">{{ line|raw }}</p>
+      {% for block in body|email_blocks("font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#2b2b2b;line-height:1.7") %}
+        {% if block.type == 'html' %}
+          {{ block.html|raw }}
+        {% elseif block.type == 'p' %}
+          <p style="margin:0 0 16px;">{{ block.html|raw }}</p>
         {% else %}
           <p style="margin:0 0 8px;"></p>
         {% endif %}
