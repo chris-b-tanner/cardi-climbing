@@ -4,7 +4,8 @@ framework:
     handle_all_throwables: true
 
     session:
-        handler_id: null
+        # Stored in MySQL (the `sessions` table), not on the dyno's disk, so logins survive deploys and dyno restarts
+        handler_id: Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler
         cookie_secure: auto
         cookie_samesite: lax
         storage_factory_id: session.storage.factory.native
