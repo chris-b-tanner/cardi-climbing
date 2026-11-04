@@ -529,6 +529,22 @@ class AdminController extends AbstractController
                 return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
             }
 
+            // user.email is unique (case-insensitively, per the column's collation), so saving
+            // another member's address would hit the database's unique index and 500. Checked
+            // before any setter runs, so nothing is half-applied.
+            if ($newEmail !== null && strcasecmp($newEmail, (string) $previousEmail) !== 0) {
+                $existing = $userRepository->findOneBy(['email' => $newEmail]);
+                if ($existing && $existing->getId() !== $user->getId()) {
+                    $this->addFlash('error', sprintf(
+                        '%s is already the email address of %s (member #%d). Nothing was saved. Merge the two records or use a different address.',
+                        $newEmail,
+                        $existing->getDisplayName(),
+                        $existing->getId(),
+                    ));
+                    return $this->redirectToRoute('app_admin_user_edit', ['id' => $user->getId()]);
+                }
+            }
+
             $userService->applyProfileFields($user, $request->request->all());
             $user->setEmail($newEmail);
             $user->setEmail2(trim($request->request->get('email2', '')) ?: null);

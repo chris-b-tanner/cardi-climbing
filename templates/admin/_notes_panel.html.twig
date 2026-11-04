@@ -31,11 +31,6 @@
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
   {% if contactEmail is defined and contactEmail %}
     <div class="form-group note-email-subject" id="note-subject-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
-      {# CC — prefilled with the member's second email (`contactCc`), if they have one. Separate several
-         with commas. Hidden (and ignored server-side) on a scheduled send, since CCs aren't stored. #}
-      <input type="text" name="cc" id="note-cc-{{ noteableType }}-{{ noteableId }}" class="form-control"
-             placeholder="CC (optional, separate several with commas)" value="{{ contactCc|default('') }}"
-             aria-label="CC" style="margin-bottom:0.5rem;">
       <input type="text" name="subject" id="note-subject-{{ noteableType }}-{{ noteableId }}" class="form-control"
              placeholder="Subject line for this email…" data-last-subject="{{ lastEmailSubject|default('') }}">
     </div>
@@ -48,6 +43,13 @@
     <div class="note-mention-ids"></div>
   </div>
   {% if contactEmail is defined and contactEmail %}
+    {# CC — prefilled with the member's second email (`contactCc`), if they have one. Separate several
+       with commas. Hidden and disabled (and ignored server-side) on a scheduled send, since CCs aren't stored. #}
+    <div class="form-group note-email-cc" id="note-cc-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
+      <input type="text" name="cc" id="note-cc-{{ noteableType }}-{{ noteableId }}" class="form-control"
+             placeholder="CC (optional, separate several with commas)" value="{{ contactCc|default('') }}"
+             aria-label="CC" disabled>
+    </div>
     {% set attachmentExtensions = constant('App\\Service\\Mailer\\ContactQuickEmailMailer::ATTACHMENT_EXTENSIONS') %}
     {% set maxAttachmentBytes = constant('App\\Service\\Mailer\\ContactQuickEmailMailer::MAX_ATTACHMENT_BYTES') %}
     <div class="form-group note-email-attachments" id="note-attachments-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
@@ -190,7 +192,7 @@
 
 <script>
   (function () {
-    // Shows/requires the Subject field, doubles the note textarea's row count, and relabels the
+    // Shows/requires the Subject field, grows the note textarea to 10 rows, and relabels the
     // submit button "Send email", only while "Email {address}" is ticked — a plain note never needs either, but a note that's actually
     // going out as an email always needs a subject (enforced again server-side — see
     // AdminNoteController::add()) and tends to run longer than a quick internal note.
@@ -209,6 +211,7 @@
       const scheduleWrap   = document.getElementById('note-schedule-wrap-' + suffix);
       const scheduleDate   = document.getElementById('note-schedule-date-' + suffix);
       const scheduleTime   = document.getElementById('note-schedule-time-' + suffix);
+      const ccWrap         = document.getElementById('note-cc-wrap-' + suffix);
       const ccInput        = document.getElementById('note-cc-' + suffix);
       if (!toggle || !input || !content || !submit) return;
 
@@ -315,9 +318,10 @@
         }
         // CC only goes with an email sent right now — it isn't stored for a scheduled send. Disabled
         // rather than cleared, so unticking Schedule brings back what was there.
-        if (ccInput) {
-          ccInput.style.display = isScheduled() ? 'none' : 'block';
-          ccInput.disabled = isScheduled();
+        if (ccWrap) {
+          const showCc = toggle.checked && !isScheduled();
+          ccWrap.style.display = showCc ? 'block' : 'none';
+          ccInput.disabled = !showCc;
         }
         if (attachWrap) {
           const showAttachments = toggle.checked && !isScheduled();
@@ -357,7 +361,7 @@
       toggle.addEventListener('change', () => {
         wrap.style.display = toggle.checked ? 'block' : 'none';
         input.required = toggle.checked;
-        content.rows = toggle.checked ? baseRows * 2 : baseRows;
+        content.rows = toggle.checked ? 10 : baseRows;
         if (scheduleLabel) {
           scheduleLabel.style.display = toggle.checked ? 'flex' : 'none';
           if (!toggle.checked) scheduleToggle.checked = false;
