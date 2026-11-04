@@ -69,8 +69,9 @@ class ContactQuickEmailMailer
      * @param UploadedFile[] $attachments Already checked by AdminNoteController::add() — see attachmentError().
      * @param string|null $emailRef The ref already stored on this email's note — see EmailOpenTracking.
      * @param User|null $sender The admin sending it, who it comes from — see PersonalSenderAddress.
+     * @param string[] $cc Already validated by AdminNoteController::add() — see parseCc().
      */
-    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = [], ?string $emailRef = null, ?User $sender = null): void
+    public function send(User $contact, string $subject, string $body, ?Note $quoteNote = null, array $attachments = [], ?string $emailRef = null, ?User $sender = null, array $cc = []): void
     {
         if (!$contact->getEmail()) {
             return;
@@ -92,6 +93,10 @@ class ContactQuickEmailMailer
             ->htmlTemplate('email/bulk_blank.html.twig')
             ->textTemplate('email/bulk_blank.txt.twig')
             ->context($context);
+
+        if ($cc) {
+            $email->cc(...$cc);
+        }
 
         $this->personalSenderAddress->apply($email, $sender);
 
@@ -142,6 +147,28 @@ class ContactQuickEmailMailer
         }
 
         return null;
+    }
+
+    /**
+     * The CC field's addresses (separated by commas, semicolons or spaces), deduplicated and with
+     * the member's own To address dropped. Returns null if any of them isn't a valid email address.
+     *
+     * @return string[]|null
+     */
+    public function parseCc(string $input, User $contact): ?array
+    {
+        $cc = [];
+        foreach (preg_split('/[\s,;]+/', $input, -1, PREG_SPLIT_NO_EMPTY) as $address) {
+            if (!filter_var($address, FILTER_VALIDATE_EMAIL)) {
+                return null;
+            }
+            $key = strtolower($address);
+            if ($key !== strtolower((string) $contact->getEmail())) {
+                $cc[$key] = $address;
+            }
+        }
+
+        return array_values($cc);
     }
 
     /** @return array{author: string, date: string, text: string} */

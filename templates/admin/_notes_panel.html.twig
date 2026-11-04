@@ -31,6 +31,11 @@
   <input type="hidden" name="_csrf_token" value="{{ csrf_token('note_add_' ~ noteableType ~ '_' ~ noteableId) }}">
   {% if contactEmail is defined and contactEmail %}
     <div class="form-group note-email-subject" id="note-subject-wrap-{{ noteableType }}-{{ noteableId }}" style="display:none;margin-bottom:0.5rem;">
+      {# CC — prefilled with the member's second email (`contactCc`), if they have one. Separate several
+         with commas. Hidden (and ignored server-side) on a scheduled send, since CCs aren't stored. #}
+      <input type="text" name="cc" id="note-cc-{{ noteableType }}-{{ noteableId }}" class="form-control"
+             placeholder="CC (optional, separate several with commas)" value="{{ contactCc|default('') }}"
+             aria-label="CC" style="margin-bottom:0.5rem;">
       <input type="text" name="subject" id="note-subject-{{ noteableType }}-{{ noteableId }}" class="form-control"
              placeholder="Subject line for this email…" data-last-subject="{{ lastEmailSubject|default('') }}">
     </div>
@@ -104,8 +109,7 @@
         {% set isLongNote = contentLines|length > 5 %}
         {% if note.emailSubject %}
           <p style="font-size:0.75rem;color:var(--teal-dk);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.35rem;">
-            <i class="bi bi-envelope" title="Sent by email"></i> {{ note.emailSubject }}
-          </p>
+            <i class="bi bi-envelope" title="Sent by email"></i> {{ note.emailSubject }}          </p>
         {% endif %}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;">
           <p style="font-size:0.9375rem;white-space:pre-wrap;margin-bottom:0.3rem;">
@@ -205,6 +209,7 @@
       const scheduleWrap   = document.getElementById('note-schedule-wrap-' + suffix);
       const scheduleDate   = document.getElementById('note-schedule-date-' + suffix);
       const scheduleTime   = document.getElementById('note-schedule-time-' + suffix);
+      const ccInput        = document.getElementById('note-cc-' + suffix);
       if (!toggle || !input || !content || !submit) return;
 
       // A file input's own selection is replaced, not added to, each time the picker is reopened,
@@ -307,6 +312,12 @@
         if (scheduleWrap) {
           scheduleWrap.style.display = isScheduled() ? 'block' : 'none';
           scheduleDate.required = scheduleTime.required = isScheduled();
+        }
+        // CC only goes with an email sent right now — it isn't stored for a scheduled send. Disabled
+        // rather than cleared, so unticking Schedule brings back what was there.
+        if (ccInput) {
+          ccInput.style.display = isScheduled() ? 'none' : 'block';
+          ccInput.disabled = isScheduled();
         }
         if (attachWrap) {
           const showAttachments = toggle.checked && !isScheduled();

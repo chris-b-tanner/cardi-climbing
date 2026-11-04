@@ -117,6 +117,17 @@ class AdminNoteController extends AbstractController
         // now: a scheduled send happens in a later process, after the uploads are gone.
         $attachments = $wantsEmail && !$scheduledFor ? array_values(array_filter($request->files->all('attachments'))) : [];
 
+        // CC field (prefilled with the member's second email, if any). Like attachments, only for an
+        // email sent now: it isn't stored anywhere, so a scheduled send has nothing to read it back from.
+        $cc = [];
+        if ($wantsEmail && !$scheduledFor) {
+            $cc = $this->contactQuickEmailMailer->parseCc($request->request->get('cc', ''), $noteable);
+            if ($cc === null) {
+                $this->addFlash('error', 'One of the CC addresses isn\'t a valid email address. Nothing was saved or sent.');
+                return $this->redirectForNoteable($noteableType, $noteableId);
+            }
+        }
+
         if ($attachments && ($attachmentError = $this->contactQuickEmailMailer->attachmentError($attachments))) {
             $this->addFlash('error', $attachmentError . ' Nothing was saved or sent.');
             return $this->redirectForNoteable($noteableType, $noteableId);
@@ -133,9 +144,13 @@ class AdminNoteController extends AbstractController
             // The files themselves aren't kept, so the note ends with a line listing what was
             // attached as the record of it. Added to the stored note only; the email itself goes
             // out with exactly what the admin typed.
+            // CC addresses aren't stored anywhere else either, so they're recorded the same way.
             $noteContent = $content;
+            if ($cc) {
+                $noteContent .= "\n\nCC: " . implode(', ', $cc);
+            }
             if ($attachments) {
-                $noteContent .= "\n\nAttachments: " . implode(', ', array_map(
+                $noteContent .= ($cc ? "\n" : "\n\n") . "Attachments: " . implode(', ', array_map(
                     static fn ($file) => $file->getClientOriginalName() . ' (' . self::formatSize((int) $file->getSize()) . ')',
                     $attachments,
                 ));
@@ -188,10 +203,11 @@ class AdminNoteController extends AbstractController
                     $this->addFlash('success', 'Note added. Email to ' . $noteable->getEmail() . ' scheduled for '
                         . $scheduledFor->setTimezone(new \DateTimeZone('Europe/London'))->format('j M Y, H:i') . '.');
                 } elseif ($wantsEmail) {
-                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef(), $admin);
+                    $this->contactQuickEmailMailer->send($noteable, $subject, $content, $previousThreadNote, $attachments, $note->getEmailRef(), $admin, $cc);
                     $this->contactWatchMailer->notifyEmailSent($noteable, $subject, $noteContent, $admin);
                     $attachedNote = $attachments ? ' with ' . count($attachments) . (count($attachments) === 1 ? ' attachment' : ' attachments') : '';
-                    $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $attachedNote . '.');
+                    $ccNote = $cc ? ' (CC ' . implode(', ', $cc) . ')' : '';
+                    $this->addFlash('success', 'Note added and emailed to ' . $noteable->getEmail() . $ccNote . $attachedNote . '.');
                 }
             }
         }
