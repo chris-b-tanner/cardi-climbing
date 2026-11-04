@@ -1,0 +1,9 @@
+{#
+  Spam protection fields for every newsletter signup form — see App\Service\SubscribeGuard.
+  The honeypot is moved off-screen rather than display:none (some bots skip hidden fields), kept out
+  of the tab order and away from autofill, and labelled so a screen-reader user knows to leave it.
+#}
+<input type="hidden" name="_form_ts" value="{{ subscribe_form_token() }}">
+<div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
+  <label>Leave this field empty <input type="text" name="website" value="" tabindex="-1" autocomplete="off"></label>
+</div>

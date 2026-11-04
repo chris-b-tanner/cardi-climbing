@@ -5,6 +5,7 @@ namespace App\Twig;
 use App\Repository\PurchaseOrderRepository;
 use App\Service\AvatarUploader;
 use App\Service\ProductImageUploader;
+use App\Service\SubscribeGuard;
 use App\Service\UkPhoneFormatter;
 use App\Service\UnsubscribeToken;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -21,6 +22,7 @@ class AppExtension extends AbstractExtension
         private readonly AvatarUploader $avatarUploader,
         private readonly ProductImageUploader $productImageUploader,
         private readonly PurchaseOrderRepository $purchaseOrderRepository,
+        private readonly SubscribeGuard $subscribeGuard,
     ) {}
 
     public function getFunctions(): array
@@ -29,6 +31,7 @@ class AppExtension extends AbstractExtension
             new TwigFunction('unsubscribe_url', $this->unsubscribeUrl(...)),
             new TwigFunction('avatar_url', $this->avatarUploader->getUrl(...)),
             new TwigFunction('product_image_url', $this->productImageUploader->getUrl(...)),
+            new TwigFunction('subscribe_form_token', $this->subscribeGuard->issueToken(...)),
             new TwigFunction('purchase_orders_awaiting_approval', $this->purchaseOrderRepository->countAwaitingApproval(...)),
         ];
     }

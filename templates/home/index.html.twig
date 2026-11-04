@@ -38,6 +38,7 @@
       {% else %}
         <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          {% include '_subscribe_guard.html.twig' %}
           <div class="subscribe-form__fields">
             <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
             <input type="text"  name="lastName"  class="subscribe-form__input" placeholder="Last name">
@@ -286,6 +287,7 @@
         <p style="font-family:var(--f-head);font-size:1.4rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--white);margin-bottom:1.25rem;">Sign up for emails</p>
         <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          {% include '_subscribe_guard.html.twig' %}
           <div class="subscribe-form__fields">
             <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
             <input type="text"  name="lastName"  class="subscribe-form__input" placeholder="Last name">

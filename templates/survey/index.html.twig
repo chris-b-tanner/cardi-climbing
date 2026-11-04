@@ -23,6 +23,7 @@
       {% else %}
         <form method="post" action="{{ path('app_subscribe') }}" class="subscribe-form" novalidate>
           <input type="hidden" name="_csrf_token" value="{{ csrf_token('subscribe') }}">
+          {% include '_subscribe_guard.html.twig' %}
           <input type="hidden" name="returnTo" value="{{ path('app_survey') }}">
           <div class="subscribe-form__fields">
             <input type="text"  name="firstName" class="subscribe-form__input" placeholder="First name">
