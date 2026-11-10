@@ -1008,6 +1008,10 @@ p + p { margin-top: 1rem; }
   padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
   font-size: 0.82rem; font-family: inherit; color: var(--black); background: var(--white);
 }
+.event-preview__ticket-qty {
+  width: 3.5rem; padding: 0.4rem 0.4rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.82rem; font-family: inherit; color: var(--black); background: var(--white);
+}
 .event-preview__ticket--locked { opacity: 0.55; }
 .event-preview__ticket-badge {
   align-self: flex-start; margin-top: 0.1rem; padding: 0.1rem 0.45rem;

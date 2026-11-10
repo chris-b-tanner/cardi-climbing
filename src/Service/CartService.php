@@ -119,25 +119,29 @@ class CartService
             }
         }
 
+        $key      = $this->lineKey($product->getId(), $beneficiary->getId(), $occurrenceDate);
+        $lines    = $this->getLines($user);
+        $existing = $lines[$key] ?? null;
+
+        // Adding something that's already in the cart for this person adds to that line's quantity,
+        // when the line can hold more than one: a stock item, or a ticket for an unrestricted event.
+        // Anything else (a membership, credit or restricted-event ticket) stays one per person.
+        if ($existing !== null && $this->allowsMultipleQty($product)) {
+            $qty += $existing['qty'];
+        } else {
+            $existingLines = [];
+            foreach ($lines as $line) {
+                $existingLines[] = [$line['product'], $line['occurrenceDate'], $line['beneficiary']];
+            }
+
+            if ($this->salesOrderService->wouldConflictWithExisting($product, $occurrenceDate, $beneficiary, $existingLines)) {
+                throw new \InvalidArgumentException('That\'s already in your cart for this person.');
+            }
+        }
+
         $this->assertQtyAllowed($product, $qty, $occurrenceDate);
 
-        $existingLines = [];
-        foreach ($this->getLines($user) as $line) {
-            $existingLines[] = [$line['product'], $line['occurrenceDate'], $line['beneficiary']];
-        }
-
-        if ($this->salesOrderService->wouldConflictWithExisting($product, $occurrenceDate, $beneficiary, $existingLines)) {
-            throw new \InvalidArgumentException('That\'s already in your cart for this person.');
-        }
-
         $raw = $this->readRaw();
-        $key = $this->lineKey($product->getId(), $beneficiary->getId(), $occurrenceDate);
-
-        // Adding a stock item that's already in the cart adds to its quantity, rather than replacing that line.
-        if (!$product->requiresBeneficiary() && isset($raw[$key])) {
-            $qty += max(1, (int) ($raw[$key]['qty'] ?? 1));
-        }
-
         $raw[$key] = [
             'productId'      => $product->getId(),
             'beneficiaryId'  => $beneficiary->getId(),
@@ -214,6 +218,17 @@ class CartService
         $this->clear();
 
         return $order;
+    }
+
+    /** Whether one cart line can hold more than one of {product}: a stock item, or a ticket for an event with no certification restrictions. */
+    private function allowsMultipleQty(Product $product): bool
+    {
+        if ($product->getProductType() === Product::TYPE_STOCK) {
+            return true;
+        }
+
+        $eventTicketProduct = $product->getEventTicketProduct();
+        return $eventTicketProduct !== null && $eventTicketProduct->getEvent()->getRestrictions()->isEmpty();
     }
 
     /** Beneficiary products (memberships, credits, tickets) and stock items. A service product is never sold online. */

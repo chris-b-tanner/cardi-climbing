@@ -125,6 +125,9 @@
                     {% endif %}
                   {% endfor %}
                 </select>
+                {% if event.restrictions is empty %}
+                  <input type="number" name="qty" value="1" min="1" class="event-preview__ticket-qty" aria-label="Number of tickets">
+                {% endif %}
                 <button type="submit" class="btn btn--teal btn--sm">Add to cart</button>
               </form>
             {% endif %}

@@ -228,24 +228,29 @@
               <input type="hidden" name="_csrf_token" value="{{ csrf_token('shop_add') }}">
               <input type="hidden" name="productId" value="{{ product.id }}">
 
-              {% if product.productType == 'stock' %}
+              {% if product.productType != 'stock' %}
+                {% if people|length > 1 %}
+                  <div class="shop-item__field">
+                    <label for="beneficiary-{{ product.id }}">For</label>
+                    <select id="beneficiary-{{ product.id }}" name="beneficiaryId">
+                      {% for person in people %}
+                        <option value="{{ person == app.user ? '' : person.id }}">{{ person == app.user ? 'Myself' : person.displayName }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                {% else %}
+                  {% set person = people|first %}
+                  <input type="hidden" name="beneficiaryId" value="{{ person == app.user ? '' : person.id }}">
+                  <p class="shop-item__field-inline">For: <strong>{{ person == app.user ? 'Me' : person.displayName }}</strong></p>
+                {% endif %}
+              {% endif %}
+
+              {# A stock item, or a ticket for an unrestricted event, can be bought several at a time. #}
+              {% if product.productType == 'stock' or (event and event.restrictions is empty) %}
                 <div class="shop-item__field">
                   <label for="qty-{{ product.id }}">Qty</label>
                   <input type="number" id="qty-{{ product.id }}" name="qty" value="1" min="1">
                 </div>
-              {% elseif people|length > 1 %}
-                <div class="shop-item__field">
-                  <label for="beneficiary-{{ product.id }}">For</label>
-                  <select id="beneficiary-{{ product.id }}" name="beneficiaryId">
-                    {% for person in people %}
-                      <option value="{{ person == app.user ? '' : person.id }}">{{ person == app.user ? 'Myself' : person.displayName }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-              {% else %}
-                {% set person = people|first %}
-                <input type="hidden" name="beneficiaryId" value="{{ person == app.user ? '' : person.id }}">
-                <p class="shop-item__field-inline">For: <strong>{{ person == app.user ? 'Me' : person.displayName }}</strong></p>
               {% endif %}
 
               <button type="submit" class="btn btn--teal">Add to cart</button>
