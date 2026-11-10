@@ -200,9 +200,7 @@
           return;
         }
 
-        // Refresh the whole modal rather than just this form — that's what picks up the
-        // "you have N in your cart" notice, which depends on the cart count as of right now.
-        if (currentPreviewUrl) openPreview(currentPreviewUrl);
+        window.location.href = data.redirectUrl || '{{ path('app_cart') }}';
       });
   });
 </script>

@@ -63,13 +63,31 @@ class ProductRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    /** Active products for the public self-serve shop — memberships and drop-in credits. Event tickets are sold from the event preview modal instead, one event at a time. */
+    /**
+     * Active products for the public self-serve shop: memberships, drop-in credits, stock items,
+     * and event tickets. A ticket is only listed while its event is published and still has a date
+     * to come. For a one-off event that means its date is today or later; for a recurring event
+     * it means its recurUntil is open or today or later.
+     */
     public function findActiveForShop(): array
     {
+        $today = new \DateTimeImmutable('today');
+
         return $this->createQueryBuilder('p')
+            ->leftJoin('p.eventTicketProduct', 'etp')
+            ->leftJoin('etp.event', 'e')
+            ->addSelect('etp', 'e')
             ->where('p.isActive = true')
-            ->andWhere('p.productType IN (:types)')
-            ->setParameter('types', [Product::TYPE_MEMBERSHIP, Product::TYPE_CREDIT])
+            ->andWhere(
+                'p.productType IN (:plainTypes)
+                 OR (p.productType = :ticketType AND e.status = :published
+                     AND ((e.isRecurring = false AND e.date >= :today)
+                       OR (e.isRecurring = true AND (e.recurUntil IS NULL OR e.recurUntil >= :today))))'
+            )
+            ->setParameter('plainTypes', [Product::TYPE_MEMBERSHIP, Product::TYPE_CREDIT, Product::TYPE_STOCK])
+            ->setParameter('ticketType', Product::TYPE_EVENT_TICKET)
+            ->setParameter('published', Event::STATUS_PUBLISHED)
+            ->setParameter('today', $today)
             ->orderBy('p.productType', 'ASC')
             ->addOrderBy('p.name', 'ASC')
             ->addOrderBy('p.variantValue', 'ASC')

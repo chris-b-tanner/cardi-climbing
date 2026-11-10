@@ -14,9 +14,9 @@ use Symfony\Component\HttpFoundation\RequestStack;
 /**
  * A member's self-serve shopping cart — held in session, not persisted as a SalesOrder until
  * checkout(), so browsing/adding never leaves a draft order behind; only actually paying does.
- * Every product sold here requires a beneficiary (Product::requiresBeneficiary()) and the only
- * people it can be bought for are the member themself or their own dependents — so a line is
- * always exactly one of a product for one person, never a quantity.
+ * A membership, credit or ticket is bought for a beneficiary: the member themself or one of
+ * their own dependents. A stock item has no beneficiary, so its line is held against the buyer,
+ * and it can be bought in any quantity.
  */
 class CartService
 {
@@ -83,12 +83,13 @@ class CartService
     public function addLine(User $user, int $productId, ?int $beneficiaryId, ?string $occurrenceDateRaw, int $qty = 1): void
     {
         $product = $this->productRepository->find($productId);
-        if (!$product instanceof Product || !$product->isActive() || !$product->requiresBeneficiary()) {
+        if (!$product instanceof Product || !$product->isActive() || !$this->isSellableOnline($product)) {
             throw new \InvalidArgumentException('Choose a valid product.');
         }
 
+        // A stock item has no beneficiary, so its line is always held against the buyer.
         $eligible    = $this->eligibleBeneficiaries($user);
-        $beneficiary = $eligible[$beneficiaryId ?? $user->getId()] ?? null;
+        $beneficiary = $eligible[$product->requiresBeneficiary() ? ($beneficiaryId ?? $user->getId()) : $user->getId()] ?? null;
         if ($beneficiary === null) {
             throw new \InvalidArgumentException('Choose yourself or one of your dependents.');
         }
@@ -130,7 +131,14 @@ class CartService
         }
 
         $raw = $this->readRaw();
-        $raw[$this->lineKey($product->getId(), $beneficiary->getId(), $occurrenceDate)] = [
+        $key = $this->lineKey($product->getId(), $beneficiary->getId(), $occurrenceDate);
+
+        // Adding a stock item that's already in the cart adds to its quantity, rather than replacing that line.
+        if (!$product->requiresBeneficiary() && isset($raw[$key])) {
+            $qty += max(1, (int) ($raw[$key]['qty'] ?? 1));
+        }
+
+        $raw[$key] = [
             'productId'      => $product->getId(),
             'beneficiaryId'  => $beneficiary->getId(),
             'occurrenceDate' => $occurrenceDate?->format('Y-m-d'),
@@ -208,6 +216,12 @@ class CartService
         return $order;
     }
 
+    /** Beneficiary products (memberships, credits, tickets) and stock items. A service product is never sold online. */
+    private function isSellableOnline(Product $product): bool
+    {
+        return $product->requiresBeneficiary() || $product->getProductType() === Product::TYPE_STOCK;
+    }
+
     /** @return array<int, User> keyed by id — the member themself plus their dependents, the only people they can buy for here. */
     private function eligibleBeneficiaries(User $user): array
     {
@@ -229,6 +243,10 @@ class CartService
     {
         if ($qty < 1) {
             throw new \InvalidArgumentException('Choose at least one.');
+        }
+
+        if ($product->getProductType() === Product::TYPE_STOCK) {
+            return;
         }
 
         $eventTicketProduct = $product->getEventTicketProduct();

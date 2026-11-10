@@ -13,27 +13,28 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Public self-serve shop — buy a membership or drop-in credits for yourself or a dependent.
- * Event tickets aren't listed here; they're added to the cart from the event preview modal instead
- * (add() below is shared by both — the modal calls it over AJAX, this page's own forms plain POST).
+ * Public self-serve shop: memberships, drop-in credits, stock items and event tickets. Anyone can
+ * browse it, but adding to the cart needs a login. Event tickets can also be added from the event
+ * preview modal. add() below serves both: the modal calls it over AJAX, and this page's own forms
+ * use a plain POST. Either way, a successful add takes the member straight to the cart.
  */
 #[Route('/shop')]
-#[IsGranted('ROLE_USER')]
 class ShopController extends AbstractController
 {
     #[Route('', name: 'app_shop')]
     public function index(ProductRepository $productRepository, CartService $cartService): Response
     {
-        /** @var User $user */
+        /** @var User|null $user */
         $user = $this->getUser();
 
         return $this->render('shop/index.html.twig', [
             'products'  => $productRepository->findActiveForShop(),
-            'cartCount' => count($cartService->getLines($user)),
+            'cartCount' => $user !== null ? count($cartService->getLines($user)) : 0,
         ]);
     }
 
     #[Route('/add', name: 'app_shop_add', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
     public function add(Request $request, CartService $cartService): Response
     {
         if (!$this->isCsrfTokenValid('shop_add', $request->request->get('_csrf_token'))) {
@@ -47,19 +48,24 @@ class ShopController extends AbstractController
         $beneficiaryRaw     = trim($request->request->get('beneficiaryId', ''));
         $beneficiaryId      = $beneficiaryRaw !== '' ? (int) $beneficiaryRaw : null;
         $occurrenceDateRaw  = trim($request->request->get('occurrenceDate', '')) ?: null;
+        $qty                = max(1, (int) $request->request->get('qty', 1));
 
         try {
-            $cartService->addLine($user, $productId, $beneficiaryId, $occurrenceDateRaw);
+            $cartService->addLine($user, $productId, $beneficiaryId, $occurrenceDateRaw, $qty);
         } catch (\InvalidArgumentException $e) {
             return $this->addFailure($request, $e->getMessage(), 422);
         }
 
         if ($request->isXmlHttpRequest()) {
-            return $this->json(['success' => true, 'cartCount' => count($cartService->getLines($user))]);
+            return $this->json([
+                'success'     => true,
+                'cartCount'   => count($cartService->getLines($user)),
+                'redirectUrl' => $this->generateUrl('app_cart'),
+            ]);
         }
 
         $this->addFlash('success', 'Added to your cart.');
-        return $this->redirectToRoute('app_shop');
+        return $this->redirectToRoute('app_cart');
     }
 
     private function addFailure(Request $request, string $message, int $status): Response

@@ -61,14 +61,17 @@
         <div class="account-card">
           {% for key, line in lines %}
             {% set eventTicketProduct = line.product.eventTicketProduct %}
-            {% set canChangeQty = eventTicketProduct and eventTicketProduct.event.restrictions is empty %}
+            {% set isStock = line.product.productType == 'stock' %}
+            {% set canChangeQty = isStock or (eventTicketProduct and eventTicketProduct.event.restrictions is empty) %}
             <div class="cart-line">
               <div>
                 <div class="cart-line__name">{{ line.product.name }}{% if line.product.variantValue %} ({{ line.product.variantValue }}){% endif %}</div>
-                <div class="cart-line__meta">
-                  For {{ line.beneficiary.displayName }}
-                  {% if line.occurrenceDate %} &middot; {{ line.occurrenceDate|date('d M Y') }}{% endif %}
-                </div>
+                {% if not isStock %}
+                  <div class="cart-line__meta">
+                    For {{ line.beneficiary.displayName }}
+                    {% if line.occurrenceDate %} &middot; {{ line.occurrenceDate|date('d M Y') }}{% endif %}
+                  </div>
+                {% endif %}
                 {% if canChangeQty %}
                   <form method="post" action="{{ path('app_cart_qty') }}" class="cart-line__qty-form">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('cart_qty') }}">
