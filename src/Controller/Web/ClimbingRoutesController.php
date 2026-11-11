@@ -166,6 +166,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#2b2b2b',
             'about'   => 'Based in Aberporth, Chris Jones Construction covers everything from new builds, extensions and roofing to carpentry, landscaping and bathrooms. No job is too big or too small.',
         ],
+        'seaweave' => [
+            'name'    => 'Seaweave',
+            'logo'    => '/images/routes-mock/seaweave.svg',
+            'url'     => 'https://www.seaweave.co.uk',
+            'tagline' => 'Sustainable seating from West Wales',
+            'colour'  => '#56868f',
+            'about'   => 'Handcrafted chairs, stools and benches made from recycled marine plastic and coppiced chestnut. The weave is spun from reclaimed fishing nets, traced back to the beach they came from, and every seat is shaped, joined and hand woven in a small workshop in Cardigan.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -275,6 +283,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A reliable all-rounder that checks every part of your climbing: a bit of balance, a bit of power and a tricky gear change halfway up. Well maintained and running smoothly since it was set.'],
             ['slug' => 'load-bearing', 'grade' => '6b+', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-11-11', 'ascents' => 31, 'rating' => 4.4, 'name' => 'Load Bearing', 'sponsor' => 'chrisjones',
                 'description' => 'Solidly built from the ground up, with big structural holds and a strong, steep finish. Get your footwork level, trust the build and keep adding to it as you go.'],
+            ['slug' => 'ghost-net', 'grade' => '6a+', 'colour' => 'Teal', 'hex' => '#1e9c96', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-11', 'ascents' => 34, 'rating' => 4.5, 'name' => 'Ghost Net', 'sponsor' => 'seaweave',
+                'description' => 'A flowing line that weaves left and right through a tangle of blue and teal holds. Read the twists, keep your feet tidy and it all pulls together into one smooth, sustained pitch.'],
             ['slug' => 'the-beanpole', 'grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst',
                 'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
             ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',
