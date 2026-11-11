@@ -9,8 +9,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * MOCKUP — public list of the routes currently set at the wall, used to show prospective
  * route sponsors what a branded route looks like. Data is hard-coded below and will be replaced
- * by the route management system; the sponsors and their logos are fictional, apart from Harvst,
- * Craft Courses, Adventure Beyond and A Bay to Remember.
+ * by the route management system. The sponsors are real businesses; the route data is sample data.
  */
 class ClimbingRoutesController extends AbstractController
 {
@@ -19,26 +18,13 @@ class ClimbingRoutesController extends AbstractController
     private const ROPED_GRADES   = ['4', '5', '5+', '6a', '6a+', '6b', '6b+', '6c', '6c+', '7a', '7a+'];
 
     private const SPONSORS = [
-        'summit' => [
-            'name'    => 'Summit Coffee Co.',
-            'logo'    => '/images/routes-mock/summit-coffee.svg',
-            'url'     => '#',
-            'tagline' => 'Fuelling every send since 2019',
-            'colour'  => '#3b2418',
-        ],
-        'coastline' => [
-            'name'    => 'Coastline Outdoor',
-            'logo'    => '/images/routes-mock/coastline-outdoor.svg',
-            'url'     => '#',
-            'tagline' => 'Kit for the Ceredigion coast and crag',
-            'colour'  => '#0f5c74',
-        ],
         'harvst' => [
             'name'    => 'Harvst',
             'logo'    => '/images/routes-mock/harvst.png',
             'url'     => 'https://harvst.io',
             'tagline' => 'Grow more',
             'colour'  => '#3a3a3a',
+            'about'   => 'Harvst helps growing businesses do more of what they do best, with software that takes care of the busywork.',
         ],
         'craftcourses' => [
             'name'    => 'Craft Courses',
@@ -46,6 +32,7 @@ class ClimbingRoutesController extends AbstractController
             'url'     => 'https://www.craftcourses.com',
             'tagline' => 'Art & craft workshops with 1000s of UK makers',
             'colour'  => '#be3455',
+            'about'   => 'Craft Courses lists art and craft workshops run by thousands of independent makers across the UK, from pottery and printmaking to knitting and woodwork.',
         ],
         'adventurebeyond' => [
             'name'    => 'Adventure Beyond',
@@ -53,6 +40,7 @@ class ClimbingRoutesController extends AbstractController
             'url'     => 'https://adventurebeyond.co.uk',
             'tagline' => 'Family-run outdoor adventures in Cardigan Bay since 1997',
             'colour'  => '#0a4fa3',
+            'about'   => 'A family-run outdoor activity centre in Cardigan, running adventures on the coast and rivers of Cardigan Bay since 1997.',
         ],
         'baytoremember' => [
             'name'    => 'A Bay to Remember',
@@ -60,6 +48,15 @@ class ClimbingRoutesController extends AbstractController
             'url'     => 'https://www.baytoremember.co.uk',
             'tagline' => 'Dolphin watching trips in Cardigan Bay',
             'colour'  => '#e5572b',
+            'about'   => 'Boat trips from Cardigan Bay to watch dolphins and other wildlife along the Ceredigion coast.',
+        ],
+        'pobldda' => [
+            'name'    => 'Pobl Dda',
+            'logo'    => '/images/routes-mock/pobl-dda.png',
+            'url'     => 'https://www.pobl-dda.com',
+            'tagline' => 'Hot desks & coworking in Cardigan, West Wales',
+            'colour'  => '#b9533c',
+            'about'   => 'A collective of creative and self-employed folk based around a coworking space on Cardigan high street, with hot desks for anyone who wants good company while they work.',
         ],
     ];
 
@@ -70,6 +67,28 @@ class ClimbingRoutesController extends AbstractController
             'boulders' => $this->prepare(self::boulders(), self::BOULDER_GRADES),
             'roped'    => $this->prepare(self::roped(), self::ROPED_GRADES),
         ]);
+    }
+
+    #[Route('/routes/{slug}', name: 'app_climbing_route_show', requirements: ['slug' => '[a-z0-9-]+'])]
+    public function show(string $slug): Response
+    {
+        $all = [
+            'problem' => $this->prepare(self::boulders(), self::BOULDER_GRADES),
+            'route'   => $this->prepare(self::roped(), self::ROPED_GRADES),
+        ];
+
+        foreach ($all as $kind => $routes) {
+            foreach ($routes as $route) {
+                if ($route['slug'] === $slug) {
+                    return $this->render('climbing_routes/show.html.twig', [
+                        'route' => $route,
+                        'kind'  => $kind,
+                    ]);
+                }
+            }
+        }
+
+        throw $this->createNotFoundException();
     }
 
     /**
@@ -93,33 +112,24 @@ class ClimbingRoutesController extends AbstractController
     private static function boulders(): array
     {
         return [
-            ['grade' => 'V3', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-10-02', 'ascents' => 142, 'rating' => 4.6, 'name' => 'Coasteer Clear', 'sponsor' => 'adventurebeyond'],
-            ['grade' => 'V0', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 211, 'rating' => 4.1],
-            ['grade' => 'V5', 'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Rhys', 'setOn' => '2026-09-25', 'ascents' => 64,  'rating' => 4.8, 'name' => 'Dolphin Dyno', 'sponsor' => 'baytoremember'],
-            ['grade' => 'VB', 'colour' => 'White',  'hex' => '#ffffff', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 188, 'rating' => 3.9],
-            ['grade' => 'V2', 'colour' => 'Green',  'hex' => '#3c9a5f', 'wall' => 'Zone 2 – Arête', 'setter' => 'Owain','setOn' => '2026-10-02', 'ascents' => 156, 'rating' => 4.3, 'name' => 'Mam’s Ladder', 'namedBy' => 'Elin W.'],
-            ['grade' => 'V4', 'colour' => 'Red',    'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave',  'setter' => 'Owain','setOn' => '2026-09-25', 'ascents' => 91,  'rating' => 4.0],
-            ['grade' => 'V1', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Zone 1 – Slab', 'setter' => 'Rhys', 'setOn' => '2026-10-09', 'ascents' => 173, 'rating' => 4.2],
-            ['grade' => 'V6', 'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Cat',  'setOn' => '2026-09-18', 'ascents' => 38,  'rating' => 4.7, 'name' => 'Teifi Tide', 'sponsor' => 'coastline'],
-            ['grade' => 'V3', 'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Zone 2 – Arête', 'setter' => 'Owain','setOn' => '2026-10-02', 'ascents' => 119, 'rating' => 3.8],
-            ['grade' => 'V7', 'colour' => 'Grey',   'hex' => '#8a8a8a', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-09-18', 'ascents' => 17,  'rating' => 4.9, 'name' => 'Bara Brith', 'namedBy' => 'Dafydd P.'],
-            ['grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst'],
-            ['grade' => 'V4', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Owain','setOn' => '2026-09-25', 'ascents' => 77,  'rating' => 4.4],
+            ['slug' => 'coasteer-clear', 'grade' => 'V3', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Zone 1 – Cave',  'setter' => 'Rhys', 'setOn' => '2026-10-02', 'ascents' => 142, 'rating' => 4.6, 'name' => 'Coasteer Clear', 'sponsor' => 'adventurebeyond',
+                'description' => 'A sit start under the lip of the cave, then a run of big, positive holds out to the edge. Keep your feet on through the roof and the top-out is a jug fest.'],
+            ['slug' => 'dolphin-dyno', 'grade' => 'V5', 'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Rhys', 'setOn' => '2026-09-25', 'ascents' => 64,  'rating' => 4.8, 'name' => 'Dolphin Dyno', 'sponsor' => 'baytoremember',
+                'description' => 'Two moves to set up, then one committing leap to the finishing jug. Hard to stick, but most people find it pure fun to try.'],
+            ['slug' => 'hot-desk', 'grade' => 'V1', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Zone 1 – Slab', 'setter' => 'Owain', 'setOn' => '2026-11-06', 'ascents' => 58, 'rating' => 4.3, 'name' => 'Hot Desk', 'sponsor' => 'pobldda',
+                'description' => 'A sociable warm-up with plenty of room for company. Big friendly holds lead to a balancy step-through near the top, where a quick chat with your feet keeps things moving.'],
+            ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
+                'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
         ];
     }
 
     private static function roped(): array
     {
         return [
-            ['grade' => '5',   'colour' => 'Green',  'hex' => '#3c9a5f', 'wall' => 'Line 1', 'style' => 'Auto-belay', 'setter' => 'Cat',  'setOn' => '2026-10-05', 'ascents' => 164, 'rating' => 4.2],
-            ['grade' => '6a+', 'colour' => 'Blue',   'hex' => '#2f6fd6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-09-28', 'ascents' => 98,  'rating' => 4.6, 'name' => 'High Tide Line', 'sponsor' => 'coastline'],
-            ['grade' => '4',   'colour' => 'White',  'hex' => '#ffffff', 'wall' => 'Line 1', 'style' => 'Auto-belay', 'setter' => 'Owain','setOn' => '2026-10-05', 'ascents' => 203, 'rating' => 3.9],
-            ['grade' => '6c',  'colour' => 'Red',    'hex' => '#d6402f', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-21', 'ascents' => 41,  'rating' => 4.7, 'name' => 'Double Shot', 'sponsor' => 'summit'],
-            ['grade' => '5+',  'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 2', 'style' => 'Auto-belay', 'setter' => 'Cat',  'setOn' => '2026-10-05', 'ascents' => 129, 'rating' => 4.0, 'name' => 'Nain’s Staircase', 'namedBy' => 'Gwen T.'],
-            ['grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst'],
-            ['grade' => '7a',  'colour' => 'Black',  'hex' => '#141414', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-09-14', 'ascents' => 14,  'rating' => 4.8],
-            ['grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses'],
-            ['grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-21', 'ascents' => 55,  'rating' => 4.5],
+            ['slug' => 'the-beanpole', 'grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst',
+                'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
+            ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',
+                'description' => 'A flowing line of pinches and side-pulls that weaves up the wall. Find the rhythm early and it comes together stitch by stitch.'],
         ];
     }
 }

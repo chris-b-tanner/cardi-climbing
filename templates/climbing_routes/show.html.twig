@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{# MOCKUP — sample route data; see ClimbingRoutesController. #}
+
+{% set title = route.name ?? (route.colour ~ ' ' ~ kind) %}
+
+{% block title %}{{ title }} ({{ route.grade }}) — Y Wal{% endblock %}
+{% block meta_description %}{{ title }}, a {{ route.grade }} {{ kind == 'problem' ? 'boulder problem' : 'route' }} at Y Wal.{% endblock %}
+{% block canonical_url %}https://www.cardiganclimbing.org{{ path('app_climbing_route_show', {slug: route.slug}) }}{% endblock %}
+
+{% block head %}
+<meta name="robots" content="noindex,nofollow">
+<style>
+  .routes-mock-banner { background: var(--sand); color: var(--black); text-align: center; font-size: 0.8rem; padding: 0.5rem 1rem; margin-top: 64px; }
+  .routes-mock-banner + .page-hero { padding-top: 3rem; }
+
+  .route-back { display: inline-block; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+  .route-back:hover { color: var(--black); }
+
+  .route-head { display: flex; align-items: stretch; gap: 1.25rem; }
+  .route-head__swatch { width: 10px; flex: none; background: var(--hold); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+  .route-head__grade { font-family: var(--f-head); font-size: 3rem; font-weight: 700; line-height: 1; align-self: center; }
+  .route-head__kicker { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .route-head h1 { margin: 0.25rem 0 0; }
+  .route-head__namedby { display: inline-block; font-size: 0.75rem; background: var(--lichen); color: var(--teal-dk); padding: 0.1rem 0.5rem; margin-top: 0.5rem; }
+
+  .route-detail { display: grid; gap: 2.5rem; }
+  @media (min-width: 860px) { .route-detail { grid-template-columns: 3fr 2fr; align-items: start; } }
+
+  .route-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 2rem; }
+  .route-facts div { background: var(--white); padding: 1rem 1.1rem; }
+  .route-facts dt { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .route-facts dd { margin: 0.3rem 0 0; font-family: var(--f-head); font-size: 1.1rem; font-weight: 700; }
+  .route-facts__stars { color: #c99a1d; letter-spacing: 0.05em; }
+
+  .route-sponsor { background: var(--white); border: 2px solid var(--brand); padding: 1.75rem; position: relative; }
+  .route-sponsor__flag {
+    position: absolute; top: -0.65rem; left: 1.5rem; background: var(--brand); color: var(--white);
+    font-family: var(--f-head); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.15rem 0.55rem;
+  }
+  .route-sponsor__logo { height: 56px; width: auto; max-width: 100%; }
+  .route-sponsor h2 { font-size: 1.25rem; margin: 1.25rem 0 0.25rem; }
+  .route-sponsor__tagline { color: var(--muted); font-size: 0.9rem; }
+  .route-sponsor__about { margin-top: 1rem; }
+  .route-sponsor .btn { margin-top: 1.5rem; background: var(--brand); border-color: var(--brand); color: var(--white); }
+  .route-sponsor .btn:hover { opacity: 0.9; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="routes-mock-banner">Mockup — sample routes for illustration only.</div>
+
+<section class="section page-hero">
+  <div class="wrap">
+    <a href="{{ path('app_climbing_routes') }}" class="route-back">← All routes</a>
+    <div class="route-head" style="--hold: {{ route.hex }};">
+      <span class="route-head__swatch" title="{{ route.colour }} holds"></span>
+      <span class="route-head__grade">{{ route.grade }}</span>
+      <div>
+        <div class="route-head__kicker">{{ kind == 'problem' ? 'Boulder problem' : 'Roped route' }} · {{ route.wall }}</div>
+        <h2 class="page-hero__h1">{{ title }}</h2>
+        {% if route.namedBy is defined %}<span class="route-head__namedby">Named by {{ route.namedBy }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--off">
+  <div class="wrap route-detail">
+    <div>
+      <div class="alert alert--warning">
+        Routes and problems are not yet set, they will be when we open!
+      </div>
+      <h4>About this {{ kind }}</h4>
+      {% if route.description is defined %}<p>{{ route.description }}</p>{% endif %}
+
+      {% set stars = route.rating|round %}
+      <dl class="route-facts">
+        <div><dt>Grade</dt><dd>{{ route.grade }}</dd></div>
+        <div><dt>Holds</dt><dd>{{ route.colour }}</dd></div>
+        <div><dt>{{ kind == 'problem' ? 'Zone' : 'Line' }}</dt><dd>{{ route.wall }}</dd></div>
+        {% if route.style is defined %}<div><dt>Style</dt><dd>{{ route.style }}</dd></div>{% endif %}
+        <div><dt>Set by</dt><dd>{{ route.setter }}</dd></div>
+        <div><dt>Set on</dt><dd>{{ route.setOn|date('j M Y') }}</dd></div>
+        <div><dt>Ascents</dt><dd>{{ route.ascents }}</dd></div>
+        <div><dt>Rating</dt><dd><span class="route-facts__stars" aria-label="Rated {{ route.rating }} out of 5">{% for i in 1..5 %}{{ i <= stars ? '★' : '☆' }}{% endfor %}</span> {{ route.rating|number_format(1) }}</dd></div>
+      </dl>
+    </div>
+
+    {% if route.sponsor %}
+      {% set sponsor = route.sponsor %}
+      <aside class="route-sponsor" style="--brand: {{ sponsor.colour }};">
+        <span class="route-sponsor__flag">Sponsored route</span>
+        <img src="{{ sponsor.logo }}" alt="{{ sponsor.name }}" class="route-sponsor__logo">
+        <h2>Sponsored by {{ sponsor.name }}</h2>
+        <div class="route-sponsor__tagline">{{ sponsor.tagline }}</div>
+        <p class="route-sponsor__about">{{ sponsor.about }}</p>
+        <a href="{{ sponsor.url }}" class="btn" target="_blank" rel="noopener sponsored">Visit {{ sponsor.name }}</a>
+      </aside>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{# MOCKUP — sample data and fictional sponsors; see ClimbingRoutesController. #}
+{# MOCKUP — sample route data; see ClimbingRoutesController. #}
 
 {% block title %}Routes at the wall — Y Wal{% endblock %}
 {% block meta_description %}Every boulder problem and roped route currently set at Y Wal, sortable by popularity or grade.{% endblock %}
@@ -13,14 +13,7 @@
   .routes-mock-banner + .page-hero { padding-top: 3rem; }
 
   .routes-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
-  .routes-tabs { display: flex; border: 2px solid var(--black); }
-  .routes-tab {
-    font-family: var(--f-head); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 0.7rem 1.25rem; background: var(--white); color: var(--black); border: none; cursor: pointer;
-  }
-  .routes-tab + .routes-tab { border-left: 2px solid var(--black); }
-  .routes-tab[aria-selected="true"] { background: var(--black); color: var(--white); }
-  .routes-tab__count { opacity: 0.6; margin-left: 0.35rem; }
+  .routes-count { font-size: 0.85rem; color: var(--muted); }
   .routes-sort { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); }
   .routes-sort select {
     font: inherit; font-size: 0.85rem; color: var(--black); background: var(--white);
@@ -28,11 +21,18 @@
   }
 
   .routes-list { list-style: none; display: grid; gap: 0.75rem; }
-  .routes-list[hidden] { display: none; }
   .route-card {
     display: grid; grid-template-columns: 6px 4.5rem 1fr auto; align-items: center; gap: 0 1.25rem;
     background: var(--white); border: 1px solid var(--border); padding-right: 1.25rem; min-height: 5.5rem;
+    position: relative; transition: box-shadow 0.15s;
   }
+  .route-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+  /* The name link stretches over the whole card; the sponsor's own link sits above it. */
+  .route-card__link { color: inherit; text-decoration: none; }
+  .route-card__link::after { content: ""; position: absolute; inset: 0; }
+  .route-card__link:focus-visible { outline: none; }
+  .route-card:focus-within { outline: 2px solid var(--black); outline-offset: 2px; }
+  .route-card__more { display: block; margin-top: 0.4rem; font-size: 0.72rem; color: var(--black); text-decoration: underline; }
   .route-card__swatch { align-self: stretch; background: var(--hold); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
   .route-card__grade { font-family: var(--f-head); font-size: 1.6rem; font-weight: 700; line-height: 1; text-align: center; }
   .route-card__body { padding: 1rem 0; min-width: 0; }
@@ -46,12 +46,12 @@
   .route-card__stars { color: #c99a1d; letter-spacing: 0.05em; }
 
   /* Sponsored routes: brand-coloured edge, logo, tagline and link — the bit sponsors are paying for. */
-  .route-card--sponsored { border: 2px solid var(--brand); position: relative; }
+  .route-card--sponsored { border: 2px solid var(--brand); }
   .route-card__sponsor { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.6rem; flex-wrap: wrap; }
   .route-card__logo { height: 40px; width: auto; }
   .route-card__sponsor-text { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
   .route-card__sponsor-text strong { display: block; color: var(--black); font-weight: 500; }
-  .route-card__sponsor-text a { color: var(--brand); text-decoration: underline; }
+  .route-card__sponsor-text a { color: var(--brand); text-decoration: underline; position: relative; z-index: 1; }
   .route-card__flag {
     position: absolute; top: -0.6rem; right: 1rem; background: var(--brand); color: var(--white);
     font-family: var(--f-head); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.15rem 0.55rem;
@@ -65,7 +65,6 @@
     .route-card__swatch { grid-row: span 2; }
     .route-card__grade { grid-row: span 2; }
     .routes-toolbar { flex-direction: column; align-items: stretch; }
-    .routes-tab { flex: 1; }
   }
 
   .sponsor-pitch { display: grid; gap: 2.5rem; }
@@ -81,18 +80,20 @@
 {% macro route_card(route, kind) %}
   {% set stars = route.rating|round %}
   <li class="route-card{{ route.sponsor ? ' route-card--sponsored' : '' }}"
-      data-ascents="{{ route.ascents }}" data-grade="{{ route.gradeRank }}" data-pinned="{{ route.pinned ? 1 : 0 }}"
+      data-ascents="{{ route.ascents }}" data-grade="{{ route.gradeRank }}" data-kind="{{ kind == 'problem' ? 0 : 1 }}" data-pinned="{{ route.pinned ? 1 : 0 }}"
       style="--hold: {{ route.hex }};{% if route.sponsor %} --brand: {{ route.sponsor.colour }};{% endif %}">
     {% if route.sponsor %}<span class="route-card__flag">Sponsored route</span>{% endif %}
     <span class="route-card__swatch" title="{{ route.colour }} holds"></span>
     <span class="route-card__grade">{{ route.grade }}</span>
     <div class="route-card__body">
+      {% set url = path('app_climbing_route_show', {slug: route.slug}) %}
       {% if route.name is defined %}
-        <div class="route-card__name">{{ route.name }}</div>
+        <div class="route-card__name"><a href="{{ url }}" class="route-card__link">{{ route.name }}</a></div>
       {% else %}
-        <div class="route-card__name route-card__name--unnamed">{{ route.colour }} {{ kind }}</div>
+        <div class="route-card__name route-card__name--unnamed"><a href="{{ url }}" class="route-card__link">{{ route.colour }} {{ kind }}</a></div>
       {% endif %}
       <div class="route-card__meta">
+        <span>{{ kind == 'problem' ? 'Boulder' : 'Roped' }}</span>
         <span>{{ route.colour }} holds</span>
         <span>{{ route.wall }}</span>
         {% if route.style is defined %}<span>{{ route.style }}</span>{% endif %}
@@ -114,12 +115,13 @@
     <div class="route-card__stats">
       <span class="route-card__ascents">{{ route.ascents }}</span> ascents
       <div class="route-card__stars" aria-label="Rated {{ route.rating }} out of 5">{% for i in 1..5 %}{{ i <= stars ? '★' : '☆' }}{% endfor %}</div>
+      <span class="route-card__more" aria-hidden="true">View route →</span>
     </div>
   </li>
 {% endmacro %}
 
 {% block content %}
-<div class="routes-mock-banner">Mockup — sample routes and example sponsors for illustration only.</div>
+<div class="routes-mock-banner">Mockup — sample routes for illustration only.</div>
 
 <section class="section page-hero routes-hero">
   <div class="wrap">
@@ -132,10 +134,7 @@
 <section class="section section--off">
   <div class="wrap">
     <div class="routes-toolbar">
-      <div class="routes-tabs" role="tablist">
-        <button type="button" class="routes-tab" role="tab" id="tab-bouldering" aria-controls="panel-bouldering" aria-selected="true">Bouldering<span class="routes-tab__count">{{ boulders|length }}</span></button>
-        <button type="button" class="routes-tab" role="tab" id="tab-roped" aria-controls="panel-roped" aria-selected="false">Roped<span class="routes-tab__count">{{ roped|length }}</span></button>
-      </div>
+      <div class="routes-count">{{ boulders|length }} boulder problems · {{ roped|length }} roped routes</div>
       <label class="routes-sort">
         Sort by
         <select id="routes-sort">
@@ -146,10 +145,8 @@
       </label>
     </div>
 
-    <ul class="routes-list" id="panel-bouldering" role="tabpanel" aria-labelledby="tab-bouldering">
+    <ul class="routes-list" id="routes-list">
       {% for route in boulders %}{{ _self.route_card(route, 'problem') }}{% endfor %}
-    </ul>
-    <ul class="routes-list" id="panel-roped" role="tabpanel" aria-labelledby="tab-roped" hidden>
       {% for route in roped %}{{ _self.route_card(route, 'route') }}{% endfor %}
     </ul>
   </div>
@@ -179,34 +176,28 @@
 {{ parent() }}
 <script>
   (function () {
-    var tabs   = document.querySelectorAll('.routes-tab');
-    var panels = [document.getElementById('panel-bouldering'), document.getElementById('panel-roped')];
-    var sort   = document.getElementById('routes-sort');
-
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        tabs.forEach(function (t) { t.setAttribute('aria-selected', t === tab ? 'true' : 'false'); });
-        panels.forEach(function (p) { p.hidden = p.id !== tab.getAttribute('aria-controls'); });
-      });
-    });
+    var list = document.getElementById('routes-list');
+    var sort = document.getElementById('routes-sort');
 
     function apply() {
-      var mode = sort.value;
-      panels.forEach(function (panel) {
-        var cards = Array.prototype.slice.call(panel.children);
-        // Pinned routes stay at the top whatever the sort; the sort applies within each group.
-        cards.sort(function (a, b) {
-          var pin = b.dataset.pinned - a.dataset.pinned;
-          if (pin) return pin;
-          var pop = b.dataset.ascents - a.dataset.ascents;
-          if (mode === 'popular') return pop;
-          var g = a.dataset.grade - b.dataset.grade;
-          return (mode === 'grade-desc' ? -g : g) || pop;
-        });
-        cards.forEach(function (c) { panel.appendChild(c); });
+      var mode  = sort.value;
+      var cards = Array.prototype.slice.call(list.children);
+      // Pinned routes stay at the top whatever the sort; the sort applies within each group.
+      // Boulder and roped grades use different scales, so grade sorts list boulders first, then roped.
+      cards.sort(function (a, b) {
+        var pin = b.dataset.pinned - a.dataset.pinned;
+        if (pin) return pin;
+        var pop = b.dataset.ascents - a.dataset.ascents;
+        if (mode === 'popular') return pop;
+        var kind = a.dataset.kind - b.dataset.kind;
+        if (kind) return kind;
+        var g = a.dataset.grade - b.dataset.grade;
+        return (mode === 'grade-desc' ? -g : g) || pop;
       });
+      cards.forEach(function (c) { list.appendChild(c); });
     }
     sort.addEventListener('change', apply);
+    apply();
   })();
 </script>
 {% endblock %}
