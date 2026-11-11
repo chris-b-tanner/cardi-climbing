@@ -158,6 +158,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#2b2b2b',
             'about'   => 'A family-run garage at Abbey Garage, St Dogmaels, founded in 1948 and selling and servicing Fiat vehicles since 1970. Today they sell new Fiat, KGM and Leapmotor vehicles alongside used cars and vans, with servicing, MOTs, a bodyshop and vehicle recovery.',
         ],
+        'wenyn' => [
+            'name'    => 'Wenyn',
+            'logo'    => '/images/routes-mock/wenyn.png',
+            'url'     => 'https://www.wenyn.co.uk',
+            'tagline' => 'Natural beeswax candles, handpoured in West Wales',
+            'colour'  => '#8a5a12',
+            'about'   => 'Danny makes 100% local beeswax candles with cotton wicks, handpoured in West Wales. The wax comes from a local beekeeper who keeps 12 hives on Wenyn’s own land, and the candles contain nothing but beeswax and a cotton wick.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -243,6 +251,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'Well designed and built to a plan: a crouched start, a coiled-up foot move, then a big jump across the overhang to a generous finishing hold.'],
             ['slug' => 'first-coat', 'grade' => 'VB', 'colour' => 'White', 'hex' => '#ffffff', 'wall' => 'Zone 1 – Slab', 'setter' => 'Owain', 'setOn' => '2026-11-10', 'ascents' => 96, 'rating' => 4.1, 'name' => 'First Coat', 'sponsor' => 'brwsh',
                 'description' => 'The perfect first layer for new climbers. Big holds, a gentle angle and a smooth finish, and you will want to go back for a second coat.'],
+            ['slug' => 'honeycomb', 'grade' => 'V3', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 2 – Arête', 'setter' => 'Cat', 'setOn' => '2026-11-11', 'ascents' => 39, 'rating' => 4.5, 'name' => 'Honeycomb', 'sponsor' => 'wenyn',
+                'description' => 'A sweet little problem built from a cluster of hexagonal holds up the arête. Slow and steady wins here: work the cells one at a time and keep a light touch.'],
             ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
         ];
