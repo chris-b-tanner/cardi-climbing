@@ -14,6 +14,25 @@
 
   .routes-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
   .routes-count { font-size: 0.85rem; color: var(--muted); }
+
+  .sponsor-strip {
+    overflow: hidden; margin-bottom: 2rem; padding: 0.9rem 0; background: var(--white); border: 1px solid var(--border);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .sponsor-strip__track { display: flex; width: max-content; animation: sponsor-scroll 40s linear infinite; }
+  .sponsor-strip:hover .sponsor-strip__track, .sponsor-strip:focus-within .sponsor-strip__track { animation-play-state: paused; }
+  .sponsor-strip__list { list-style: none; display: flex; align-items: center; gap: 2.75rem; padding-right: 2.75rem; margin: 0; }
+  .sponsor-strip__item { display: flex; align-items: center; height: 36px; opacity: 0.85; transition: opacity 0.15s; text-decoration: none; }
+  .sponsor-strip__item:hover, .sponsor-strip__item:focus-visible { opacity: 1; }
+  .sponsor-strip__item img { height: 100%; width: auto; max-width: 140px; object-fit: contain; }
+  .sponsor-strip__name { font-family: var(--f-head); font-weight: 700; font-size: 1rem; white-space: nowrap; }
+  @keyframes sponsor-scroll { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .sponsor-strip { overflow-x: auto; }
+    .sponsor-strip__track { animation: none; }
+    .sponsor-strip__list[aria-hidden="true"] { display: none; }
+  }
   .routes-sort { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); }
   .routes-sort select {
     font: inherit; font-size: 0.85rem; color: var(--black); background: var(--white);
@@ -48,6 +67,7 @@
   /* Sponsored routes: brand-coloured edge, logo, tagline and link — the bit sponsors are paying for. */
   .route-card--sponsored { border: 2px solid var(--brand); }
   .route-card__sponsor { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .logo--darken { filter: brightness(0); }
   .route-card__logo { height: 40px; width: auto; }
   .route-card__sponsor-text { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
   .route-card__sponsor-text strong { display: block; color: var(--black); font-weight: 500; }
@@ -104,7 +124,7 @@
       {% endif %}
       {% if route.sponsor %}
         <div class="route-card__sponsor">
-          <img src="{{ route.sponsor.logo }}" alt="{{ route.sponsor.name }}" class="route-card__logo">
+          {% if route.sponsor.logo %}<img src="{{ route.sponsor.logo }}" alt="{{ route.sponsor.name }}" class="route-card__logo{{ (route.sponsor.logoDark ?? false) ? ' logo--darken' : '' }}">{% endif %}
           <div class="route-card__sponsor-text">
             <strong>Sponsored by {{ route.sponsor.name }}</strong>
             {{ route.sponsor.tagline }} · <a href="{{ route.sponsor.url }}" target="_blank" rel="noopener sponsored">Visit</a>
@@ -133,6 +153,27 @@
 
 <section class="section section--off">
   <div class="wrap">
+    {# Sponsor logo strip: the list is rendered twice so the CSS scroll loops seamlessly; the copy is hidden from screen readers. #}
+    <div class="sponsor-strip" aria-label="Route sponsors">
+      <div class="sponsor-strip__track">
+        {% for copy in 1..2 %}
+          <ul class="sponsor-strip__list"{% if copy == 2 %} aria-hidden="true"{% endif %}>
+            {% for item in sponsors %}
+              <li>
+                <a href="{{ path('app_climbing_route_show', {slug: item.slug}) }}" class="sponsor-strip__item" title="{{ item.sponsor.name }}"{% if copy == 2 %} tabindex="-1"{% endif %}>
+                  {% if item.sponsor.logo %}
+                    <img src="{{ item.sponsor.logo }}" alt="{{ item.sponsor.name }}" loading="lazy" class="{{ (item.sponsor.logoDark ?? false) ? 'logo--darken' : '' }}">
+                  {% else %}
+                    <span class="sponsor-strip__name" style="color: {{ item.sponsor.colour }};">{{ item.sponsor.name }}</span>
+                  {% endif %}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      </div>
+    </div>
+
     <div class="routes-toolbar">
       <div class="routes-count">{{ boulders|length }} boulder problems · {{ roped|length }} roped routes</div>
       <label class="routes-sort">

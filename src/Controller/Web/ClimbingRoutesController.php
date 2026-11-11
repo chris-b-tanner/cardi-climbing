@@ -58,14 +58,116 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#b9533c',
             'about'   => 'A collective of creative and self-employed folk based around a coworking space on Cardigan high street, with hot desks for anyone who wants good company while they work.',
         ],
+        'madebybill' => [
+            'name'     => 'Made by Bill',
+            'logo'     => '/images/routes-mock/made-by-bill.png',
+            'logoDark' => true, // their logo is white-on-transparent; the templates darken it for our white cards
+            'url'      => 'https://www.bybill.co.uk',
+            'tagline'  => 'A design and make studio in Wales',
+            'colour'   => '#6b4a2f',
+            'about'    => 'Made by Bill makes small runs of its own objects and furniture, and takes on private commissions, kitchens and interiors for homes and businesses. Everything is handmade in their workshop in Wales using local native timbers.',
+        ],
+        'baramenyn' => [
+            'name'    => 'Bara Menyn',
+            'logo'    => '/images/routes-mock/bara-menyn.png',
+            'url'     => 'https://www.baramenynbakehouse.co.uk',
+            'tagline' => 'Bakehouse & mill on Chancery Lane, Aberteifi',
+            'colour'  => '#c4497a',
+            'about'   => 'Bara Menyn bakes burnished sourdough loaves, focaccia, pizza by the slice and their famous almond croissant at 6B Chancery Lane in Cardigan, using flour stone-milled in-house from local landrace wheats.',
+        ],
+        'elsalsa' => [
+            'name'    => 'El Salsa',
+            'logo'    => '/images/routes-mock/el-salsa.png', // their white logo, recoloured orange for our white cards
+            'url'     => 'https://elsalsa.co.uk',
+            'tagline' => 'Mexican kitchen & bar, Cardigan',
+            'colour'  => '#c8471a',
+            'about'   => 'El Salsa is a Mexican kitchen and bar in Cardigan, serving food from the kitchen and drinks from the bar. In their own words: “Come on down, we can’t wait to feed you!”',
+        ],
+        'cardished' => [
+            'name'    => 'CardiShed',
+            'logo'    => '/images/routes-mock/cardished.png',
+            'url'     => 'https://cardished.cymru',
+            'tagline' => 'Building community through creativity',
+            'colour'  => '#c41e2a',
+            'about'   => 'CardiShed is a volunteer-run charity in Cardigan with a carpentry machine shop and a greenwood workshop open to anyone over 18. It is an inclusive, non-judgmental place where everyone is made to feel welcome, with open workshops, wood carving and green woodwork through the week.',
+        ],
+        'cardibuildingsupplies' => [
+            'name'     => 'Cardi Building Supplies',
+            'logo'     => '/images/routes-mock/cardi-building-supplies.png',
+            'url'      => 'https://www.cardibuildingsupplies.com',
+            'tagline'  => 'Your local independent builders merchant',
+            'colour'   => '#1f3a5f',
+            'about'    => 'Cardigan’s local builders merchant for trade professionals and DIY customers, set up in 2003 at Llangoedmor. They offer expert advice, an approved Dulux paint mixing centre and free local delivery across Ceredigion, Pembrokeshire and Carmarthenshire.',
+        ],
+        'lofi' => [
+            'name'    => 'LOFI',
+            'logo'    => '/images/routes-mock/lofi.png',
+            'url'     => 'https://www.lofi.com',
+            'tagline' => 'An evolution in outdoor cooking',
+            'colour'  => '#2b2b2b',
+            'about'   => 'LOFI is a small outdoor equipment design and manufacturing company based in Cardigan, making gas-free cooking kit like the LOFI Stove to simplify life outdoors and respect the environment. Designed and made in West Wales.',
+        ],
+        'bluegreen' => [
+            'name'    => 'BlueGreenCymru',
+            'logo'    => '/images/routes-mock/bluegreen-cymru.png',
+            'url'     => 'https://www.bluegreencymru.com',
+            'tagline' => 'Health & wellbeing workshops in West Wales',
+            'colour'  => '#2e8540',
+            'about'   => 'BlueGreenCymru CIC works alongside local communities to support mental health and wellbeing through accessible spaces in nature, meaningful connections, tailored workshops and community food growing, at Glan-Teifi Woods overlooking St Dogmaels and the Danyrhelyg Community Garden in Newcastle Emlyn.',
+        ],
+        'howies' => [
+            'name'    => 'howies',
+            'logo'    => '/images/routes-mock/howies.png',
+            'url'     => 'https://howies.co.uk',
+            'tagline' => 'Active clothing from West Wales since 1995',
+            'colour'  => '#4a4a4a',
+            'about'   => 'howies is an independent active clothing company based in West Wales, owned and run by its employees. Since 1995 they have made high quality, lower impact clothing for the outdoors, running and cycling, using GOTS certified organic cotton and merino wool.',
+        ],
+        'frog' => [
+            'name'    => 'frog architects',
+            'logo'    => null, // no logo file on their site; the templates fall back to the name
+            'url'     => 'https://frogarchitects.co.uk',
+            'tagline' => 'Architects studio based in West Wales',
+            'colour'  => '#3d7a3a',
+            'about'   => 'Frog is an RIBA Chartered Practice based in West Wales, founded by Laura Knight and Phil Reeves. They specialise in new build, conservation and planning at all stages and scales, working closely with clients to deliver buildings that serve their needs while striving for sustainable outcomes.',
+        ],
+        'brwsh' => [
+            'name'    => 'BRWSH',
+            'logo'    => '/images/routes-mock/brwsh.png',
+            'url'     => 'https://www.brwsh.co.uk',
+            'tagline' => 'Trade trusted. Customer approved.',
+            'colour'  => '#b5651d',
+            'about'   => 'A family-run decorating supply store in Cardigan, founded in 2018 by Matthew and Claire Morgan. Pop in for free colour and wallpaper consultations, paint mixing and colour matching, with brands from Tikkurila and Johnstone’s to Sanderson and Morris & Co.',
+        ],
+        'hawen' => [
+            'name'    => 'Hawen Heating',
+            'logo'    => '/images/routes-mock/hawen-heating.png',
+            'url'     => 'https://www.hawenheating.co.uk',
+            'tagline' => 'Plumbing, heating & renewables',
+            'colour'  => '#55730a',
+            'about'   => 'A truly local business providing plumbing, heating and renewable energy solutions across Ceredigion, Pembrokeshire and Carmarthenshire, with over 15 years of experience and 24/7 emergency callouts.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
     public function index(): Response
     {
+        $boulders = $this->prepare(self::boulders(), self::BOULDER_GRADES);
+        $roped    = $this->prepare(self::roped(), self::ROPED_GRADES);
+
+        // One entry per sponsor for the logo strip, linking to their first route.
+        $sponsors = [];
+        foreach ([...self::boulders(), ...self::roped()] as $route) {
+            $key = $route['sponsor'] ?? null;
+            if ($key !== null && !isset($sponsors[$key])) {
+                $sponsors[$key] = ['sponsor' => self::SPONSORS[$key], 'slug' => $route['slug']];
+            }
+        }
+
         return $this->render('climbing_routes/index.html.twig', [
-            'boulders' => $this->prepare(self::boulders(), self::BOULDER_GRADES),
-            'roped'    => $this->prepare(self::roped(), self::ROPED_GRADES),
+            'boulders' => $boulders,
+            'roped'    => $roped,
+            'sponsors' => array_values($sponsors),
         ]);
     }
 
@@ -118,6 +220,16 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'Two moves to set up, then one committing leap to the finishing jug. Hard to stick, but most people find it pure fun to try.'],
             ['slug' => 'hot-desk', 'grade' => 'V1', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Zone 1 – Slab', 'setter' => 'Owain', 'setOn' => '2026-11-06', 'ascents' => 58, 'rating' => 4.3, 'name' => 'Hot Desk', 'sponsor' => 'pobldda',
                 'description' => 'A sociable warm-up with plenty of room for company. Big friendly holds lead to a balancy step-through near the top, where a quick chat with your feet keeps things moving.'],
+            ['slug' => 'sourdough-starter', 'grade' => 'V0', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 1 – Slab', 'setter' => 'Rhys', 'setOn' => '2026-11-06', 'ascents' => 87, 'rating' => 4.4, 'name' => 'Sourdough Starter', 'sponsor' => 'baramenyn',
+                'description' => 'The perfect first problem of the day. Generous, chunky holds and a gentle angle let you warm up slowly, and it gets better every time you come back to it.'],
+            ['slug' => 'shed-load', 'grade' => 'V3', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 2 – Arête', 'setter' => 'Cat', 'setOn' => '2026-11-10', 'ascents' => 41, 'rating' => 4.5, 'name' => 'Shed Load', 'sponsor' => 'cardished',
+                'description' => 'Hand-crafted on the arête with plenty of chunky, woody holds. Each move is simple on its own, but it takes a bit of patience and good technique to put the whole thing together.'],
+            ['slug' => 'breathing-space', 'grade' => 'V2', 'colour' => 'Green', 'hex' => '#3c9a5f', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-10', 'ascents' => 52, 'rating' => 4.4, 'name' => 'Breathing Space', 'sponsor' => 'bluegreen',
+                'description' => 'A calm, flowing slab with no need to rush. Slow down, breathe between moves and let your feet do the work, and it all falls into place.'],
+            ['slug' => 'leap-frog', 'grade' => 'V4', 'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Rhys', 'setOn' => '2026-11-10', 'ascents' => 44, 'rating' => 4.6, 'name' => 'Leap Frog', 'sponsor' => 'frog',
+                'description' => 'Well designed and built to a plan: a crouched start, a coiled-up foot move, then a big jump across the overhang to a generous finishing hold.'],
+            ['slug' => 'first-coat', 'grade' => 'VB', 'colour' => 'White', 'hex' => '#ffffff', 'wall' => 'Zone 1 – Slab', 'setter' => 'Owain', 'setOn' => '2026-11-10', 'ascents' => 96, 'rating' => 4.1, 'name' => 'First Coat', 'sponsor' => 'brwsh',
+                'description' => 'The perfect first layer for new climbers. Big holds, a gentle angle and a smooth finish, and you will want to go back for a second coat.'],
             ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
         ];
@@ -126,6 +238,18 @@ class ClimbingRoutesController extends AbstractController
     private static function roped(): array
     {
         return [
+            ['slug' => 'dovetail', 'grade' => '6a+', 'colour' => 'Green', 'hex' => '#3c9a5f', 'wall' => 'Line 2', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-06', 'ascents' => 47, 'rating' => 4.5, 'name' => 'Dovetail', 'sponsor' => 'madebybill',
+                'description' => 'Interlocking moves that only fit together one way. Opposing side-pulls and a neat foot swap near the middle make a beautifully crafted line, so take your time and measure twice.'],
+            ['slug' => 'extra-picante', 'grade' => '6c', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-06', 'ascents' => 29, 'rating' => 4.7, 'name' => 'Extra Picante', 'sponsor' => 'elsalsa',
+                'description' => 'Starts mild and builds the heat clip by clip. A pumpy steep section near the top will have your forearms burning, so shake out, breathe, and save something for the finish.'],
+            ['slug' => 'foundations', 'grade' => '6a', 'colour' => 'Grey', 'hex' => '#8a8a8a', 'wall' => 'Line 1', 'style' => 'Auto-belay', 'setter' => 'Owain', 'setOn' => '2026-11-10', 'ascents' => 66, 'rating' => 4.2, 'name' => 'Foundations', 'sponsor' => 'cardibuildingsupplies',
+                'description' => 'Solid, blocky holds stacked like brickwork make this a great route to build your technique on. Get the basics right low down and the top goes up in no time.'],
+            ['slug' => 'slow-burn', 'grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-11-10', 'ascents' => 34, 'rating' => 4.6, 'name' => 'Slow Burn', 'sponsor' => 'lofi',
+                'description' => 'No single hard move, just a long, sustained climb that slowly turns up the heat. Keep things simple, climb efficiently and you will have enough fuel left for the top.'],
+            ['slug' => 'wear-it-out', 'grade' => '6c+', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-10', 'ascents' => 22, 'rating' => 4.8, 'name' => 'Wear It Out', 'sponsor' => 'howies',
+                'description' => 'Long, steep and built for endurance. It will test your stamina all the way to the chain, so pace yourself, clip efficiently and wear it out.'],
+            ['slug' => 'heat-pump', 'grade' => '6b', 'colour' => 'Blue', 'hex' => '#2f6fd6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-10', 'ascents' => 61, 'rating' => 4.3, 'name' => 'Heat Pump', 'sponsor' => 'hawen',
+                'description' => 'Steady and efficient climbing that slowly builds the pump in your forearms. Find the rests, shake out and keep the energy flowing to the top.'],
             ['slug' => 'the-beanpole', 'grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst',
                 'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
             ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',

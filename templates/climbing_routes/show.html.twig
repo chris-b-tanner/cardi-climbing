@@ -38,6 +38,7 @@
     position: absolute; top: -0.65rem; left: 1.5rem; background: var(--brand); color: var(--white);
     font-family: var(--f-head); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.15rem 0.55rem;
   }
+  .logo--darken { filter: brightness(0); }
   .route-sponsor__logo { height: 56px; width: auto; max-width: 100%; }
   .route-sponsor h2 { font-size: 1.25rem; margin: 1.25rem 0 0.25rem; }
   .route-sponsor__tagline { color: var(--muted); font-size: 0.9rem; }
@@ -91,7 +92,7 @@
       {% set sponsor = route.sponsor %}
       <aside class="route-sponsor" style="--brand: {{ sponsor.colour }};">
         <span class="route-sponsor__flag">Sponsored route</span>
-        <img src="{{ sponsor.logo }}" alt="{{ sponsor.name }}" class="route-sponsor__logo">
+        {% if sponsor.logo %}<img src="{{ sponsor.logo }}" alt="{{ sponsor.name }}" class="route-sponsor__logo{{ (sponsor.logoDark ?? false) ? ' logo--darken' : '' }}">{% endif %}
         <h2>Sponsored by {{ sponsor.name }}</h2>
         <div class="route-sponsor__tagline">{{ sponsor.tagline }}</div>
         <p class="route-sponsor__about">{{ sponsor.about }}</p>
