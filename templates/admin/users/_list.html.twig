@@ -26,6 +26,12 @@
           <th>Tags</th>
           <th class="admin-table__memo-col">Memo</th>
           <th>Assigned</th>
+          <th class="admin-table__sortable{{ currentSort == 'lastContact' ? ' is-sorted' : '' }}" data-sort="lastContact">
+            Last contacted
+            {% if currentSort == 'lastContact' %}
+              <span class="admin-table__sort-arrow">{{ currentDir == 'desc' ? '▼' : '▲' }}</span>
+            {% endif %}
+          </th>
           {% if context == 'new_sale' %}<th></th>{% endif %}
         </tr>
       </thead>
@@ -98,6 +104,16 @@
                     {{ user.assignedTo.displayName|slice(0, 1)|upper }}
                   </span>
                 {% endif %}
+              {% endif %}
+            </td>
+            <td class="admin-table__muted" style="white-space:nowrap;">
+              {% if lastTouched %}
+                {% set daysAgo = date(lastTouched|date('Y-m-d')).diff(date('today')).days %}
+                <span title="{{ lastTouched|date('j M Y, H:i') }}">
+                  {{- daysAgo == 0 ? 'Today' : (daysAgo == 1 ? '1 day ago' : daysAgo ~ ' days ago') -}}
+                </span>
+              {% else %}
+                —
               {% endif %}
             </td>
             {% if context == 'new_sale' %}

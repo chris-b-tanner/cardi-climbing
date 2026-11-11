@@ -61,7 +61,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /**
-     * @param 'id'|'name'|'email' $sort
+     * @param 'id'|'name'|'email'|'lastContact' $sort
      * @param ?int $assignedToId 0 means "unassigned"; null means no filter on assignment.
      * @param bool $suppliersOnly only contacts flagged as suppliers (User::$isSupplier)
      */
@@ -118,6 +118,12 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         } elseif ($sort === 'email') {
             $qb->addSelect('COALESCE(u.email, \'\') AS HIDDEN sortEmail')
                ->orderBy('sortEmail', $direction);
+        } elseif ($sort === 'lastContact') {
+            // Never-contacted people count as the longest ago: first when ascending, last when descending.
+            $qb->addSelect('CASE WHEN u.lastActivityAt IS NULL THEN 0 ELSE 1 END AS HIDDEN hasContact')
+               ->orderBy('hasContact', $direction)
+               ->addOrderBy('u.lastActivityAt', $direction)
+               ->addOrderBy('u.id', 'ASC');
         } else {
             $qb->addSelect('COALESCE(u.lastName, u.email) AS HIDDEN sortLast')
                ->addSelect('COALESCE(u.firstName, u.email) AS HIDDEN sortFirst')

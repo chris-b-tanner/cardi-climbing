@@ -163,7 +163,7 @@ class AdminController extends AbstractController
         $tagId = $request->query->get('tag') !== null && $request->query->get('tag') !== ''
             ? (int) $request->query->get('tag')
             : null;
-        $sort = in_array($request->query->get('sort'), ['id', 'name', 'email'], true) ? $request->query->get('sort') : 'name';
+        $sort = in_array($request->query->get('sort'), ['id', 'name', 'email', 'lastContact'], true) ? $request->query->get('sort') : 'name';
         $dir  = $request->query->get('dir') === 'desc' ? 'desc' : 'asc';
         $hasMemo = $request->query->getBoolean('hasMemo');
         $assignedToRaw = $request->query->get('assignedTo', '');
