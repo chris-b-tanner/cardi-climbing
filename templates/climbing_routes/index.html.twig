@@ -15,6 +15,14 @@
   .routes-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
   .routes-count { font-size: 0.85rem; color: var(--muted); }
 
+  .sponsor-cta {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 2rem;
+    margin-top: 2rem; padding: 1.5rem 1.75rem; background: var(--black); color: var(--white);
+  }
+  .sponsor-cta__title { font-family: var(--f-head); font-size: 1.15rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .sponsor-cta p { color: rgba(255,255,255,0.75); margin: 0.25rem 0 0; font-size: 0.9rem; }
+  .sponsor-cta .btn { flex: none; }
+
   .sponsor-strip {
     overflow: hidden; margin-bottom: 2rem; padding: 0.9rem 0; background: var(--white); border: 1px solid var(--border);
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
@@ -146,6 +154,7 @@
 <section class="section page-hero routes-hero">
   <div class="wrap">
     <h1 class="page-hero__h1">Current routes (example page)</h1>
+    <div><a href="{{ sponsorRouteUrl }}" target="_blank" rel="noopener"><strong>Sponsor a route on Crowdfunder →</strong></a></div>
     <div><a href="/sponsorship">Click here to have a look at other sponsorship options or learn more about sponsoring a route</a></div>
     <br>
   </div>
@@ -190,6 +199,14 @@
       {% for route in boulders %}{{ _self.route_card(route, 'problem') }}{% endfor %}
       {% for route in roped %}{{ _self.route_card(route, 'route') }}{% endfor %}
     </ul>
+
+    <div class="sponsor-cta">
+      <div>
+        <div class="sponsor-cta__title">Want your name on the wall?</div>
+        <p>Sponsor a route through our Crowdfunder: name it, add your logo and link, and help get Y Wal built.</p>
+      </div>
+      <a href="{{ sponsorRouteUrl }}" class="btn btn--teal" target="_blank" rel="noopener">Sponsor a route</a>
+    </div>
   </div>
 </section>
 
@@ -204,7 +221,8 @@
         <li><strong>Stand out in the list.</strong> Sponsored routes are highlighted in your brand colour, however climbers sort.</li>
         <li><strong>Support local climbing.</strong> Sponsorship helps keep Y Wal affordable and open to everyone.</li>
       </ul>
-      <a href="mailto:hello@cardiganclimbing.org?subject={{ 'Sponsoring a route at Y Wal'|url_encode }}" class="btn btn--teal">Talk to us about sponsoring</a>
+      <a href="{{ sponsorRouteUrl }}" class="btn btn--teal" target="_blank" rel="noopener">Sponsor a route on Crowdfunder</a>
+      <a href="mailto:hello@cardiganclimbing.org?subject={{ 'Sponsoring a route at Y Wal'|url_encode }}" class="btn btn--outline">Talk to us first</a>
     </div>
     <ul class="routes-list" aria-label="Example sponsored route">
       {{ _self.route_card(boulders|filter(r => r.sponsor)|first, 'problem') }}

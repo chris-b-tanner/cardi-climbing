@@ -45,6 +45,14 @@
   .route-sponsor__about { margin-top: 1rem; }
   .route-sponsor .btn { margin-top: 1.5rem; background: var(--brand); border-color: var(--brand); color: var(--white); }
   .route-sponsor .btn:hover { opacity: 0.9; }
+
+  .sponsor-cta {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 2rem;
+    margin-top: 2rem; padding: 1.5rem 1.75rem; background: var(--black); color: var(--white);
+  }
+  .sponsor-cta__title { font-family: var(--f-head); font-size: 1.15rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .sponsor-cta p { color: rgba(255,255,255,0.75); margin: 0.25rem 0 0; font-size: 0.9rem; }
+  .sponsor-cta .btn { flex: none; }
 </style>
 {% endblock %}
 
@@ -99,6 +107,15 @@
         <a href="{{ sponsor.url }}" class="btn" target="_blank" rel="noopener sponsored">Visit {{ sponsor.name }}</a>
       </aside>
     {% endif %}
+  </div>
+  <div class="wrap">
+    <div class="sponsor-cta">
+      <div>
+        <div class="sponsor-cta__title">Sponsor a route like this</div>
+        <p>Name a route, add your logo and a link to your business, and help get Y Wal built. It's all done through our Crowdfunder.</p>
+      </div>
+      <a href="{{ sponsorRouteUrl }}" class="btn btn--teal" target="_blank" rel="noopener">Sponsor a route</a>
+    </div>
   </div>
 </section>
 {% endblock %}

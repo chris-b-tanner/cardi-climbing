@@ -17,6 +17,9 @@ class ClimbingRoutesController extends AbstractController
     private const BOULDER_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'];
     private const ROPED_GRADES   = ['4', '5', '5+', '6a', '6a+', '6b', '6b+', '6c', '6c+', '7a', '7a+'];
 
+    // Crowdfunder reward for sponsoring a route — linked from the listing and every route page.
+    private const SPONSOR_ROUTE_URL = 'https://www.crowdfunder.co.uk/checkout/cardigan-climbing-and-bouldering/start/2993975';
+
     private const SPONSORS = [
         'harvst' => [
             'name'    => 'Harvst',
@@ -147,6 +150,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#55730a',
             'about'   => 'A truly local business providing plumbing, heating and renewable energy solutions across Ceredigion, Pembrokeshire and Carmarthenshire, with over 15 years of experience and 24/7 emergency callouts.',
         ],
+        'bvrees' => [
+            'name'    => 'B V Rees',
+            'logo'    => '/images/routes-mock/bv-rees.png',
+            'url'     => 'https://www.bvrees.com',
+            'tagline' => 'New & used cars and vans in West Wales',
+            'colour'  => '#2b2b2b',
+            'about'   => 'A family-run garage at Abbey Garage, St Dogmaels, founded in 1948 and selling and servicing Fiat vehicles since 1970. Today they sell new Fiat, KGM and Leapmotor vehicles alongside used cars and vans, with servicing, MOTs, a bodyshop and vehicle recovery.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -168,6 +179,7 @@ class ClimbingRoutesController extends AbstractController
             'boulders' => $boulders,
             'roped'    => $roped,
             'sponsors' => array_values($sponsors),
+            'sponsorRouteUrl' => self::SPONSOR_ROUTE_URL,
         ]);
     }
 
@@ -185,6 +197,7 @@ class ClimbingRoutesController extends AbstractController
                     return $this->render('climbing_routes/show.html.twig', [
                         'route' => $route,
                         'kind'  => $kind,
+                        'sponsorRouteUrl' => self::SPONSOR_ROUTE_URL,
                     ]);
                 }
             }
@@ -250,6 +263,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'Long, steep and built for endurance. It will test your stamina all the way to the chain, so pace yourself, clip efficiently and wear it out.'],
             ['slug' => 'heat-pump', 'grade' => '6b', 'colour' => 'Blue', 'hex' => '#2f6fd6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-10', 'ascents' => 61, 'rating' => 4.3, 'name' => 'Heat Pump', 'sponsor' => 'hawen',
                 'description' => 'Steady and efficient climbing that slowly builds the pump in your forearms. Find the rests, shake out and keep the energy flowing to the top.'],
+            ['slug' => 'full-service', 'grade' => '6a+', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 2', 'style' => 'Top rope', 'setter' => 'Owain', 'setOn' => '2026-11-10', 'ascents' => 58, 'rating' => 4.3, 'name' => 'Full Service', 'sponsor' => 'bvrees',
+                'description' => 'A reliable all-rounder that checks every part of your climbing: a bit of balance, a bit of power and a tricky gear change halfway up. Well maintained and running smoothly since it was set.'],
             ['slug' => 'the-beanpole', 'grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst',
                 'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
             ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',
