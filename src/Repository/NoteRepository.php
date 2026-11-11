@@ -197,4 +197,26 @@ class NoteRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    /**
+     * Who added each note, and when, from {since} onwards — for the staff activity grid (see
+     * AdminActivityController). Leaves out notes nobody added (system notes) and bulk email
+     * audit notes ("Emailed: …", one per recipient), which would swamp a sender's real activity;
+     * the content check catches any sent before notes were linked to their Email.
+     *
+     * @return list<array{addedById: int, createdAt: \DateTimeImmutable}>
+     */
+    public function findActivitySince(\DateTimeImmutable $since): array
+    {
+        return $this->createQueryBuilder('n')
+            ->select('IDENTITY(n.addedBy) AS addedById', 'n.createdAt')
+            ->where('n.addedBy IS NOT NULL')
+            ->andWhere('n.email IS NULL')
+            ->andWhere('n.content NOT LIKE :bulk')
+            ->andWhere('n.createdAt >= :since')
+            ->setParameter('bulk', 'Emailed: %')
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getArrayResult();
+    }
 }
