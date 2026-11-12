@@ -158,6 +158,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#8a5a12',
             'about'   => 'Danny makes 100% local beeswax candles with cotton wicks, handpoured in West Wales. The wax comes from a local beekeeper who keeps 12 hives on Wenyn’s own land, and the candles contain nothing but beeswax and a cotton wick.',
         ],
+        'bikebikebike' => [
+            'name'    => 'bikebikebike.bike',
+            'logo'    => '/images/routes-mock/bikebikebike.png',
+            'url'     => 'https://bikebikebike.bike',
+            'tagline' => 'Bikes & e-bikes: retail, repairs and rentals in Cardigan',
+            'colour'  => '#e3262b',
+            'about'   => 'An independent bike shop on Pendre in Cardigan town centre, open since 1997. They sell e-bikes and traditional bikes, run a workshop for repairs, servicing and wheel building, and hire out bikes for exploring West Wales.',
+        ],
         'chrisjones' => [
             'name'    => 'Chris Jones Construction',
             'logo'    => '/images/routes-mock/chris-jones-construction.png',
@@ -261,6 +269,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'The perfect first layer for new climbers. Big holds, a gentle angle and a smooth finish, and you will want to go back for a second coat.'],
             ['slug' => 'honeycomb', 'grade' => 'V3', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Zone 2 – Arête', 'setter' => 'Cat', 'setOn' => '2026-11-11', 'ascents' => 39, 'rating' => 4.5, 'name' => 'Honeycomb', 'sponsor' => 'wenyn',
                 'description' => 'A sweet little problem built from a cluster of hexagonal holds up the arête. Slow and steady wins here: work the cells one at a time and keep a light touch.'],
+            ['slug' => 'chain-reaction', 'grade' => 'V2', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave', 'setter' => 'Owain', 'setOn' => '2026-11-12', 'ascents' => 27, 'rating' => 4.4, 'name' => 'Chain Reaction', 'sponsor' => 'bikebikebike',
+                'description' => 'A flowing line of linked moves out of the cave. Each one sets up the next, so find your rhythm, keep the momentum going and the whole thing runs like a well-oiled chain.'],
             ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
         ];
