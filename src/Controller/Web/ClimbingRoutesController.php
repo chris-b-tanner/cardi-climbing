@@ -166,6 +166,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#e3262b',
             'about'   => 'An independent bike shop on Pendre in Cardigan town centre, open since 1997. They sell e-bikes and traditional bikes, run a workshop for repairs, servicing and wheel building, and hire out bikes for exploring West Wales.',
         ],
+        'aberteififarmvets' => [
+            'name'    => 'Aberteifi Farm Vets',
+            'logo'    => '/images/routes-mock/aberteifi-farm-vets.png',
+            'url'     => 'https://aberteififarmvets.co.uk',
+            'tagline' => 'Independent farm animal vets in Cardigan',
+            'colour'  => '#0d5a4b',
+            'about'   => 'A new, independent farm vet practice in Cardigan, led by Kate Burnby, offering farm animal care, hoofcare, consultancy and training to the local farming community. The practice is owned by the people who work in it, and clients can join a membership club to share in its success.',
+        ],
         'chrisjones' => [
             'name'    => 'Chris Jones Construction',
             'logo'    => '/images/routes-mock/chris-jones-construction.png',
@@ -271,6 +279,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A sweet little problem built from a cluster of hexagonal holds up the arête. Slow and steady wins here: work the cells one at a time and keep a light touch.'],
             ['slug' => 'active-travel', 'grade' => 'V2', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave', 'setter' => 'Owain', 'setOn' => '2026-11-12', 'ascents' => 27, 'rating' => 4.4, 'name' => 'Active Travel', 'sponsor' => 'bikebikebike',
                 'description' => 'A flowing line of linked moves out of the cave. Each one sets up the next, so find your rhythm, keep the momentum going and the whole thing runs like a well-oiled chain.'],
+            ['slug' => 'common-ground', 'grade' => 'V1', 'colour' => 'Green', 'hex' => '#3c9a5f', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-12', 'ascents' => 31, 'rating' => 4.3, 'name' => 'Common Ground', 'sponsor' => 'aberteififarmvets',
+                'description' => 'A friendly, down-to-earth slab where everyone can find their footing. Solid holds and steady moves make it a problem to share, so climb it together and swap beta at the bottom.'],
             ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
         ];
