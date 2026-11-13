@@ -174,6 +174,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#0d5a4b',
             'about'   => 'A new, independent farm vet practice in Cardigan, led by Kate Burnby, offering farm animal care, hoofcare, consultancy and training to the local farming community. The practice is owned by the people who work in it, and clients can join a membership club to share in its success.',
         ],
+        'anturio' => [
+            'name'    => 'Anturio',
+            'logo'    => '/images/routes-mock/anturio.png',
+            'url'     => 'https://www.anturio.wales',
+            'tagline' => 'Guided adventure journeys in West Wales',
+            'colour'  => '#1a1a1a',
+            'about'   => 'Anturio, Welsh for “to adventure”, runs bespoke guided journeys along the coast and countryside of West Wales, mixing climbing and abseiling, coasteering, paddling, walking and wild camping. Each journey is tailored to you, with the final details kept a mystery until you get there. The team is led by IFMGA mountain guide Mark Thomas.',
+        ],
         'chrisjones' => [
             'name'    => 'Chris Jones Construction',
             'logo'    => '/images/routes-mock/chris-jones-construction.png',
@@ -309,6 +317,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
             ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',
                 'description' => 'A flowing line of pinches and side-pulls that weaves up the wall. Find the rhythm early and it comes together stitch by stitch.'],
+            ['slug' => 'into-the-unknown', 'grade' => '6c', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-13', 'ascents' => 18, 'rating' => 4.7, 'name' => 'Into the Unknown', 'sponsor' => 'anturio',
+                'description' => 'An adventurous lead where the next hold is never quite where you expect it. Read the wall as you go, stay calm between clips and enjoy the journey to the top.'],
         ];
     }
 }
