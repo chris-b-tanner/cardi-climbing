@@ -15,7 +15,7 @@ class ClimbingRoutesController extends AbstractController
 {
     // Ordered easiest → hardest; the index is the sort rank used by the "grade" sort.
     private const BOULDER_GRADES = ['VB', 'V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'];
-    private const ROPED_GRADES   = ['4', '5', '5+', '6a', '6a+', '6b', '6b+', '6c', '6c+', '7a', '7a+'];
+    private const ROPED_GRADES   = ['4', '5', '5+', '6a', '6a+', '6b', '6b+', '6c', '6c+', '7a', '7a+', '7b'];
 
     // Crowdfunder reward for sponsoring a route — linked from the listing and every route page.
     private const SPONSOR_ROUTE_URL = 'https://www.crowdfunder.co.uk/checkout/cardigan-climbing-and-bouldering/start/2993975';
@@ -315,8 +315,12 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A flowing line that weaves left and right through a tangle of blue and teal holds. Read the twists, keep your feet tidy and it all pulls together into one smooth, sustained pitch.'],
             ['slug' => 'the-beanpole', 'grade' => '6b',  'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Owain','setOn' => '2026-09-28', 'ascents' => 72,  'rating' => 4.3, 'name' => 'The Beanpole', 'sponsor' => 'harvst',
                 'description' => 'Tall, straight up, and full of long reaches between well-spaced holds. Shorter climbers will find a high foot or two that does the job.'],
-            ['slug' => 'cast-on', 'grade' => '6a',  'colour' => 'Pink',   'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat',  'setOn' => '2026-09-28', 'ascents' => 111, 'rating' => 4.1, 'name' => 'Cast On', 'sponsor' => 'craftcourses',
-                'description' => 'A flowing line of pinches and side-pulls that weaves up the wall. Find the rhythm early and it comes together stitch by stitch.'],
+            ['slug' => 'sams-route', 'grade' => '5', 'colour' => 'Pink', 'hex' => '#e463a6', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-14', 'ascents' => 74, 'rating' => 4.2, 'name' => 'Sam’s Route', 'sponsor' => 'craftcourses',
+                'description' => 'A friendly introduction to the ropes. Big holds and a steady angle let you learn the basics one move at a time, the perfect first workshop on the wall.'],
+            ['slug' => 'sams-dilemma', 'grade' => '6a', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 2', 'style' => 'Top rope', 'setter' => 'Cat', 'setOn' => '2026-11-14', 'ascents' => 46, 'rating' => 4.4, 'name' => 'Sam’s Dilemma', 'sponsor' => 'craftcourses',
+                'description' => 'Two good-looking options at every turn, and only one of them really works. Take a moment to plan your sequence before you commit, and the right line soon takes shape.'],
+            ['slug' => 'sams-ascent', 'grade' => '7b', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 5', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-14', 'ascents' => 9, 'rating' => 4.9, 'name' => 'Sam’s Ascent', 'sponsor' => 'craftcourses',
+                'description' => 'The masterpiece. Small crimps, precise footwork and a sustained steep finish demand every skill you have honed. A true test of craft, and hugely satisfying to clip the chain.'],
             ['slug' => 'into-the-unknown', 'grade' => '6c', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-13', 'ascents' => 18, 'rating' => 4.7, 'name' => 'Into the Unknown', 'sponsor' => 'anturio',
                 'description' => 'An adventurous lead where the next hold is never quite where you expect it. Read the wall as you go, stay calm between clips and enjoy the journey to the top.'],
         ];
