@@ -30,12 +30,12 @@ class ClimbingRoutesController extends AbstractController
             'about'   => 'Harvst helps growing businesses do more of what they do best, with software that takes care of the busywork.',
         ],
         'craftcourses' => [
-            'name'    => 'Craft Courses',
-            'logo'    => '/images/routes-mock/craft-courses.svg',
+            'name'    => 'CraftCourses.com',
+            'logo'    => '/images/routes-mock/craft-courses.png',
             'url'     => 'https://www.craftcourses.com',
             'tagline' => 'Art & craft workshops with 1000s of UK makers',
             'colour'  => '#be3455',
-            'about'   => 'Craft Courses lists art and craft workshops run by thousands of independent makers across the UK, from pottery and printmaking to knitting and woodwork.',
+            'about'   => 'CraftCourses.com lists art and craft workshops run by thousands of independent makers across the UK, from pottery and printmaking to knitting and woodwork.',
         ],
         'adventurebeyond' => [
             'name'    => 'Adventure Beyond',
