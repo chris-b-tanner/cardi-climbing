@@ -107,14 +107,14 @@
 
 {% block content %}
 {% set categories = [
-  {key: 'membership', label: 'Memberships'},
-  {key: 'event_ticket', label: 'Event tickets'},
-  {key: 'credit', label: 'Drop-in credits'},
-  {key: 'stock', label: 'Items'},
-  {key: 'service', label: 'Other'},
+  {key: 'membership', type: 'membership', label: 'Memberships'},
+  {key: 'event_ticket', type: 'event_ticket', label: 'Event tickets'},
+  {key: 'credit', type: 'credit', label: 'Drop-in credits'},
+  {key: 'stock', type: 'stock', label: 'Items'},
+  {key: 'other', type: 'service', label: 'Other'},
 ] %}
-{# Only categories with something in them are offered; an unknown or empty ?category= falls back to showing everything. #}
-{% set categories = categories|filter(c => products|filter(p => p.productType == c.key)|length > 0) %}
+{# key is the ?category= value in the URL; type is the Product::TYPE_* it lists. Only categories with something in them are offered; an unknown or empty ?category= falls back to showing everything. #}
+{% set categories = categories|filter(c => products|filter(p => p.productType == c.type)|length > 0) %}
 {% set requestedCategory = app.request.query.get('category', '') %}
 {% set activeCategory = categories|filter(c => c.key == requestedCategory)|length > 0 ? requestedCategory : '' %}
 
@@ -150,7 +150,7 @@
             {% for category in categories %}
               <li>
                 <a href="{{ path('app_shop', {category: category.key}) }}" class="shop-cats__link{{ activeCategory == category.key ? ' is-active' }}"{% if activeCategory == category.key %} aria-current="page"{% endif %}>
-                  {{ category.label }} <span class="shop-cats__count">{{ products|filter(p => p.productType == category.key)|length }}</span>
+                  {{ category.label }} <span class="shop-cats__count">{{ products|filter(p => p.productType == category.type)|length }}</span>
                 </a>
               </li>
             {% endfor %}
@@ -159,8 +159,8 @@
 
         <div class="shop-main">
           {% for section in categories|filter(c => activeCategory == '' or c.key == activeCategory) %}
-            {% set sectionProducts = products|filter(p => p.productType == section.key) %}
-            {% if section.key == 'event_ticket' %}
+            {% set sectionProducts = products|filter(p => p.productType == section.type) %}
+            {% if section.type == 'event_ticket' %}
               {% set sectionProducts = sectionProducts|sort((a, b) => a.eventTicketProduct.event.date <=> b.eventTicketProduct.event.date) %}
             {% endif %}
             <section class="shop-section">
