@@ -61,7 +61,7 @@
         <div class="account-card">
           {% for key, line in lines %}
             {% set eventTicketProduct = line.product.eventTicketProduct %}
-            {% set isStock = line.product.productType == 'stock' %}
+            {% set isStock = line.product.productType in ['stock', 'service'] %}
             {% set canChangeQty = isStock or (eventTicketProduct and eventTicketProduct.event.restrictions is empty) %}
             <div class="cart-line">
               <div>

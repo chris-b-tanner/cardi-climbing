@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Public self-serve shop: memberships, drop-in credits, stock items and event tickets. Anyone can
+ * Public self-serve shop: memberships, drop-in credits, stock items, services and event tickets. Anyone can
  * browse it, but adding to the cart needs a login. Event tickets can also be added from the event
  * preview modal. add() below serves both: the modal calls it over AJAX, and this page's own forms
  * use a plain POST. Either way, a successful add takes the member straight to the cart.

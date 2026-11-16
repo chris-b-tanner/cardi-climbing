@@ -87,7 +87,7 @@ class CartService
             throw new \InvalidArgumentException('Choose a valid product.');
         }
 
-        // A stock item has no beneficiary, so its line is always held against the buyer.
+        // A stock or service item has no beneficiary, so its line is always held against the buyer.
         $eligible    = $this->eligibleBeneficiaries($user);
         $beneficiary = $eligible[$product->requiresBeneficiary() ? ($beneficiaryId ?? $user->getId()) : $user->getId()] ?? null;
         if ($beneficiary === null) {
@@ -124,7 +124,7 @@ class CartService
         $existing = $lines[$key] ?? null;
 
         // Adding something that's already in the cart for this person adds to that line's quantity,
-        // when the line can hold more than one: a stock item, or a ticket for an unrestricted event.
+        // when the line can hold more than one: a stock or service item, or a ticket for an unrestricted event.
         // Anything else (a membership, credit or restricted-event ticket) stays one per person.
         if ($existing !== null && $this->allowsMultipleQty($product)) {
             $qty += $existing['qty'];
@@ -220,10 +220,10 @@ class CartService
         return $order;
     }
 
-    /** Whether one cart line can hold more than one of {product}: a stock item, or a ticket for an event with no certification restrictions. */
+    /** Whether one cart line can hold more than one of {product}: a stock or service item, or a ticket for an event with no certification restrictions. */
     private function allowsMultipleQty(Product $product): bool
     {
-        if ($product->getProductType() === Product::TYPE_STOCK) {
+        if ($this->isPlainItem($product)) {
             return true;
         }
 
@@ -231,10 +231,16 @@ class CartService
         return $eventTicketProduct !== null && $eventTicketProduct->getEvent()->getRestrictions()->isEmpty();
     }
 
-    /** Beneficiary products (memberships, credits, tickets) and stock items. A service product is never sold online. */
+    /** Beneficiary products (memberships, credits, tickets) plus stock and service items. */
     private function isSellableOnline(Product $product): bool
     {
-        return $product->requiresBeneficiary() || $product->getProductType() === Product::TYPE_STOCK;
+        return $product->requiresBeneficiary() || $this->isPlainItem($product);
+    }
+
+    /** A stock or service item: bought by the buyer for themself, with no beneficiary or qty limit. */
+    private function isPlainItem(Product $product): bool
+    {
+        return in_array($product->getProductType(), [Product::TYPE_STOCK, Product::TYPE_SERVICE], true);
     }
 
     /** @return array<int, User> keyed by id — the member themself plus their dependents, the only people they can buy for here. */
@@ -260,7 +266,7 @@ class CartService
             throw new \InvalidArgumentException('Choose at least one.');
         }
 
-        if ($product->getProductType() === Product::TYPE_STOCK) {
+        if ($this->isPlainItem($product)) {
             return;
         }
 
