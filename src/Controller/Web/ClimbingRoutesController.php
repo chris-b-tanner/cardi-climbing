@@ -198,6 +198,22 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#56868f',
             'about'   => 'Handcrafted chairs, stools and benches made from recycled marine plastic and coppiced chestnut. The weave is spun from reclaimed fishing nets, traced back to the beach they came from, and every seat is shaped, joined and hand woven in a small workshop in Cardigan.',
         ],
+        'rhysharries' => [
+            'name'    => 'Rhys Harries Fitness Coaching',
+            'logo'    => '/images/routes-mock/rhys-harries.png',
+            'url'     => 'https://www.facebook.com/rhysharriesfitnesscoaching', // no website; Facebook page only
+            'tagline' => 'Fitness coaching & sports massage',
+            'colour'  => '#c4232f',
+            'about'   => 'Rhys Harries offers fitness coaching and sports massage.',
+        ],
+        '3dbuilders' => [
+            'name'    => '3D Builders',
+            'logo'    => '/images/routes-mock/3d-builders.png', // their logo is on solid black, kept as a black tile
+            'url'     => 'https://www.facebook.com/profile.php?id=100054617671556', // no website; Facebook page only
+            'tagline' => 'Building and construction',
+            'colour'  => '#d96a00',
+            'about'   => '3D Builders is a building firm.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -291,6 +307,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A friendly, down-to-earth slab where everyone can find their footing. Solid holds and steady moves make it a problem to share, so climb it together and swap beta at the bottom.'],
             ['slug' => 'green-fingers', 'grade' => 'V2', 'colour' => 'Teal',   'hex' => '#1e9c96', 'wall' => 'Zone 2 – Slab', 'setter' => 'Cat',  'setOn' => '2026-10-09', 'ascents' => 134, 'rating' => 4.0, 'name' => 'Green Fingers', 'sponsor' => 'harvst',
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
+            ['slug' => 'deep-tissue', 'grade' => 'V4', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 12, 'rating' => 4.6, 'name' => 'Deep Tissue', 'sponsor' => 'rhysharries',
+                'description' => 'A core-heavy workout on the overhang: body tension to hold the swing, a long lock-off and a strong pull to the top. Warm up properly first, and stretch it out afterwards.'],
         ];
     }
 
@@ -323,6 +341,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'The masterpiece. Small crimps, precise footwork and a sustained steep finish demand every skill you have honed. A true test of craft, and hugely satisfying to clip the chain.'],
             ['slug' => 'into-the-unknown', 'grade' => '6c', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-13', 'ascents' => 18, 'rating' => 4.7, 'name' => 'Into the Unknown', 'sponsor' => 'anturio',
                 'description' => 'An adventurous lead where the next hold is never quite where you expect it. Read the wall as you go, stay calm between clips and enjoy the journey to the top.'],
+            ['slug' => 'building-blocks', 'grade' => '6a', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 1', 'style' => 'Top rope', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 15, 'rating' => 4.4, 'name' => 'Building Blocks', 'sponsor' => '3dbuilders',
+                'description' => 'Big square-cut volumes stacked up the wall like a puzzle. Work out how each piece fits, build your sequence one block at a time and the whole structure comes together at the top.'],
         ];
     }
 }
