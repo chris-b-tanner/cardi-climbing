@@ -230,6 +230,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#1f1f1f',
             'about'   => 'A small-batch distillery in a former pub, the Gogerddan Arms at Tan-y-groes, five miles north of Cardigan. They make Welsh whisky, gin, vodka and rum, including a 100% grain to glass single malt, and run gin tastings, gin making and distillery tours.',
         ],
+        'faithinnature' => [
+            'name'    => 'Faith In Nature',
+            'logo'    => '/images/routes-mock/faith-in-nature.svg', // their header wordmark (inline SVG on their site), filled black
+            'url'     => 'https://www.faithinnature.co.uk',
+            'tagline' => 'Walking the walk since 1974',
+            'colour'  => '#1f1f1f',
+            'about'   => 'Faith In Nature makes natural origin products for skin, hair and home, from shampoo and body wash to washing up liquid and refills. Family run and independent, born in Scotland and made in Manchester, they are vegan, cruelty free and a B Corp, and were the first company in the world to put Nature on the board.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -327,6 +335,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A core-heavy workout on the overhang: body tension to hold the swing, a long lock-off and a strong pull to the top. Warm up properly first, and stretch it out afterwards.'],
             ['slug' => 'double-glazed', 'grade' => 'V2', 'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-17', 'ascents' => 19, 'rating' => 4.3, 'name' => 'Double Glazed', 'sponsor' => 'pkwindows',
                 'description' => 'A smooth, glassy slab with pairs of matching holds all the way up. Keep your feet flat, your weight still and your movement clean, and you will see the way through.'],
+            ['slug' => 'walking-the-walk', 'grade' => 'V1', 'colour' => 'Pink', 'hex' => '#e463a6', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-18', 'ascents' => 21, 'rating' => 4.4, 'name' => 'Walking the Walk', 'sponsor' => 'faithinnature',
+                'description' => 'A gentle, natural line that rewards honest footwork. No tricks and nothing artificial: just step up, trust your feet and keep walking the walk all the way to the top.'],
         ];
     }
 
