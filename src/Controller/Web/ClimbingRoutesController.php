@@ -351,8 +351,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'The masterpiece. Small crimps, precise footwork and a sustained steep finish demand every skill you have honed. A true test of craft, and hugely satisfying to clip the chain.'],
             ['slug' => 'into-the-unknown', 'grade' => '6c', 'colour' => 'Black', 'hex' => '#141414', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Rhys', 'setOn' => '2026-11-13', 'ascents' => 18, 'rating' => 4.7, 'name' => 'Into the Unknown', 'sponsor' => 'anturio',
                 'description' => 'An adventurous lead where the next hold is never quite where you expect it. Read the wall as you go, stay calm between clips and enjoy the journey to the top.'],
-            ['slug' => 'building-blocks', 'grade' => '6a', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 1', 'style' => 'Top rope', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 15, 'rating' => 4.4, 'name' => 'Building Blocks', 'sponsor' => '3dbuilders',
-                'description' => 'Big square-cut volumes stacked up the wall like a puzzle. Work out how each piece fits, build your sequence one block at a time and the whole structure comes together at the top.'],
+            ['slug' => 'saw-fingers', 'grade' => '6a', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 1', 'style' => 'Top rope', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 15, 'rating' => 4.4, 'name' => 'Saw Fingers', 'sponsor' => '3dbuilders',
+                'description' => 'A run of sharp-edged crimps up a blocky, square-cut wall. Measure each reach, cut a clean line between the edges and your fingertips will know all about it by the top.'],
         ];
     }
 }
