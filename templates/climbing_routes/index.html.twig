@@ -123,7 +123,6 @@
       <div class="route-card__meta">
         <span>{{ kind == 'problem' ? 'Boulder' : 'Roped' }}</span>
         <span>{{ route.colour }} holds</span>
-        <span>{{ route.wall }}</span>
         {% if route.style is defined %}<span>{{ route.style }}</span>{% endif %}
         <span>Set {{ route.setOn|date('j M') }} by {{ route.setter }}</span>
       </div>

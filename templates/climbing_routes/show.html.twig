@@ -12,20 +12,77 @@
 <meta name="robots" content="noindex,nofollow">
 <style>
   .routes-mock-banner { background: var(--sand); color: var(--black); text-align: center; font-size: 0.8rem; padding: 0.5rem 1rem; margin-top: 64px; }
-  .routes-mock-banner + .page-hero { padding-top: 3rem; }
+  .routes-mock-banner + .page-hero { padding-top: 3rem; padding-bottom: 2rem; }
 
   .route-back { display: inline-block; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
   .route-back:hover { color: var(--black); }
 
   .route-head { display: flex; align-items: stretch; gap: 1.25rem; }
   .route-head__swatch { width: 10px; flex: none; background: var(--hold); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
-  .route-head__grade { font-family: var(--f-head); font-size: 3rem; font-weight: 700; line-height: 1; align-self: center; }
+  .route-head__grade { font-family: var(--f-head); font-size: 1.4rem; font-weight: 700; line-height: 1; align-self: center; }
   .route-head__kicker { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
-  .route-head h1 { margin: 0.25rem 0 0; }
+  .route-head .page-hero__h1 { font-size: clamp(1.4rem, 4vw, 1.9rem); margin: 0.25rem 0 0; }
   .route-head__namedby { display: inline-block; font-size: 0.75rem; background: var(--lichen); color: var(--teal-dk); padding: 0.1rem 0.5rem; margin-top: 0.5rem; }
 
   .route-detail { display: grid; gap: 2.5rem; }
   @media (min-width: 860px) { .route-detail { grid-template-columns: 3fr 2fr; align-items: start; } }
+  /* Stacked on mobile: the sponsor card comes first, so it's what you see on landing (e.g. from a QR code on the wall). */
+  @media (max-width: 859px) { .route-side { order: -1; } }
+
+  /* ── Rate this route ── */
+  .route-rate-btn { display: block; width: 100%; margin-top: 1rem; padding-top: 1rem; padding-bottom: 1rem; text-align: center; }
+  .route-rate-thanks { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
+
+  html.rate-open { overflow: hidden; }
+  .rate-modal {
+    width: 100%; max-width: none; height: 100vh; height: 100dvh; max-height: none;
+    margin: 0; padding: 0; border: 0; background: var(--white); color: var(--black);
+  }
+  .rate-modal::backdrop { background: rgba(20,20,20,0.6); }
+  @media (min-width: 600px) {
+    .rate-modal { width: 420px; height: min(90dvh, 760px); margin: auto; border-radius: 16px; }
+  }
+  .rate-modal__inner {
+    height: 100%; display: flex; flex-direction: column; gap: 1rem;
+    padding: max(1rem, env(safe-area-inset-top)) 1.25rem max(1.25rem, env(safe-area-inset-bottom));
+  }
+  .rate-modal__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  .rate-modal__kicker { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .rate-modal__title { font-family: var(--f-head); font-size: 1.25rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem; }
+  .rate-modal__close {
+    flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--offwhite);
+    font-size: 1.5rem; line-height: 1; color: var(--black); cursor: pointer;
+  }
+  .rate-modal__value { text-align: center; font-family: var(--f-head); font-weight: 700; line-height: 1; }
+  .rate-modal__number { font-size: 3.5rem; }
+  .rate-modal__outof { font-size: 1.25rem; color: var(--muted); margin-left: 0.25rem; }
+  .rate-modal__stars { display: block; margin-top: 0.4rem; font-size: 1.5rem; color: #c99a1d; letter-spacing: 0.1em; }
+
+  /* The slider fills all the height left between the header and the Done button. */
+  .rate-slider { flex: 1; min-height: 0; display: flex; justify-content: center; gap: 1rem; }
+  .rate-slider__scale {
+    display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end;
+    padding: 20px 0; /* thumb radius (32px) minus half a label's line-height, so labels line up with the thumb's centre */
+    font-family: var(--f-head); font-weight: 700; font-size: 1rem; line-height: 24px; color: var(--muted);
+  }
+  .rate-slider__track {
+    --pct: 0; position: relative; width: 88px; height: 100%;
+    border-radius: 44px; background: var(--offwhite); box-shadow: inset 0 0 0 1px var(--border);
+    touch-action: none; cursor: grab; outline: none; -webkit-tap-highlight-color: transparent;
+  }
+  .rate-slider__track:focus-visible { box-shadow: inset 0 0 0 1px var(--border), 0 0 0 3px var(--teal-dk); }
+  .rate-slider__fill {
+    position: absolute; left: 0; right: 0; bottom: 0; border-radius: 44px; background: var(--teal-dk);
+    height: calc(64px + (100% - 64px) * var(--pct));
+  }
+  .rate-slider__thumb {
+    position: absolute; left: 50%; width: 64px; height: 64px; margin-left: -32px; border-radius: 50%;
+    bottom: calc((100% - 64px) * var(--pct)); background: var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    border: 4px solid var(--teal-dk);
+  }
+  .rate-slider__track.is-dragging { cursor: grabbing; }
+  .rate-slider__track.is-dragging .rate-slider__thumb { transform: scale(1.08); }
+  .rate-modal__done { width: 100%; padding-top: 1.1rem; padding-bottom: 1.1rem; font-size: 0.95rem; background: var(--teal-dk); border-color: var(--teal-dk); }
 
   .route-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 2rem; }
   .route-facts div { background: var(--white); padding: 1rem 1.1rem; }
@@ -66,7 +123,7 @@
       <span class="route-head__swatch" title="{{ route.colour }} holds"></span>
       <span class="route-head__grade">{{ route.grade }}</span>
       <div>
-        <div class="route-head__kicker">{{ kind == 'problem' ? 'Boulder problem' : 'Roped route' }} · {{ route.wall }}</div>
+        <div class="route-head__kicker">{{ kind == 'problem' ? 'Boulder problem' : 'Roped route' }}</div>
         <h2 class="page-hero__h1">{{ title }}</h2>
         {% if route.namedBy is defined %}<span class="route-head__namedby">Named by {{ route.namedBy }}</span>{% endif %}
       </div>
@@ -87,7 +144,6 @@
       <dl class="route-facts">
         <div><dt>Grade</dt><dd>{{ route.grade }}</dd></div>
         <div><dt>Holds</dt><dd>{{ route.colour }}</dd></div>
-        <div><dt>{{ kind == 'problem' ? 'Zone' : 'Line' }}</dt><dd>{{ route.wall }}</dd></div>
         {% if route.style is defined %}<div><dt>Style</dt><dd>{{ route.style }}</dd></div>{% endif %}
         <div><dt>Set by</dt><dd>{{ route.setter }}</dd></div>
         <div><dt>Set on</dt><dd>{{ route.setOn|date('j M Y') }}</dd></div>
@@ -96,6 +152,7 @@
       </dl>
     </div>
 
+    <div class="route-side">
     {% if route.sponsor %}
       {% set sponsor = route.sponsor %}
       <aside class="route-sponsor" style="--brand: {{ sponsor.colour }};">
@@ -107,6 +164,9 @@
         <a href="{{ sponsor.url }}" class="btn" target="_blank" rel="noopener sponsored">Visit {{ sponsor.name }}</a>
       </aside>
     {% endif %}
+      <button type="button" class="btn btn--outline route-rate-btn" id="rate-open">Rate this {{ kind }}</button>
+      <p class="route-rate-thanks" id="rate-thanks" hidden></p>
+    </div>
   </div>
   <div class="wrap">
     <div class="sponsor-cta">
@@ -118,4 +178,133 @@
     </div>
   </div>
 </section>
+
+<dialog class="rate-modal" id="rate-modal" aria-labelledby="rate-title">
+  <div class="rate-modal__inner">
+    <div class="rate-modal__head">
+      <div>
+        <div class="rate-modal__kicker">Rate this {{ kind }}</div>
+        <div class="rate-modal__title" id="rate-title">{{ title }} ({{ route.grade }})</div>
+      </div>
+      <button type="button" class="rate-modal__close" id="rate-close" aria-label="Close without rating">&times;</button>
+    </div>
+
+    <div class="rate-modal__value" aria-hidden="true">
+      <span class="rate-modal__number" id="rate-number">0</span><span class="rate-modal__outof">/ 5</span>
+      <span class="rate-modal__stars" id="rate-stars">☆☆☆☆☆</span>
+    </div>
+
+    <div class="rate-slider">
+      <div class="rate-slider__scale" aria-hidden="true">
+        {% for n in 5..0 %}<span>{{ n }}</span>{% endfor %}
+      </div>
+      <div class="rate-slider__track" id="rate-track" role="slider" tabindex="0" aria-label="Your rating"
+           aria-orientation="vertical" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="0 out of 5">
+        <div class="rate-slider__fill"></div>
+        <div class="rate-slider__thumb"></div>
+      </div>
+    </div>
+
+    <button type="button" class="btn rate-modal__done" id="rate-done">Done</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+  // MOCKUP — there's no route database yet, so a rating is only remembered in this browser.
+  (function () {
+    const MAX = 5, STEP = 0.5, THUMB = 64;
+    const storageKey = 'route-rating:{{ route.slug|e('js') }}';
+    const kindLabel  = '{{ kind|e('js') }}';
+
+    const modal   = document.getElementById('rate-modal');
+    const openBtn = document.getElementById('rate-open');
+    const thanks  = document.getElementById('rate-thanks');
+    const track   = document.getElementById('rate-track');
+    const number  = document.getElementById('rate-number');
+    const stars   = document.getElementById('rate-stars');
+    if (!modal || !track || typeof modal.showModal !== 'function') return;
+
+    let value = 0;
+
+    function readSaved() {
+      try { const v = parseFloat(localStorage.getItem(storageKey)); return isNaN(v) ? null : v; } catch (e) { return null; }
+    }
+    function save(v) {
+      try { localStorage.setItem(storageKey, String(v)); } catch (e) { /* private mode etc. — not critical */ }
+    }
+    function fmt(v) { return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+
+    function setValue(v) {
+      v = Math.min(MAX, Math.max(0, Math.round(v / STEP) * STEP));
+      if (v !== value && navigator.vibrate) { try { navigator.vibrate(5); } catch (e) {} }
+      value = v;
+      track.style.setProperty('--pct', String(v / MAX));
+      track.setAttribute('aria-valuenow', String(v));
+      track.setAttribute('aria-valuetext', fmt(v) + ' out of 5');
+      number.textContent = fmt(v);
+      const full = Math.round(v);
+      stars.textContent = '★'.repeat(full) + '☆'.repeat(MAX - full);
+    }
+
+    function showSaved(v) {
+      if (v === null) return;
+      openBtn.textContent = 'You rated this ' + fmt(v) + ' / 5 · Change';
+      thanks.textContent  = 'Thanks for rating this ' + kindLabel + '!';
+      thanks.hidden = false;
+    }
+
+    // ── Dragging: the value follows the finger anywhere on the track, 0 at the bottom, 5 at the top ──
+    function valueFromPointer(clientY) {
+      const rect   = track.getBoundingClientRect();
+      const usable = rect.height - THUMB;
+      return (rect.bottom - clientY - THUMB / 2) / usable * MAX;
+    }
+    track.addEventListener('pointerdown', function (e) {
+      track.setPointerCapture(e.pointerId);
+      track.classList.add('is-dragging');
+      setValue(valueFromPointer(e.clientY));
+    });
+    track.addEventListener('pointermove', function (e) {
+      if (track.hasPointerCapture(e.pointerId)) setValue(valueFromPointer(e.clientY));
+    });
+    function endDrag(e) {
+      if (track.hasPointerCapture(e.pointerId)) track.releasePointerCapture(e.pointerId);
+      track.classList.remove('is-dragging');
+    }
+    track.addEventListener('pointerup', endDrag);
+    track.addEventListener('pointercancel', endDrag);
+
+    track.addEventListener('keydown', function (e) {
+      const moves = { ArrowUp: STEP, ArrowRight: STEP, ArrowDown: -STEP, ArrowLeft: -STEP, PageUp: 1, PageDown: -1 };
+      if (e.key in moves)      setValue(value + moves[e.key]);
+      else if (e.key === 'Home') setValue(0);
+      else if (e.key === 'End')  setValue(MAX);
+      else return;
+      e.preventDefault();
+    });
+
+    // ── Open / close ──
+    openBtn.addEventListener('click', function () {
+      setValue(readSaved() ?? 0);
+      document.documentElement.classList.add('rate-open');
+      modal.showModal();
+      track.focus({ preventScroll: true });
+    });
+    modal.addEventListener('close', function () {
+      document.documentElement.classList.remove('rate-open');
+    });
+    document.getElementById('rate-close').addEventListener('click', function () { modal.close(); });
+    document.getElementById('rate-done').addEventListener('click', function () {
+      save(value);
+      showSaved(value);
+      modal.close();
+      openBtn.focus({ preventScroll: true });
+    });
+
+    showSaved(readSaved());
+  })();
+</script>
 {% endblock %}
