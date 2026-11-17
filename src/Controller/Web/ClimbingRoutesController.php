@@ -238,6 +238,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#1f1f1f',
             'about'   => 'Faith In Nature makes natural origin products for skin, hair and home, from shampoo and body wash to washing up liquid and refills. Family run and independent, born in Scotland and made in Manchester, they are vegan, cruelty free and a B Corp, and were the first company in the world to put Nature on the board.',
         ],
+        'mjmullins' => [
+            'name'    => 'MJ Mullins Electrical & Renewables',
+            'logo'    => '/images/routes-mock/mj-mullins-electrical.png', // their logo's white lettering recoloured near-black for our white cards
+            'url'     => 'https://www.mjmullinselectrical.com',
+            'tagline' => 'Renewable energy installers based in Cardigan',
+            'colour'  => '#c97a00',
+            'about'   => 'Founded in Cardigan in 2019 by Michael Mullins, MJ Mullins installs solar panels, EV chargers and battery storage for homes and businesses across Wales, alongside domestic and commercial electrical work, fault finding and repairs. They are RECC, MCS and NICEIC accredited, and Tesla and FOXESS approved.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -373,6 +381,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A run of sharp-edged crimps up a blocky, square-cut wall. Measure each reach, cut a clean line between the edges and your fingertips will know all about it by the top.'],
             ['slug' => 'crooked-paths', 'grade' => '6b', 'colour' => 'White', 'hex' => '#ffffff', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-11-17', 'ascents' => 14, 'rating' => 4.5, 'name' => 'Crooked Paths', 'sponsor' => 'inthewelshwind',
                 'description' => 'A wandering line that zigzags up the wall like a path over the hills. Never take the obvious way: follow the holds where they lead, enjoy the detours and savour the view from the top.'],
+            ['slug' => 'live-wire', 'grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Owain', 'setOn' => '2026-11-18', 'ascents' => 17, 'rating' => 4.6, 'name' => 'Live Wire', 'sponsor' => 'mjmullins',
+                'description' => 'An electric line full of energy: quick, dynamic moves between small holds with no time to switch off. Stay charged through the crux, keep the current flowing and clip the chain before you run out of power.'],
         ];
     }
 }
