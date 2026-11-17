@@ -222,6 +222,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#8e2f9c',
             'about'   => 'Based on Pentood Industrial Estate in Cardigan and working across Ceredigion, Pembrokeshire and Carmarthenshire, PK Windows fits double-glazed uPVC windows, entrance and patio doors, conservatories and porches, carports and canopies, plus fascias, soffits and guttering.',
         ],
+        'inthewelshwind' => [
+            'name'    => 'In the Welsh Wind',
+            'logo'    => '/images/routes-mock/in-the-welsh-wind.png',
+            'url'     => 'https://inthewelshwind.co.uk',
+            'tagline' => 'Maverick distillers on the west Wales coast',
+            'colour'  => '#1f1f1f',
+            'about'   => 'A small-batch distillery in a former pub, the Gogerddan Arms at Tan-y-groes, five miles north of Cardigan. They make Welsh whisky, gin, vodka and rum, including a 100% grain to glass single malt, and run gin tastings, gin making and distillery tours.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -353,6 +361,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'An adventurous lead where the next hold is never quite where you expect it. Read the wall as you go, stay calm between clips and enjoy the journey to the top.'],
             ['slug' => 'saw-fingers', 'grade' => '6a', 'colour' => 'Orange', 'hex' => '#ef8a2b', 'wall' => 'Line 1', 'style' => 'Top rope', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 15, 'rating' => 4.4, 'name' => 'Saw Fingers', 'sponsor' => '3dbuilders',
                 'description' => 'A run of sharp-edged crimps up a blocky, square-cut wall. Measure each reach, cut a clean line between the edges and your fingertips will know all about it by the top.'],
+            ['slug' => 'crooked-paths', 'grade' => '6b', 'colour' => 'White', 'hex' => '#ffffff', 'wall' => 'Line 3', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-11-17', 'ascents' => 14, 'rating' => 4.5, 'name' => 'Crooked Paths', 'sponsor' => 'inthewelshwind',
+                'description' => 'A wandering line that zigzags up the wall like a path over the hills. Never take the obvious way: follow the holds where they lead, enjoy the detours and savour the view from the top.'],
         ];
     }
 }
