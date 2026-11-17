@@ -214,6 +214,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#d96a00',
             'about'   => '3D Builders is a building firm.',
         ],
+        'pkwindows' => [
+            'name'    => 'PK Windows (Wales)',
+            'logo'    => '/images/routes-mock/pk-windows.png',
+            'url'     => 'https://pkwindowswalesltd.co.uk',
+            'tagline' => 'Windows, doors, conservatories & roofline',
+            'colour'  => '#8e2f9c',
+            'about'   => 'Based on Pentood Industrial Estate in Cardigan and working across Ceredigion, Pembrokeshire and Carmarthenshire, PK Windows fits double-glazed uPVC windows, entrance and patio doors, conservatories and porches, carports and canopies, plus fascias, soffits and guttering.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -309,6 +317,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A delicate slab of small crimps and smears. Trust your feet, keep your weight over them and the route grows on you.'],
             ['slug' => 'deep-tissue', 'grade' => 'V4', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 2 – Overhang', 'setter' => 'Owain', 'setOn' => '2026-11-17', 'ascents' => 12, 'rating' => 4.6, 'name' => 'Deep Tissue', 'sponsor' => 'rhysharries',
                 'description' => 'A core-heavy workout on the overhang: body tension to hold the swing, a long lock-off and a strong pull to the top. Warm up properly first, and stretch it out afterwards.'],
+            ['slug' => 'double-glazed', 'grade' => 'V2', 'colour' => 'Purple', 'hex' => '#7a4cc2', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-17', 'ascents' => 19, 'rating' => 4.3, 'name' => 'Double Glazed', 'sponsor' => 'pkwindows',
+                'description' => 'A smooth, glassy slab with pairs of matching holds all the way up. Keep your feet flat, your weight still and your movement clean, and you will see the way through.'],
         ];
     }
 
