@@ -246,6 +246,14 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#c97a00',
             'about'   => 'Founded in Cardigan in 2019 by Michael Mullins, MJ Mullins installs solar panels, EV chargers and battery storage for homes and businesses across Wales, alongside domestic and commercial electrical work, fault finding and repairs. They are RECC, MCS and NICEIC accredited, and Tesla and FOXESS approved.',
         ],
+        'stephenparkes' => [
+            'name'    => 'Stephen Parkes Groundworks & Fencing',
+            'logo'    => '/images/routes-mock/stephen-parkes.png',
+            'url'     => 'https://stephenparkes.wales',
+            'tagline' => 'Groundworks & fencing contractor in West Wales',
+            'colour'  => '#d4141b',
+            'about'   => 'A family agricultural and groundworks contractor in Pembrokeshire, established in 1974 by Graham and Angela Parkes and now run by their son Stephen. They cover groundworks, site clearance, driveways and farm tracks, hedge and tree management, wood chipping and agricultural fencing across Pembrokeshire, Ceredigion and Carmarthenshire.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -345,6 +353,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A smooth, glassy slab with pairs of matching holds all the way up. Keep your feet flat, your weight still and your movement clean, and you will see the way through.'],
             ['slug' => 'walking-the-walk', 'grade' => 'V1', 'colour' => 'Pink', 'hex' => '#e463a6', 'wall' => 'Zone 1 – Slab', 'setter' => 'Cat', 'setOn' => '2026-11-18', 'ascents' => 21, 'rating' => 4.4, 'name' => 'Walking the Walk', 'sponsor' => 'faithinnature',
                 'description' => 'A gentle, natural line that rewards honest footwork. No tricks and nothing artificial: just step up, trust your feet and keep walking the walk all the way to the top.'],
+            ['slug' => 'dig-deep', 'grade' => 'V5', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave', 'setter' => 'Rhys', 'setOn' => '2026-11-18', 'ascents' => 11, 'rating' => 4.7, 'name' => 'Dig Deep', 'sponsor' => 'stephenparkes',
+                'description' => 'A hard-graft problem out of the back of the cave. Solid foundations low down, then a powerful dig through the roof where you will need to dig deep and keep grinding to break new ground at the top.'],
         ];
     }
 
