@@ -254,6 +254,22 @@ class ClimbingRoutesController extends AbstractController
             'colour'  => '#d4141b',
             'about'   => 'A family agricultural and groundworks contractor in Pembrokeshire, established in 1974 by Graham and Angela Parkes and now run by their son Stephen. They cover groundworks, site clearance, driveways and farm tracks, hedge and tree management, wood chipping and agricultural fencing across Pembrokeshire, Ceredigion and Carmarthenshire.',
         ],
+        'lofi' => [
+            'name'    => 'LOFI',
+            'logo'    => '/images/routes-mock/lofi.png',
+            'url'     => 'https://www.lofi.com',
+            'tagline' => 'An evolution in outdoor cooking',
+            'colour'  => '#2b2b2b',
+            'about'   => 'LOFI is a small outdoor equipment design and manufacturing company based in Cardigan, making gas-free cooking kit like the LOFI Stove to simplify life outdoors and respect the environment. Designed and made in West Wales.',
+        ],
+        'yrhenprintworks' => [
+            'name'    => 'Yr Hen Printworks',
+            'logo'    => '/images/routes-mock/yr-hen-printworks.png',
+            'url'     => 'https://www.yrhenprintworks.co.uk',
+            'tagline' => 'Drink, dine, unwind in Cardigan',
+            'colour'  => '#2b2b2b',
+            'about'   => 'A bar and restaurant in Cardigan’s historic Old Hope Chapel, opened in 2021 and awarded a MICHELIN Bib Gourmand every year from 2023 to 2026. The menu is built around small plates, using ingredients from small producers across Ceredigion and Pembrokeshire.',
+        ],
     ];
 
     #[Route('/routes', name: 'app_climbing_routes')]
@@ -355,6 +371,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A gentle, natural line that rewards honest footwork. No tricks and nothing artificial: just step up, trust your feet and keep walking the walk all the way to the top.'],
             ['slug' => 'dig-deep', 'grade' => 'V5', 'colour' => 'Red', 'hex' => '#d6402f', 'wall' => 'Zone 1 – Cave', 'setter' => 'Rhys', 'setOn' => '2026-11-18', 'ascents' => 11, 'rating' => 4.7, 'name' => 'Dig Deep', 'sponsor' => 'stephenparkes',
                 'description' => 'A hard-graft problem out of the back of the cave. Solid foundations low down, then a powerful dig through the roof where you will need to dig deep and keep grinding to break new ground at the top.'],
+            ['slug' => 'hot-off-the-press', 'grade' => 'V2', 'colour' => 'Blue', 'hex' => '#2f6fd6', 'wall' => 'Zone 2 – Slab', 'setter' => 'Owain', 'setOn' => '2026-11-19', 'ascents' => 13, 'rating' => 4.5, 'name' => 'Hot off the Press', 'sponsor' => 'yrhenprintworks',
+                'description' => 'Freshly set and served in small plates: a handful of short, tasty sequences that each need pressing just right. Savour every move, and it all comes together into one satisfying finish.'],
         ];
     }
 
@@ -393,6 +411,8 @@ class ClimbingRoutesController extends AbstractController
                 'description' => 'A wandering line that zigzags up the wall like a path over the hills. Never take the obvious way: follow the holds where they lead, enjoy the detours and savour the view from the top.'],
             ['slug' => 'live-wire', 'grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Lead', 'setter' => 'Owain', 'setOn' => '2026-11-18', 'ascents' => 17, 'rating' => 4.6, 'name' => 'Live Wire', 'sponsor' => 'mjmullins',
                 'description' => 'An electric line full of energy: quick, dynamic moves between small holds with no time to switch off. Stay charged through the crux, keep the current flowing and clip the chain before you run out of power.'],
+            ['slug' => 'will-it-burn', 'grade' => '6b+', 'colour' => 'Yellow', 'hex' => '#ecbe49', 'wall' => 'Line 4', 'style' => 'Top rope', 'setter' => 'Rhys', 'setOn' => '2026-11-10', 'ascents' => 34, 'rating' => 4.6, 'name' => 'Will It Burn?', 'sponsor' => 'lofi',
+                'description' => 'No single hard move, just a long, sustained climb that slowly turns up the heat. Keep things simple, climb efficiently and you will have enough fuel left for the top.'],
         ];
     }
 }
