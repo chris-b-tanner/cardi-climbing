@@ -194,6 +194,16 @@
 </div>
 
 <div>
+  {% set itemPageUrl = url('app_shop_item', {id: product.id}) %}
+  <div class="card">
+    <div class="card__label" style="margin-bottom:0.3rem;">Shop page &amp; QR code</div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.6rem;">Opens this item in the online shop, with all its variants on one page.</p>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a href="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{ itemPageUrl|url_encode }}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener">Open QR code</a>
+      <a href="{{ itemPageUrl }}" class="btn btn--ghost btn--sm" target="_blank" rel="noopener">View shop page</a>
+    </div>
+  </div>
+
   {% if product.productType == 'stock' and product.stockProduct %}
     {% if onOrder is not empty %}
       <div class="card">

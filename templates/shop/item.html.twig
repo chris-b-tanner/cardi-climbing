@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+
+{# One item and all its variants (ShopController::item) — the page a product's QR code opens. #}
+
+{% block title %}{{ product.name }} — Shop — Y Wal{% endblock %}
+{% block meta_description %}{{ product.shortDescription ?: product.name ~ ', available from the Y Wal shop.' }}{% endblock %}
+
+{% block head %}
+{{ include('shop/_styles.html.twig') }}
+<style>
+  .shop-item-page__back { display: inline-block; font-size: 0.85rem; color: #6b7280; text-decoration: none; margin-bottom: 1rem; }
+  .shop-item-page__back:hover { color: var(--black); }
+  .shop-item-page__empty a { color: var(--teal-dk); font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="shop-page">
+  <div class="wrap">
+    <a href="{{ path('app_shop') }}" class="shop-item-page__back">&larr; All products</a>
+
+    <div class="shop-header">
+      <div>
+        <h1>{{ product.name }}</h1>
+        {% if product.shortDescription %}<p class="subtitle">{{ product.shortDescription }}</p>{% endif %}
+      </div>
+      {% if app.user %}
+        <a href="{{ path('app_cart') }}" class="shop-cart-link">View cart ({{ cartCount }}) &rarr;</a>
+      {% else %}
+        <a href="{{ path('app_login', {returnTo: app.request.requestUri}) }}" class="shop-cart-link">Sign in to buy &rarr;</a>
+      {% endif %}
+    </div>
+
+    {% for msg in app.flashes('success') %}<div class="alert--success">{{ msg }}</div>{% endfor %}
+    {% for msg in app.flashes('error') %}<div class="alert--error">{{ msg }}</div>{% endfor %}
+
+    {% if variants is empty %}
+      <p class="shop-empty shop-item-page__empty">This item isn't available to buy online right now. <a href="{{ path('app_shop') }}">Browse the shop</a>.</p>
+    {% else %}
+      {% if variants|length > 1 and product.variantName %}
+        <h2 class="shop-section-title">Choose a {{ product.variantName|lower }}</h2>
+      {% endif %}
+      <div class="shop-grid">
+        {% for product in variants %}
+          {{ include('shop/_product_tile.html.twig') }}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

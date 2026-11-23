@@ -2,6 +2,7 @@
 
 namespace App\Controller\Web;
 
+use App\Entity\Product;
 use App\Entity\User;
 use App\Repository\ProductRepository;
 use App\Service\CartService;
@@ -29,6 +30,30 @@ class ShopController extends AbstractController
 
         return $this->render('shop/index.html.twig', [
             'products'  => $productRepository->findActiveForShop(),
+            'cartCount' => $user !== null ? count($cartService->getLines($user)) : 0,
+        ]);
+    }
+
+    /**
+     * Landing page for one item — what a product's QR code (on its admin edit page) points at. Shows
+     * every variant in the item's group (products sharing its name), limited to what the shop itself
+     * would list, so a size or colour that's gone inactive simply drops off. A printed QR code should
+     * never dead-end, so if nothing in the group is on sale right now it still renders, with a note.
+     */
+    #[Route('/item/{id}', name: 'app_shop_item', requirements: ['id' => '\d+'])]
+    public function item(Product $product, ProductRepository $productRepository, CartService $cartService): Response
+    {
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        $variants = array_values(array_filter(
+            $productRepository->findActiveForShop(),
+            fn (Product $candidate) => $candidate->getName() === $product->getName(),
+        ));
+
+        return $this->render('shop/item.html.twig', [
+            'product'   => $product,
+            'variants'  => $variants,
             'cartCount' => $user !== null ? count($cartService->getLines($user)) : 0,
         ]);
     }
