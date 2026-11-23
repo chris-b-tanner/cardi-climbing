@@ -82,6 +82,11 @@
 
     <form method="post" action="{{ path('app_register') }}" novalidate>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token('register') }}">
+      {# Honeypot: hidden from people, keyboard and autofill; a bot that fills every field fills this too — see RegistrationController::looksLikeSpam(). #}
+      <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;">
+        <label for="website">Leave this empty</label>
+        <input type="text" id="website" name="website" value="" tabindex="-1" autocomplete="off">
+      </div>
 
       <div class="account-card">
         <div class="account-card__title">Personal details</div>
