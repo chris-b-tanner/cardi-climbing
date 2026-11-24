@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Request;
  *    seconds to type their details; a script posting straight back doesn't. Signed with the
  *    kernel secret so it can't be forged, and expires so an old harvested token can't be replayed
  *    forever.
+ *  - Known bot details: names a sign-up bot keeps using, e.g. "Test User" (see SpamSignature).
  *  - Rate limit: at most MAX_PER_HOUR signups per IP per hour (the app trusts Heroku's router, so
  *    getClientIp() is the visitor's address). Counted in cache.app, so it's per dyno and resets
  *    on deploy — fine for slowing a flood, not meant as an exact quota.
@@ -71,6 +72,11 @@ class SubscribeGuard
             if (preg_match('#https?:|www\.|[<>]|\.(?:com|ru|net|xyz|top)\b#i', (string) $request->request->get($field, ''))) {
                 return self::BOT;
             }
+        }
+
+        // A known sign-up bot's details (e.g. "Test User") — see SpamSignature.
+        if (SpamSignature::matches((string) $request->request->get('firstName', ''), (string) $request->request->get('lastName', ''))) {
+            return self::BOT;
         }
 
         // Fixed one-hour window per IP. Only reached by submissions that passed the checks above.

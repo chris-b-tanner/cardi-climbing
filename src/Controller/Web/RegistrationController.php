@@ -3,6 +3,7 @@
 namespace App\Controller\Web;
 
 use App\Entity\User;
+use App\Service\SpamSignature;
 use App\Service\UserService;
 use App\Service\Mailer\WelcomeMailer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,13 +15,6 @@ use Symfony\Component\Routing\Attribute\Route;
 /** Self-service account creation — a real, member-chosen password and every field the account profile page has, so a new member never has to visit "My account" afterward just to fill in details they could have given up front. */
 class RegistrationController extends AbstractController
 {
-    /**
-     * A bot has been creating hundreds of accounts with exactly these details (phone 8 (999) 000-00-00,
-     * name "Test User", company "Test Company"). Phone is compared as digits only so any formatting of it matches.
-     */
-    private const SPAM_PHONE_DIGITS = ['89990000000'];
-    private const SPAM_FULL_NAMES   = ['test user'];
-    private const SPAM_COMPANIES    = ['test company'];
 
     #[Route('/register', name: 'app_register', methods: ['GET', 'POST'])]
     public function register(
@@ -109,7 +103,7 @@ class RegistrationController extends AbstractController
     }
 
     /**
-     * Known bot sign-up details (see SPAM_* above), or the hidden "website" honeypot field filled in —
+     * Known bot sign-up details (see SpamSignature), or the hidden "website" honeypot field filled in —
      * it's off-screen and skipped by keyboard and autofill, so only a form-filling bot ever puts anything there.
      */
     private function looksLikeSpam(array $input, Request $request): bool
@@ -118,12 +112,6 @@ class RegistrationController extends AbstractController
             return true;
         }
 
-        $phoneDigits = preg_replace('/\D+/', '', $input['phone']);
-        $fullName    = strtolower(preg_replace('/\s+/', ' ', trim($input['firstName'] . ' ' . $input['lastName'])));
-        $company     = strtolower(preg_replace('/\s+/', ' ', $input['company']));
-
-        return in_array($phoneDigits, self::SPAM_PHONE_DIGITS, true)
-            || in_array($fullName, self::SPAM_FULL_NAMES, true)
-            || in_array($company, self::SPAM_COMPANIES, true);
+        return SpamSignature::matches($input['firstName'], $input['lastName'], $input['company'], $input['phone']);
     }
 }
