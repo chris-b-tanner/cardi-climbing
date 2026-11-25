@@ -14,6 +14,20 @@ Date:            {{ payment.succeededAt|date('l j F Y') }}
 Description:     {{ description }}
 Payment method:  {{ payment.method == 'terminal' ? 'Card (in person)' : 'Card (online)' }}
 Amount:          £{{ payment.amount }}
+{% if payment.order and payment.order.rows is not empty %}
+
+ORDER SUMMARY
+-------------
+{% for row in payment.order.rows %}
+{{ row.qty }} × {{ row.product.name }}{% if row.product.variantValue %} ({{ row.product.variantValue }}){% endif %} — £{{ row.lineTotal }}
+{% if row.occurrenceDate %}    {{ row.occurrenceDate|date('l j F Y') }}
+{% endif %}
+{% if row.beneficiaryMember and row.beneficiaryMember != user %}    For {{ row.beneficiaryMember.displayName }}
+{% endif %}
+{% endfor %}
+
+Total: £{{ payment.order.total }}
+{% endif %}
 
 Please keep this email as your receipt for this payment.
 
