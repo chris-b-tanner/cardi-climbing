@@ -1,0 +1,84 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'team_meta_title'|trans }}{% endblock %}
+{% block og_title %}{{ 'team_meta_title'|trans }}{% endblock %}
+{% block meta_description %}{{ 'team_intro'|trans }}{% endblock %}
+{% block og_description %}{{ 'team_intro'|trans }}{% endblock %}
+
+{% block head %}
+{# Not linked from anywhere yet — keep it out of search results until it's ready. #}
+<meta name="robots" content="noindex">
+<style>
+  .team-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 2rem; margin-top: 2rem;
+  }
+  .person { border-top: 3px solid var(--teal); padding-top: 1.25rem; }
+  .person__avatar {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--teal); color: var(--black);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--f-head); font-weight: 700; font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .person__name { color: var(--black); margin: 0 0 0.25rem; }
+  .person__role {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 0 0 0.75rem;
+  }
+  .person__bio { font-size: 0.9rem; margin: 0; }
+
+  .steering__pledge {
+    background: var(--white); border-left: 4px solid var(--teal);
+    padding: 1.5rem 1.75rem; margin-top: 1.5rem;
+  }
+  .steering__pledge p { margin: 0 0 0.75rem; color: var(--black); max-width: none; }
+  .steering__pledge ul { margin: 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.8; }
+  .steering__pledge strong { color: var(--black); }
+</style>
+{% endblock %}
+
+{% macro person(p) %}
+  {% set words = p.name|replace({'&': ''})|split(' ')|filter(w => w|trim != '') %}
+  <div class="person">
+    <div class="person__avatar" aria-hidden="true">{{ words|first|first|upper }}{{ words|last|first|upper }}</div>
+    <h3 class="person__name">{{ p.name }}</h3>
+    <p class="person__role">{% for role in p.roles %}{{ role|trans }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+    {% if p.bio %}<p class="person__bio">{{ p.bio }}</p>{% endif %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+<section class="section page-hero">
+  <div class="wrap">
+    <h1 class="page-hero__h1">{{ 'team_h1'|trans }}</h1>
+    <p class="page-hero__sub">{{ 'team_intro'|trans }}</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>{{ 'team_founders_h'|trans }}</h2>
+    <div class="team-grid">
+      {% for p in founders %}{{ _self.person(p) }}{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--off" id="steering-group">
+  <div class="wrap">
+    <h2>{{ 'team_steering_h'|trans }}</h2>
+    <div class="steering__pledge">
+      <p><strong>{{ 'team_steering_lead'|trans }}</strong></p>
+      <ul>
+        <li>{{ 'team_steering_point_1'|trans }}</li>
+        <li>{{ 'team_steering_point_2'|trans }}</li>
+        <li>{{ 'team_steering_point_3'|trans }}</li>
+      </ul>
+    </div>
+    <div class="team-grid">
+      {% for p in steeringGroup %}{{ _self.person(p) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}
